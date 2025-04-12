@@ -1,3 +1,8 @@
+
 export default function Home() {
-  return <></>;
+  return (
+    <div>
+      <h1>Welcome to Firebase Studio App!</h1>
+    </div>
+  );
 }
