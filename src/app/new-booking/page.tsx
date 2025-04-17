@@ -234,7 +234,7 @@ export default function NewBookingPage() {
                         </div>
                     </div>
                     <Separator className="my-2" />
-                    <Button type="submit" className="bg-accent text-primary-foreground hover:bg-accent/80 font-bold py-2 px-4 rounded">
+                    <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/80 font-bold py-2 px-4 rounded">
                         Submit Booking
                     </Button>
                 </form>
@@ -242,5 +242,6 @@ export default function NewBookingPage() {
         </div>
     );
 }
+
 
 
