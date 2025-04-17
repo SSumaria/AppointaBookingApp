@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
-import { format } from "date-fns"
+import { format, set } from "date-fns"
 import { CalendarIcon, Home, Search } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Input } from "@/components/ui/input"
@@ -19,8 +19,19 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, query, where, getDocs } from "firebase/firestore";
 import { firebaseConfig } from '@/lib/firebaseConfig';
 
+// Initialize Firebase app and Firestore
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+// Function to generate a unique alphanumeric ClientID
+function generateAlphanumericID(length: number): string {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return result;
+}
 
 export default function NewBookingPage() {
     const [clientName, setClientName] = useState('');
@@ -28,12 +39,13 @@ export default function NewBookingPage() {
     const [serviceProcedure, setServiceProcedure] = useState('');
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [time, setTime] = useState('');
-    const [confirmationMessage, setConfirmationMessage] = useState('');
     const { toast } = useToast()
 
+    // Function to handle form submission
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
+        // Check if required fields are filled
         if (!clientName || !serviceProcedure || !date || !time) {
              toast({
                 title: "Error",
@@ -44,45 +56,61 @@ export default function NewBookingPage() {
         }
 
         try {
-            // 1. Check if client exists
+            // Reference to the Clients collection
             const clientsCollection = collection(db, 'Clients');
+
+            // Check if client exists based on the client's name
             const q = query(clientsCollection, where('ClientName', '==', clientName));
             const querySnapshot = await getDocs(q);
 
             let clientId: string;
 
             if (querySnapshot.empty) {
-                // 2. Create new client if not exists
-                const newClientDoc = await addDoc(clientsCollection, {
+                // Generate a unique alphanumeric ClientID
+                clientId = generateAlphanumericID(10); // You can adjust the length as needed
+
+                // Get current date and time
+                const now = new Date();
+                const createDate = now.toISOString().split('T')[0];
+                const createTime = now.toLocaleTimeString();
+
+                // Create a new client document in the Clients collection
+                await addDoc(clientsCollection, {
+                    ClientID: clientId,
+                    CreateDate: createDate,
+                    CreateTime: createTime,
                     ClientName: clientName,
                     ClientContact: clientContact
                 });
-                clientId = newClientDoc.id;
             } else {
-                // 3. Retrieve ClientID if client exists
-                clientId = querySnapshot.docs[0].id;
+                // Retrieve ClientID if client exists
+                clientId = querySnapshot.docs[0].data().ClientID;
             }
 
-            // 4. Create new appointment record
+            // Create new appointment record
             const appointmentsCollection = collection(db, 'Appointments');
+
+            // Format appointment date to avoid timezone issues
+            const selectedDate = date ? format(date, 'yyyy-MM-dd') : '';
             await addDoc(appointmentsCollection, {
                 ClientID: clientId,
                 ServiceProcedure: serviceProcedure,
-                AppointmentDate: date.toISOString().split('T')[0], // Format date
+                AppointmentDate: selectedDate,
                 AppointmentTime: time
             });
 
-            // 5. Show confirmation message
+            // Show confirmation message
              toast({
                 title: "Success",
                 description: "Booking Confirmed!",
               })
+
+            // Reset form fields
             setClientName('');
             setClientContact('');
             setServiceProcedure('');
             setDate(undefined);
             setTime('');
-            setConfirmationMessage('Booking Confirmed!');
 
         } catch (error: any) {
             console.error("Error during booking:", error);
@@ -91,7 +119,6 @@ export default function NewBookingPage() {
                 description: error.message,
                 variant: "destructive",
               })
-            setConfirmationMessage('Booking Failed. Please try again.');
         }
     };
 
@@ -197,12 +224,6 @@ export default function NewBookingPage() {
                     <Button type="submit" className="bg-accent text-primary-foreground hover:bg-accent/80 font-bold py-2 px-4 rounded">
                         Submit Booking
                     </Button>
-
-                    {confirmationMessage && (
-                        <div className="mt-4 p-3 bg-secondary rounded-md">
-                            {confirmationMessage}
-                        </div>
-                    )}
                 </form>
             </div>
         </div>
