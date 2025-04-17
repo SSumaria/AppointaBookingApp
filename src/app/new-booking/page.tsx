@@ -52,6 +52,7 @@ export default function NewBookingPage() {
 
     // Function to handle form submission
     const handleSubmit = async (e: React.FormEvent) => {
+      try {
         e.preventDefault();
 
         // Check if Firebase is initialized
@@ -133,6 +134,9 @@ export default function NewBookingPage() {
                 variant: "destructive",
               })
         }
+      } catch (err) {
+        console.log('Error in handleSubmit', err);
+      }
     };
 
     return (
