@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 import { format, set } from "date-fns"
@@ -20,8 +20,17 @@ import { getFirestore, collection, addDoc, query, where, getDocs } from "firebas
 import { firebaseConfig } from '@/lib/firebaseConfig';
 
 // Initialize Firebase app and Firestore
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+let app: any;
+let db: any;
+
+try {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+} catch (error) {
+    console.error("Firebase initialization error:", error);
+    // Handle the error appropriately, e.g., display an error message to the user
+}
+
 
 // Function to generate a unique alphanumeric ClientID
 function generateAlphanumericID(length: number): string {
@@ -44,6 +53,17 @@ export default function NewBookingPage() {
     // Function to handle form submission
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Check if Firebase is initialized
+        if (!db) {
+            toast({
+                title: "Error",
+                description: "Firebase is not initialized. Please check your configuration.",
+                variant: "destructive",
+            });
+            return;
+        }
+
 
         // Check if required fields are filled
         if (!clientName || !serviceProcedure || !date || !time) {
@@ -229,4 +249,5 @@ export default function NewBookingPage() {
         </div>
     );
 }
+
 
