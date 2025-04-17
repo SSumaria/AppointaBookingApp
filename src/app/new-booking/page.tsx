@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, Home, Search } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
+import Link from 'next/link';
 
 // Firebase imports
 import { initializeApp } from "firebase/app";
@@ -95,93 +96,115 @@ export default function NewBookingPage() {
     };
 
     return (
-        <div className="container max-w-2xl mx-auto py-10">
-            <h1 className="text-2xl font-bold mb-4">New Booking</h1>
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                    <Label htmlFor="clientName">Client Name *</Label>
-                    <Input
-                        type="text"
-                        id="clientName"
-                        value={clientName}
-                        onChange={(e) => setClientName(e.target.value)}
-                        required
-                        className="w-full"
-                    />
+        <div className="min-h-screen flex flex-col">
+            {/* Header */}
+            <header className="bg-background py-4 shadow-sm">
+                <div className="container max-w-5xl mx-auto flex items-center justify-between">
+                    <Link href="/" className="text-2xl font-bold">
+                        ServiceBooker Pro
+                    </Link>
+                    <nav className="flex items-center space-x-6">
+                        <Link href="/" className="hover:text-primary flex items-center">
+                            <Home className="mr-1 h-5 w-5" />
+                            Home
+                        </Link>
+                        <Link href="/client-search" className="hover:text-primary flex items-center">
+                            <Search className="mr-1 h-5 w-5" />
+                            Client Search
+                        </Link>
+                    </nav>
                 </div>
-                <div>
-                    <Label htmlFor="clientContact">Client Contact (Phone or Email)</Label>
-                    <Input
-                        type="text"
-                        id="clientContact"
-                        value={clientContact}
-                        onChange={(e) => setClientContact(e.target.value)}
-                        className="w-full"
-                    />
-                </div>
-                <div>
-                    <Label htmlFor="serviceProcedure">Service/Procedure *</Label>
-                    <Textarea
-                        id="serviceProcedure"
-                        value={serviceProcedure}
-                        onChange={(e) => setServiceProcedure(e.target.value)}
-                        required
-                        className="w-full"
-                    />
-                </div>
-                <div className="flex gap-4">
-                     <div>
-                        <Label htmlFor="date">Appointment Date *</Label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-[240px] justify-start text-left font-normal",
-                                !date && "text-muted-foreground"
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {date ? format(date, "PPP") : <span>Pick a date</span>}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={date}
-                              onSelect={setDate}
-                              disabled={(date) =>
-                                date < new Date()
-                              }
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
+            </header>
 
+            {/* Main Content */}
+            <div className="container max-w-2xl mx-auto py-10">
+                <h1 className="text-2xl font-bold mb-4">New Booking</h1>
+                <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <Label htmlFor="time">Appointment Time *</Label>
+                        <Label htmlFor="clientName">Client Name *</Label>
                         <Input
-                            type="time"
-                            id="time"
-                            value={time}
-                            onChange={(e) => setTime(e.target.value)}
+                            type="text"
+                            id="clientName"
+                            value={clientName}
+                            onChange={(e) => setClientName(e.target.value)}
                             required
-                            className="w-32"
+                            className="w-full"
                         />
                     </div>
-                </div>
-                 <Separator className="my-2" />
-                <Button type="submit" className="bg-accent text-primary-foreground hover:bg-accent/80 font-bold py-2 px-4 rounded">
-                    Submit Booking
-                </Button>
-
-                {confirmationMessage && (
-                    <div className="mt-4 p-3 bg-secondary rounded-md">
-                        {confirmationMessage}
+                    <div>
+                        <Label htmlFor="clientContact">Client Contact (Phone or Email)</Label>
+                        <Input
+                            type="text"
+                            id="clientContact"
+                            value={clientContact}
+                            onChange={(e) => setClientContact(e.target.value)}
+                            className="w-full"
+                        />
                     </div>
-                )}
-            </form>
+                    <div>
+                        <Label htmlFor="serviceProcedure">Service/Procedure *</Label>
+                        <Textarea
+                            id="serviceProcedure"
+                            value={serviceProcedure}
+                            onChange={(e) => setServiceProcedure(e.target.value)}
+                            required
+                            className="w-full"
+                        />
+                    </div>
+                    <div className="flex gap-4">
+                        <div>
+                            <Label htmlFor="date">Appointment Date *</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant={"outline"}
+                                        className={cn(
+                                            "w-[240px] justify-start text-left font-normal",
+                                            !date && "text-muted-foreground"
+                                        )}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {date ? format(date, "PPP") : <span>Pick a date</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                        mode="single"
+                                        selected={date}
+                                        onSelect={setDate}
+                                        disabled={(date) =>
+                                            date < new Date()
+                                        }
+                                        initialFocus
+                                    />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+
+                        <div>
+                            <Label htmlFor="time">Appointment Time *</Label>
+                            <Input
+                                type="time"
+                                id="time"
+                                value={time}
+                                onChange={(e) => setTime(e.target.value)}
+                                required
+                                className="w-32"
+                            />
+                        </div>
+                    </div>
+                    <Separator className="my-2" />
+                    <Button type="submit" className="bg-accent text-primary-foreground hover:bg-accent/80 font-bold py-2 px-4 rounded">
+                        Submit Booking
+                    </Button>
+
+                    {confirmationMessage && (
+                        <div className="mt-4 p-3 bg-secondary rounded-md">
+                            {confirmationMessage}
+                        </div>
+                    )}
+                </form>
+            </div>
         </div>
     );
 }

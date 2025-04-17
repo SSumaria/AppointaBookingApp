@@ -121,4 +121,3 @@ function Users(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
-
