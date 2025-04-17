@@ -62,13 +62,7 @@ export default function NewBookingPage() {
                 variant: "destructive",
             });
             return;
-        }
-
-
-        // Check if required fields are filled
-        if (!clientName || !serviceProcedure || !date || !time) {
-             toast({
-                title: "Error",
+        } if (!clientName || !serviceProcedure || !date || !time) { toast({ title: "Error",
                 description: "Please fill in all required fields.",
                 variant: "destructive",
               })
@@ -78,40 +72,39 @@ export default function NewBookingPage() {
         try {
             // Reference to the Clients collection
             const clientsCollection = collection(db, 'Clients');
-
-            // Check if client exists based on the client's name
-            const q = query(clientsCollection, where('ClientName', '==', clientName));
-            const querySnapshot = await getDocs(q);
-
             let clientId: string;
 
-            if (querySnapshot.empty) {
-                // Generate a unique alphanumeric ClientID
-                clientId = generateAlphanumericID(10); // You can adjust the length as needed
+            // Check if client exists based on the client's name
+            const clientQuery = query(clientsCollection, where('ClientName', '==', clientName));
+            const clientQuerySnapshot = await getDocs(clientQuery);
 
-                // Get current date and time
-                const now = new Date();
-                const createDate = now.toISOString().split('T')[0];
-                const createTime = now.toLocaleTimeString();
-
-                // Create a new client document in the Clients collection
-                await addDoc(clientsCollection, {
-                    ClientID: clientId,
-                    CreateDate: createDate,
-                    CreateTime: createTime,
-                    ClientName: clientName,
-                    ClientContact: clientContact
-                });
+            if (clientQuerySnapshot.empty) {
+                // Generate a unique alphanumeric ClientID for a new client
+                clientId = generateAlphanumericID(10);
+                // Get current date and time for client creation
+                const now = new Date(); // Current date and time
+                const createDate = now.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+                const createTime = now.toLocaleTimeString(); // Format as HH:MM:SS
+                
+                 // Create a new client document in the Clients collection
+                 await addDoc(clientsCollection, {
+                    ClientID: clientId,  // Unique ID for the client
+                    CreateDate: createDate,  // Date when the client was created
+                    CreateTime: createTime,  // Time when the client was created
+                    ClientName: clientName,  // Name of the client
+                    ClientContact: clientContact // Contact details of the client
+                }); 
             } else {
-                // Retrieve ClientID if client exists
-                clientId = querySnapshot.docs[0].data().ClientID;
+               // Retrieve ClientID if client exists
+               clientId = clientQuerySnapshot.docs[0].data().ClientID;
             }
 
             // Create new appointment record
             const appointmentsCollection = collection(db, 'Appointments');
 
             // Format appointment date to avoid timezone issues
-            const selectedDate = date ? format(date, 'yyyy-MM-dd') : '';
+            const selectedDate = date ? format(date, 'yyyy-MM-dd') : ''; // YYYY-MM-DD
+
             await addDoc(appointmentsCollection, {
                 ClientID: clientId,
                 ServiceProcedure: serviceProcedure,
