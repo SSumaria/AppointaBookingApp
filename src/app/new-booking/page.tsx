@@ -114,10 +114,14 @@ export default function NewBookingPage() {
             });
 
             // Show confirmation message
-             toast({
-                title: "Success",
-                description: "Booking Confirmed!",
-              })
+            try {
+                toast({
+                    title: "Success",
+                    description: "Booking Confirmed!",
+                });
+            } catch (toastError: any) {
+                console.error("Error displaying toast:", toastError);
+            }
 
             // Reset form fields
             setClientName('');
@@ -246,6 +250,7 @@ export default function NewBookingPage() {
         </div>
     );
 }
+
 
 
 
