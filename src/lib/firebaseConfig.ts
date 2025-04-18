@@ -1,4 +1,3 @@
-
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, doc, setDoc, getDocs, query, limit } from "firebase/firestore";
 
@@ -13,8 +12,16 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+let app: any;
+let db: any;
+
+try {
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+} catch (error: any) {
+  console.error("Firebase initialization error:", error);
+  // Handle the error appropriately, e.g., display an error message to the user
+}
 
 // Function to create a collection with an initial document if it doesn't exist
 async function createCollectionIfNotExist(collectionName: string, initialData: any) {
@@ -40,19 +47,23 @@ let databaseInitialized = false;
 // Initialize Clients and Appointments collections
 async function initializeDatabase() {
   if (!databaseInitialized) {
-    await createCollectionIfNotExist("Clients", {
-      ClientID: "InitialClientID",
-      ClientName: "InitialClientName",
-      ClientContact: "InitialClientContact",
-    });
-    await createCollectionIfNotExist("Appointments", {
-      AppointmentID: "InitialAppointmentID",
-      ClientID: "InitialClientID",
-      ServiceProcedure: "InitialService",
-      AppointmentDate: "2024-01-01",
-      AppointmentTime: "00:00",
-    });
-    databaseInitialized = true;
+    try {
+      await createCollectionIfNotExist("Clients", {
+        ClientID: "InitialClientID",
+        ClientName: "InitialClientName",
+        ClientContact: "InitialClientContact",
+      });
+      await createCollectionIfNotExist("Appointments", {
+        AppointmentID: "InitialAppointmentID",
+        ClientID: "InitialClientID",
+        ServiceProcedure: "InitialService",
+        AppointmentDate: "2024-01-01",
+        AppointmentTime: "00:00",
+      });
+      databaseInitialized = true;
+    } catch (error) {
+      console.error("Database initialization failed:", error);
+    }
   }
 }
 

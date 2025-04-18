@@ -250,7 +250,3 @@ export default function NewBookingPage() {
         </div>
     );
 }
-
-
-
-
