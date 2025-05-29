@@ -3,6 +3,9 @@ import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getDatabase, type Database } from "firebase/database";
 import { getAuth, type Auth } from "firebase/auth"; // Added
 
+// Log the API key to help debug
+console.log("Attempting to use Firebase API Key:", process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
+
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
