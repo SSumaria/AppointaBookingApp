@@ -1,28 +1,18 @@
 
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getDatabase, type Database } from "firebase/database";
-import { getAuth, type Auth } from "firebase/auth"; // Added
+import { getAuth, type Auth } from "firebase/auth";
 
 // --- Start of Diagnostic Logging ---
-console.log("--- Firebase Config Environment Variables ---");
-console.log("Attempting to use Firebase API Key (NEXT_PUBLIC_FIREBASE_API_KEY):", process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
-console.log("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:", process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN);
-console.log("NEXT_PUBLIC_FIREBASE_PROJECT_ID:", process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
-console.log("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:", process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
-console.log("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:", process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID);
-console.log("NEXT_PUBLIC_FIREBASE_APP_ID:", process.env.NEXT_PUBLIC_FIREBASE_APP_ID);
-console.log("NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID:", process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID);
-console.log("Database URL is hardcoded in firebaseConfig as: https://bookerpro-e5c9f-default-rtdb.firebaseio.com/");
-console.log("--- End of Firebase Config Environment Variables ---");
-
-if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
-  console.error(
-    "CRITICAL ERROR: NEXT_PUBLIC_FIREBASE_API_KEY is undefined. " +
-    "Please ensure it is set in your .env.local file and that you have " +
-    "restarted the Next.js development server."
-  );
-}
-// --- End of Diagnostic Logging ---
+console.log("--- Firebase Config: Raw Environment Variables (firebaseConfig.ts) ---");
+console.log("process.env.NEXT_PUBLIC_FIREBASE_API_KEY:", process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
+console.log("process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:", process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN);
+console.log("process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID:", process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
+console.log("process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:", process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
+console.log("process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:", process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID);
+console.log("process.env.NEXT_PUBLIC_FIREBASE_APP_ID:", process.env.NEXT_PUBLIC_FIREBASE_APP_ID);
+console.log("process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID:", process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID);
+console.log("--- End of Raw Environment Variables (firebaseConfig.ts) ---");
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -35,26 +25,41 @@ const firebaseConfig = {
   databaseURL: "https://bookerpro-e5c9f-default-rtdb.firebaseio.com/",
 };
 
+console.log("--- Firebase Config: Constructed firebaseConfig object (firebaseConfig.ts) ---");
+console.log(JSON.stringify(firebaseConfig, null, 2)); // Pretty print the config object
+// --- End of Constructed firebaseConfig object ---
+
 let app: FirebaseApp;
+
+if (!firebaseConfig.apiKey) {
+  console.error(
+    "CRITICAL ERROR (firebaseConfig.ts): firebaseConfig.apiKey is missing or undefined. " +
+    "This strongly suggests NEXT_PUBLIC_FIREBASE_API_KEY is not set correctly in your .env.local file, " +
+    "the .env.local file is missing/in the wrong location, or the Next.js server was not restarted after setting it. " +
+    "Firebase will NOT be initialized correctly."
+  );
+}
+
 if (!getApps().length) {
   try {
-    if (!firebaseConfig.apiKey) {
-      console.error("Firebase config is missing apiKey. Firebase will not be initialized correctly.");
-      // You might choose to throw an error here or handle it differently
-      // For now, we let initializeApp attempt and likely fail, which will be caught
-    }
+    console.log("Attempting to initialize Firebase app (firebaseConfig.ts)...");
     app = initializeApp(firebaseConfig);
+    console.log("Firebase app initialization attempt complete (firebaseConfig.ts).");
   } catch (error) {
-    console.error("Firebase initialization error directly from initializeApp:", error);
-    // Re-throw the error to prevent the application from continuing with a broken Firebase state.
-    // This ensures that subsequent calls like getAuth() or getDatabase() don't mask the original init problem.
-    throw new Error(`Firebase initialization failed: ${(error as Error).message}. Please check your Firebase config and .env.local file.`);
+    console.error("Firebase initialization error during initializeApp (firebaseConfig.ts):", error);
+    // If initialization fails, app might be undefined or a broken instance.
+    // Subsequent getDatabase or getAuth calls will likely fail.
+    // We'll proceed to let those errors manifest to confirm.
   }
 } else {
   app = getApp();
+  console.log("Firebase app already initialized. Getting existing app (firebaseConfig.ts).");
 }
 
+// Assign database and auth. These will throw errors if 'app' is not correctly initialized.
+// @ts-ignore app might be uninitialized if API key was missing and init failed
 const db: Database = getDatabase(app);
-const auth: Auth = getAuth(app); // Added
+// @ts-ignore app might be uninitialized if API key was missing and init failed
+const auth: Auth = getAuth(app);
 
-export { app, db, auth, firebaseConfig }; // Added auth
+export { app, db, auth, firebaseConfig };
