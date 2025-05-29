@@ -1,9 +1,9 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { Home, Calendar, Search as SearchIcon, User } from "lucide-react";
+import { Home, Calendar as CalendarIcon, Search as SearchIcon, User } from "lucide-react"; // Renamed Calendar to CalendarIcon
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,23 +19,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
-// Firebase imports
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, query, where, getDocs, DocumentData } from "firebase/firestore";
-import { firebaseConfig } from '@/lib/firebaseConfig'; // Ensure this path is correct
-
-// Initialize Firebase app and Firestore
-let app;
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp();
-}
-const db = getFirestore(app);
+// Firebase imports for Realtime Database
+import { ref, get, query as rtQuery, orderByChild, startAt, endAt } from "firebase/database";
+import { db } from '@/lib/firebaseConfig'; // Import RTDB instance
 
 interface Client {
-  id: string; // Firestore document ID
-  ClientID: string;
+  id: string; // Realtime Database node key (which is our ClientID)
+  ClientID: string; // Stored within the object as well
   ClientName: string;
   ClientContact?: string;
   CreateDate: string;
@@ -58,35 +48,49 @@ export default function ClientSearchPage() {
         variant: "destructive",
       });
       setSearchResults([]);
-      setHasSearched(true);
+      setHasSearched(true); // Indicate that a search was attempted
       return;
     }
 
     setIsLoading(true);
     setHasSearched(true);
 
+    if (!db) {
+        toast({
+            title: "Error",
+            description: "Firebase Realtime Database is not initialized.",
+            variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+    }
+
     try {
-      const clientsCollection = collection(db, 'Clients');
-      // Basic "starts with" search for ClientName. For more complex searches, consider dedicated search services.
-      const clientQuery = query(
-        clientsCollection,
-        where('ClientName', '>=', searchQuery),
-        where('ClientName', '<=', searchQuery + '\uf8ff')
+      const clientsRef = ref(db, 'Clients');
+      // Query for client names starting with searchQuery.
+      // \uf8ff is a high Unicode character to act as a range limit for "starts with"
+      const clientQuery = rtQuery(
+        clientsRef,
+        orderByChild('ClientName'),
+        startAt(searchQuery),
+        endAt(searchQuery + '\uf8ff')
       );
 
-      const querySnapshot = await getDocs(clientQuery);
+      const snapshot = await get(clientQuery);
       const clients: Client[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data() as DocumentData;
-        clients.push({
-          id: doc.id,
-          ClientID: data.ClientID,
-          ClientName: data.ClientName,
-          ClientContact: data.ClientContact,
-          CreateDate: data.CreateDate,
-          CreateTime: data.CreateTime,
+      if (snapshot.exists()) {
+        snapshot.forEach((childSnapshot) => {
+          const data = childSnapshot.val();
+          clients.push({
+            id: childSnapshot.key as string, // The node key is the ClientID
+            ClientID: data.ClientID,
+            ClientName: data.ClientName,
+            ClientContact: data.ClientContact,
+            CreateDate: data.CreateDate,
+            CreateTime: data.CreateTime,
+          });
         });
-      });
+      }
 
       setSearchResults(clients);
 
@@ -124,7 +128,7 @@ export default function ClientSearchPage() {
               Home
             </Link>
             <Link href="/new-booking" className="hover:text-primary flex items-center">
-              <Calendar className="mr-1 h-5 w-5" />
+              <CalendarIcon className="mr-1 h-5 w-5" />
               New Booking
             </Link>
             <Link href="/client-search" className="hover:text-primary flex items-center text-primary">
@@ -224,4 +228,3 @@ export default function ClientSearchPage() {
     </div>
   );
 }
- 
