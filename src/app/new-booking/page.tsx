@@ -1,11 +1,11 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react'; // Added useEffect
-import { Calendar as CalendarIconLucide } from "@/components/ui/calendar" // Renamed to avoid conflict with lucide icon
+import React, { useState, useEffect } from 'react';
+import { Calendar as CalendarIconLucide } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
-import { Calendar as CalendarIcon } from "lucide-react" // lucide icon
+import { Calendar as CalendarIcon } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,9 +13,9 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
-import Header from '@/components/layout/Header'; // Added
-import { useAuth } from '@/context/AuthContext'; // Added
-import { useRouter } from 'next/navigation'; // Added
+import Header from '@/components/layout/Header';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 // Firebase imports for Realtime Database
 import { ref, set, get, query as rtQuery, orderByChild, equalTo, push } from "firebase/database";
@@ -39,10 +39,10 @@ export default function NewBookingPage() {
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const { currentUser, loading: authLoading } = useAuth(); // Added
-    const router = useRouter(); // Added
+    const { currentUser, loading: authLoading } = useAuth();
+    const router = useRouter();
 
-    useEffect(() => { // Added
+    useEffect(() => {
       if (!authLoading && !currentUser) {
         router.push('/login');
       }
@@ -53,7 +53,7 @@ export default function NewBookingPage() {
         e.preventDefault();
         setIsSubmitting(true);
 
-        if (!currentUser) { // Added check
+        if (!currentUser) {
             toast({
                 title: "Authentication Error",
                 description: "You must be logged in to create a booking.",
@@ -86,45 +86,49 @@ export default function NewBookingPage() {
 
         try {
             let clientId: string;
-            const clientsRef = ref(db, 'Clients');
+            // Clients are now stored under /Clients/[userID]/[clientID]
+            const userClientsRefPath = `Clients/${currentUser.uid}`;
+            const clientsRef = ref(db, userClientsRefPath);
             const clientQuery = rtQuery(clientsRef, orderByChild('ClientName'), equalTo(clientName));
             const clientSnapshot = await get(clientQuery);
 
             if (clientSnapshot.exists()) {
+                // Client exists, retrieve their ClientID (key of the snapshot child)
                 clientSnapshot.forEach((childSnapshot) => {
-                    clientId = childSnapshot.key as string; 
+                    clientId = childSnapshot.key as string;
                 });
-                clientId = clientId!;
+                clientId = clientId!; // Ensure clientId is assigned
             } else {
+                // Client does not exist for this user, create a new one
                 clientId = generateAlphanumericID(10);
                 const now = new Date();
                 const createDate = now.toISOString().split('T')[0];
                 const createTime = now.toLocaleTimeString();
                 
-                await set(ref(db, 'Clients/' + clientId), {
-                    ClientID: clientId,
+                await set(ref(db, `${userClientsRefPath}/${clientId}`), {
+                    ClientID: clientId, // Store the ID within the object as well for convenience
                     ClientName: clientName,
                     ClientContact: clientContact,
                     CreateDate: createDate,
                     CreateTime: createTime,
-                    // Optionally associate with the user who created it
-                    // CreatedByUserID: currentUser.uid 
+                    CreatedByUserID: currentUser.uid // Store the user ID for clarity
                 });
             }
 
-            const appointmentsRef = ref(db, 'Appointments');
-            const newAppointmentRef = push(appointmentsRef);
+            // Appointments are now stored under /Appointments/[userID]/[appointmentID]
+            const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
+            const appointmentsRef = ref(db, userAppointmentsRefPath);
+            const newAppointmentRef = push(appointmentsRef); // Generate a unique ID for the appointment
             const appointmentId = newAppointmentRef.key;
             const selectedDate = date ? format(date, 'yyyy-MM-dd') : '';
 
             await set(newAppointmentRef, {
-                AppointmentID: appointmentId,
-                ClientID: clientId,
+                AppointmentID: appointmentId, // Store the push key as the AppointmentID
+                ClientID: clientId, // This is the ID of the client under the user's client list
                 ServiceProcedure: serviceProcedure,
                 AppointmentDate: selectedDate,
                 AppointmentTime: time,
-                // Optionally associate with the user who created it
-                // BookedByUserID: currentUser.uid 
+                BookedByUserID: currentUser.uid // Store the user ID for clarity
             });
 
             toast({
@@ -141,7 +145,7 @@ export default function NewBookingPage() {
         } catch (error: any) {
             console.error("Error during booking:", error);
             toast({
-                title: "Error",
+                title: "Error creating booking",
                 description: error.message || "An unexpected error occurred.",
                 variant: "destructive",
             });
@@ -150,8 +154,7 @@ export default function NewBookingPage() {
         }
     };
     
-    if (authLoading || !currentUser) { // Added
-      // You can render a loading spinner or a skeleton UI here
+    if (authLoading || !currentUser) {
       return (
         <div className="min-h-screen flex flex-col">
             <Header />
@@ -173,7 +176,7 @@ export default function NewBookingPage() {
 
     return (
         <div className="min-h-screen flex flex-col">
-            <Header /> {/* Replaced old header */}
+            <Header />
             <main className="flex-grow py-10">
                 <div className="container max-w-2xl mx-auto">
                     <h1 className="text-3xl font-bold mb-8 text-center text-primary">New Booking</h1>
@@ -229,7 +232,7 @@ export default function NewBookingPage() {
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0" align="start">
-                                        <CalendarIconLucide // Using the renamed ShadCN calendar
+                                        <CalendarIconLucide
                                             mode="single"
                                             selected={date}
                                             onSelect={setDate}
@@ -269,3 +272,5 @@ export default function NewBookingPage() {
         </div>
     );
 }
+
+    

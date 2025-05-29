@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react'; // Added useEffect
+import React, { useState, useEffect } from 'react';
 import { User } from "lucide-react"; 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,22 +17,23 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import Header from '@/components/layout/Header'; // Added
-import { useAuth } from '@/context/AuthContext'; // Added
-import { useRouter } from 'next/navigation'; // Added
-import { Icons } from '@/components/icons'; // For SearchIcon
+import Header from '@/components/layout/Header';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
+import { Icons } from '@/components/icons';
 
 // Firebase imports for Realtime Database
 import { ref, get, query as rtQuery, orderByChild, startAt, endAt } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
 
 interface Client {
-  id: string; 
-  ClientID: string; 
+  id: string; // This will be the Firebase key
+  ClientID: string; // The generated alphanumeric ID stored in the client object
   ClientName: string;
   ClientContact?: string;
   CreateDate: string;
   CreateTime: string;
+  CreatedByUserID?: string; // To confirm it's the user's client
 }
 
 export default function ClientSearchPage() {
@@ -42,10 +43,10 @@ export default function ClientSearchPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const { toast } = useToast();
 
-  const { currentUser, loading: authLoading } = useAuth(); // Added
-  const router = useRouter(); // Added
+  const { currentUser, loading: authLoading } = useAuth();
+  const router = useRouter();
 
-  useEffect(() => { // Added
+  useEffect(() => {
     if (!authLoading && !currentUser) {
       router.push('/login');
     }
@@ -54,7 +55,7 @@ export default function ClientSearchPage() {
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
-    if (!currentUser) { // Added check
+    if (!currentUser) {
       toast({
         title: "Authentication Error",
         description: "You must be logged in to search clients.",
@@ -89,12 +90,14 @@ export default function ClientSearchPage() {
     }
 
     try {
-      const clientsRef = ref(db, 'Clients');
+      // Clients are now searched under /Clients/[userID]/
+      const userClientsRefPath = `Clients/${currentUser.uid}`;
+      const clientsRef = ref(db, userClientsRefPath);
       const clientQuery = rtQuery(
         clientsRef,
         orderByChild('ClientName'),
         startAt(searchQuery),
-        endAt(searchQuery + '\uf8ff')
+        endAt(searchQuery + '\uf8ff') // Standard way to do "starts with" in RTDB
       );
 
       const snapshot = await get(clientQuery);
@@ -102,21 +105,27 @@ export default function ClientSearchPage() {
       if (snapshot.exists()) {
         snapshot.forEach((childSnapshot) => {
           const data = childSnapshot.val();
-          clients.push({
-            id: childSnapshot.key as string,
-            ClientID: data.ClientID,
-            ClientName: data.ClientName,
-            ClientContact: data.ClientContact,
-            CreateDate: data.CreateDate,
-            CreateTime: data.CreateTime,
-          });
+          // We only add if it truly belongs to this user, though the path query should ensure this.
+          // However, a client might have been manually moved/copied in the DB without updating CreatedByUserID.
+          // The rules will be the ultimate enforcer.
+          if (data.CreatedByUserID === currentUser.uid || !data.CreatedByUserID) { // !data.CreatedByUserID for older data
+             clients.push({
+                id: childSnapshot.key as string, // The Firebase key for this client entry
+                ClientID: data.ClientID,
+                ClientName: data.ClientName,
+                ClientContact: data.ClientContact,
+                CreateDate: data.CreateDate,
+                CreateTime: data.CreateTime,
+                CreatedByUserID: data.CreatedByUserID,
+             });
+          }
         });
       }
       setSearchResults(clients);
       if (clients.length === 0) {
         toast({
           title: "No Results",
-          description: "No clients found matching your search.",
+          description: "No clients found matching your search under your account.",
         });
       }
     } catch (error: any) {
@@ -124,7 +133,7 @@ export default function ClientSearchPage() {
       if (error.message && error.message.includes("Permission denied")) {
          toast({
             title: "Permission Denied",
-            description: "You do not have permission to search clients. Please log in.",
+            description: "You do not have permission to search clients. Please log in or check database rules.",
             variant: "destructive",
         });
       } else {
@@ -140,7 +149,7 @@ export default function ClientSearchPage() {
     }
   };
 
-  if (authLoading || !currentUser) { // Added
+  if (authLoading || !currentUser) {
     return (
         <div className="min-h-screen flex flex-col">
             <Header />
@@ -162,7 +171,7 @@ export default function ClientSearchPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header /> {/* Replaced old header */}
+      <Header />
       <main className="flex-grow py-10">
         <div className="container max-w-4xl mx-auto">
           <Card className="shadow-xl">
@@ -211,7 +220,7 @@ export default function ClientSearchPage() {
 
               {!isLoading && searchResults.length > 0 && (
                 <Table>
-                  <TableCaption>A list of clients matching your search.</TableCaption>
+                  <TableCaption>A list of your clients matching your search.</TableCaption>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[200px]">Client Name</TableHead>
@@ -236,7 +245,7 @@ export default function ClientSearchPage() {
               )}
               {!isLoading && !hasSearched && (
                  <div className="text-center py-4 text-muted-foreground">
-                    Enter a client name above and click Search to find clients.
+                    Enter a client name above and click Search to find clients in your records.
                  </div>
               )}
             </CardContent>
@@ -249,3 +258,5 @@ export default function ClientSearchPage() {
     </div>
   );
 }
+
+    
