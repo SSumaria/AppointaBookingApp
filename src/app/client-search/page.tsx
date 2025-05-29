@@ -1,9 +1,8 @@
 
 "use client";
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { Home, Calendar as CalendarIcon, Search as SearchIcon, User } from "lucide-react"; // Renamed Calendar to CalendarIcon
+import React, { useState, useEffect } from 'react'; // Added useEffect
+import { User } from "lucide-react"; 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,14 +17,18 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import Header from '@/components/layout/Header'; // Added
+import { useAuth } from '@/context/AuthContext'; // Added
+import { useRouter } from 'next/navigation'; // Added
+import { Icons } from '@/components/icons'; // For SearchIcon
 
 // Firebase imports for Realtime Database
 import { ref, get, query as rtQuery, orderByChild, startAt, endAt } from "firebase/database";
-import { db } from '@/lib/firebaseConfig'; // Import RTDB instance
+import { db } from '@/lib/firebaseConfig';
 
 interface Client {
-  id: string; // Realtime Database node key (which is our ClientID)
-  ClientID: string; // Stored within the object as well
+  id: string; 
+  ClientID: string; 
   ClientName: string;
   ClientContact?: string;
   CreateDate: string;
@@ -39,8 +42,28 @@ export default function ClientSearchPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const { toast } = useToast();
 
+  const { currentUser, loading: authLoading } = useAuth(); // Added
+  const router = useRouter(); // Added
+
+  useEffect(() => { // Added
+    if (!authLoading && !currentUser) {
+      router.push('/login');
+    }
+  }, [currentUser, authLoading, router]);
+
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+
+    if (!currentUser) { // Added check
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to search clients.",
+        variant: "destructive",
+      });
+      router.push('/login');
+      return;
+    }
+
     if (!searchQuery.trim()) {
       toast({
         title: "Search Error",
@@ -48,7 +71,7 @@ export default function ClientSearchPage() {
         variant: "destructive",
       });
       setSearchResults([]);
-      setHasSearched(true); // Indicate that a search was attempted
+      setHasSearched(true); 
       return;
     }
 
@@ -67,8 +90,6 @@ export default function ClientSearchPage() {
 
     try {
       const clientsRef = ref(db, 'Clients');
-      // Query for client names starting with searchQuery.
-      // \uf8ff is a high Unicode character to act as a range limit for "starts with"
       const clientQuery = rtQuery(
         clientsRef,
         orderByChild('ClientName'),
@@ -82,7 +103,7 @@ export default function ClientSearchPage() {
         snapshot.forEach((childSnapshot) => {
           const data = childSnapshot.val();
           clients.push({
-            id: childSnapshot.key as string, // The node key is the ClientID
+            id: childSnapshot.key as string,
             ClientID: data.ClientID,
             ClientName: data.ClientName,
             ClientContact: data.ClientContact,
@@ -91,61 +112,63 @@ export default function ClientSearchPage() {
           });
         });
       }
-
       setSearchResults(clients);
-
       if (clients.length === 0) {
         toast({
           title: "No Results",
           description: "No clients found matching your search.",
         });
       }
-
     } catch (error: any) {
       console.error("Error searching clients:", error);
-      toast({
-        title: "Search Error",
-        description: error.message || "An unexpected error occurred while searching.",
-        variant: "destructive",
-      });
+      if (error.message && error.message.includes("Permission denied")) {
+         toast({
+            title: "Permission Denied",
+            description: "You do not have permission to search clients. Please log in.",
+            variant: "destructive",
+        });
+      } else {
+        toast({
+            title: "Search Error",
+            description: error.message || "An unexpected error occurred while searching.",
+            variant: "destructive",
+        });
+      }
       setSearchResults([]);
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (authLoading || !currentUser) { // Added
+    return (
+        <div className="min-h-screen flex flex-col">
+            <Header />
+            <main className="flex-grow flex items-center justify-center">
+                <div className="text-center">
+                    <svg className="animate-spin mx-auto h-12 w-12 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p className="mt-4 text-muted-foreground">Loading client search...</p>
+                </div>
+            </main>
+             <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
+                © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
+            </footer>
+        </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <header className="bg-background py-4 shadow-sm">
-        <div className="container max-w-5xl mx-auto flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold">
-            ServiceBooker Pro
-          </Link>
-          <nav className="flex items-center space-x-6">
-            <Link href="/" className="hover:text-primary flex items-center">
-              <Home className="mr-1 h-5 w-5" />
-              Home
-            </Link>
-            <Link href="/new-booking" className="hover:text-primary flex items-center">
-              <CalendarIcon className="mr-1 h-5 w-5" />
-              New Booking
-            </Link>
-            <Link href="/client-search" className="hover:text-primary flex items-center text-primary">
-              <SearchIcon className="mr-1 h-5 w-5" />
-              Client Search
-            </Link>
-          </nav>
-        </div>
-      </header>
-
-      {/* Main Content */}
+      <Header /> {/* Replaced old header */}
       <main className="flex-grow py-10">
         <div className="container max-w-4xl mx-auto">
-          <Card className="shadow-lg">
+          <Card className="shadow-xl">
             <CardHeader>
-              <CardTitle className="text-2xl font-bold flex items-center">
-                <User className="mr-2 h-6 w-6 text-primary" /> Client Search
+              <CardTitle className="text-2xl font-bold flex items-center text-primary">
+                <User className="mr-2 h-6 w-6" /> Client Search
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -163,12 +186,12 @@ export default function ClientSearchPage() {
                 </div>
                 <Button type="submit" disabled={isLoading} className="bg-primary text-primary-foreground hover:bg-primary/90">
                   {isLoading ? (
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                   ) : (
-                    <SearchIcon className="mr-2 h-5 w-5" />
+                    <Icons.search className="mr-2 h-5 w-5" />
                   )}
                   Search
                 </Button>
@@ -220,8 +243,6 @@ export default function ClientSearchPage() {
           </Card>
         </div>
       </main>
-
-      {/* Footer */}
       <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
         © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
       </footer>

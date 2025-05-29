@@ -1,11 +1,11 @@
 
 "use client";
 
-import React, { useState } from 'react';
-import { Calendar } from "@/components/ui/calendar"
+import React, { useState, useEffect } from 'react'; // Added useEffect
+import { Calendar as CalendarIconLucide } from "@/components/ui/calendar" // Renamed to avoid conflict with lucide icon
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
-import { CalendarIcon, Home, Search } from "lucide-react"
+import { Calendar as CalendarIcon } from "lucide-react" // lucide icon
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,13 +13,14 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
-import Link from 'next/link';
+import Header from '@/components/layout/Header'; // Added
+import { useAuth } from '@/context/AuthContext'; // Added
+import { useRouter } from 'next/navigation'; // Added
 
 // Firebase imports for Realtime Database
 import { ref, set, get, query as rtQuery, orderByChild, equalTo, push } from "firebase/database";
-import { db } from '@/lib/firebaseConfig'; // Import RTDB instance
+import { db } from '@/lib/firebaseConfig';
 
-// Function to generate a unique alphanumeric ClientID
 function generateAlphanumericID(length: number): string {
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
@@ -38,10 +39,30 @@ export default function NewBookingPage() {
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Function to handle form submission
+    const { currentUser, loading: authLoading } = useAuth(); // Added
+    const router = useRouter(); // Added
+
+    useEffect(() => { // Added
+      if (!authLoading && !currentUser) {
+        router.push('/login');
+      }
+    }, [currentUser, authLoading, router]);
+
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
+
+        if (!currentUser) { // Added check
+            toast({
+                title: "Authentication Error",
+                description: "You must be logged in to create a booking.",
+                variant: "destructive",
+            });
+            setIsSubmitting(false);
+            router.push('/login');
+            return;
+        }
 
         if (!clientName || !serviceProcedure || !date || !time) {
             toast({
@@ -65,53 +86,45 @@ export default function NewBookingPage() {
 
         try {
             let clientId: string;
-
-            // Check if client exists based on the client's name
             const clientsRef = ref(db, 'Clients');
             const clientQuery = rtQuery(clientsRef, orderByChild('ClientName'), equalTo(clientName));
             const clientSnapshot = await get(clientQuery);
 
             if (clientSnapshot.exists()) {
-                // Client exists, retrieve their ClientID
-                // Assuming ClientName is unique for simplicity here.
-                // If not unique, you'd need a more robust way to select the correct client.
                 clientSnapshot.forEach((childSnapshot) => {
-                    clientId = childSnapshot.key as string; // The key is the ClientID
-                    // If multiple clients have the same name, this takes the first one.
-                    // Consider a UI to select if multiple matches.
+                    clientId = childSnapshot.key as string; 
                 });
-                clientId = clientId!; // Ensure clientId is assigned
+                clientId = clientId!;
             } else {
-                // Generate a unique alphanumeric ClientID for a new client
                 clientId = generateAlphanumericID(10);
                 const now = new Date();
                 const createDate = now.toISOString().split('T')[0];
                 const createTime = now.toLocaleTimeString();
                 
-                // Create a new client record in the Clients node
-                // The key of the client record will be `clientId`
                 await set(ref(db, 'Clients/' + clientId), {
                     ClientID: clientId,
                     ClientName: clientName,
                     ClientContact: clientContact,
                     CreateDate: createDate,
                     CreateTime: createTime,
+                    // Optionally associate with the user who created it
+                    // CreatedByUserID: currentUser.uid 
                 });
             }
 
-            // Create new appointment record
             const appointmentsRef = ref(db, 'Appointments');
-            const newAppointmentRef = push(appointmentsRef); // Generates a unique key for the appointment
+            const newAppointmentRef = push(appointmentsRef);
             const appointmentId = newAppointmentRef.key;
-
             const selectedDate = date ? format(date, 'yyyy-MM-dd') : '';
 
             await set(newAppointmentRef, {
-                AppointmentID: appointmentId, // Store the generated key as AppointmentID
+                AppointmentID: appointmentId,
                 ClientID: clientId,
                 ServiceProcedure: serviceProcedure,
                 AppointmentDate: selectedDate,
-                AppointmentTime: time
+                AppointmentTime: time,
+                // Optionally associate with the user who created it
+                // BookedByUserID: currentUser.uid 
             });
 
             toast({
@@ -119,11 +132,10 @@ export default function NewBookingPage() {
                 description: "Booking Confirmed!",
             });
 
-            // Reset form fields
             setClientName('');
             setClientContact('');
             setServiceProcedure('');
-            setDate(new Date()); // Reset to today or undefined
+            setDate(new Date());
             setTime('');
 
         } catch (error: any) {
@@ -137,37 +149,35 @@ export default function NewBookingPage() {
             setIsSubmitting(false);
         }
     };
+    
+    if (authLoading || !currentUser) { // Added
+      // You can render a loading spinner or a skeleton UI here
+      return (
+        <div className="min-h-screen flex flex-col">
+            <Header />
+            <main className="flex-grow flex items-center justify-center">
+                <div className="text-center">
+                    <svg className="animate-spin mx-auto h-12 w-12 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p className="mt-4 text-muted-foreground">Loading form...</p>
+                </div>
+            </main>
+             <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
+                © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
+            </footer>
+        </div>
+      );
+    }
 
     return (
         <div className="min-h-screen flex flex-col">
-            {/* Header */}
-            <header className="bg-background py-4 shadow-sm">
-                <div className="container max-w-5xl mx-auto flex items-center justify-between">
-                    <Link href="/" className="text-2xl font-bold">
-                        ServiceBooker Pro
-                    </Link>
-                    <nav className="flex items-center space-x-6">
-                        <Link href="/" className="hover:text-primary flex items-center">
-                            <Home className="mr-1 h-5 w-5" />
-                            Home
-                        </Link>
-                        <Link href="/new-booking" className="hover:text-primary flex items-center text-primary">
-                             <CalendarIcon className="mr-1 h-5 w-5" />
-                             New Booking
-                        </Link>
-                        <Link href="/client-search" className="hover:text-primary flex items-center">
-                            <Search className="mr-1 h-5 w-5" />
-                            Client Search
-                        </Link>
-                    </nav>
-                </div>
-            </header>
-
-            {/* Main Content */}
+            <Header /> {/* Replaced old header */}
             <main className="flex-grow py-10">
                 <div className="container max-w-2xl mx-auto">
-                    <h1 className="text-2xl font-bold mb-6 text-center">New Booking</h1>
-                    <form onSubmit={handleSubmit} className="space-y-6 bg-card p-8 rounded-lg shadow-lg">
+                    <h1 className="text-3xl font-bold mb-8 text-center text-primary">New Booking</h1>
+                    <form onSubmit={handleSubmit} className="space-y-6 bg-card p-8 rounded-lg shadow-xl">
                         <div>
                             <Label htmlFor="clientName" className="font-medium">Client Name *</Label>
                             <Input
@@ -219,11 +229,11 @@ export default function NewBookingPage() {
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
+                                        <CalendarIconLucide // Using the renamed ShadCN calendar
                                             mode="single"
                                             selected={date}
                                             onSelect={setDate}
-                                            disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))} // Disable past dates
+                                            disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
                                             initialFocus
                                         />
                                     </PopoverContent>
@@ -244,7 +254,7 @@ export default function NewBookingPage() {
                         <Separator className="my-4" />
                         <Button type="submit" disabled={isSubmitting} className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-semibold py-3">
                              {isSubmitting ? (
-                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
@@ -253,7 +263,6 @@ export default function NewBookingPage() {
                     </form>
                 </div>
             </main>
-            {/* Footer */}
             <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
                  © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
             </footer>

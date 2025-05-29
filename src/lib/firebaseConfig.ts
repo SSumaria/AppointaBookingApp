@@ -1,6 +1,7 @@
 
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getDatabase, type Database } from "firebase/database";
+import { getAuth, type Auth } from "firebase/auth"; // Added
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -10,7 +11,7 @@ const firebaseConfig = {
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
-  databaseURL: "https://bookerpro-e5c9f-default-rtdb.firebaseio.com/", // Added Realtime Database URL
+  databaseURL: "https://bookerpro-e5c9f-default-rtdb.firebaseio.com/",
 };
 
 let app: FirebaseApp;
@@ -21,7 +22,6 @@ if (!getApps().length) {
 }
 
 const db: Database = getDatabase(app);
+const auth: Auth = getAuth(app); // Added
 
-// No longer initializing Firestore collections here
-
-export { app, db, firebaseConfig };
+export { app, db, auth, firebaseConfig }; // Added auth
