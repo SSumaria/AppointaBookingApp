@@ -43,7 +43,7 @@ const generateTimeSlots = () => {
   currentTime.setHours(6, 0, 0, 0); // Start at 6:00 AM
 
   const endTimeLimit = new Date();
-  endTimeLimit.setHours(21, 0, 0, 0); // End at 9:00 PM
+  endTimeLimit.setHours(21, 0, 0, 0); // End at 9:00 PM (slot itself will be 21:00, meaning booking can end at 21:00)
 
   while (currentTime <= endTimeLimit) {
     slots.push(format(currentTime, "HH:mm"));
@@ -93,12 +93,12 @@ export default function NewBookingPage() {
             const booking = childSnapshot.val() as ExistingBooking;
             try {
               // Ensure date part is consistent for parsing
-              const baseDateStr = "2000-01-01"; // Dummy date for time parsing
-              const slotStartTime = parse(`${baseDateStr} ${booking.AppointmentStartTime}`, "yyyy-MM-dd HH:mm", new Date());
-              const slotEndTime = parse(`${baseDateStr} ${booking.AppointmentEndTime}`, "yyyy-MM-dd HH:mm", new Date());
+              const baseDateForParse = new Date(formattedDate); // Use the actual selected date for parsing context
+              const slotStartTime = parse(booking.AppointmentStartTime, "HH:mm", baseDateForParse);
+              const slotEndTime = parse(booking.AppointmentEndTime, "HH:mm", baseDateForParse);
               
               let currentSlotTime = slotStartTime;
-              while (currentSlotTime < slotEndTime) {
+              while (currentSlotTime < slotEndTime) { // Iterate through each 30-min segment of the booking
                 newBookedSlots.add(format(currentSlotTime, "HH:mm"));
                 currentSlotTime = addMinutes(currentSlotTime, 30);
               }
@@ -122,12 +122,12 @@ export default function NewBookingPage() {
     }, [currentUser, toast]);
 
     useEffect(() => {
-      if (date) {
+      if (date && currentUser) { // Ensure currentUser is also available
         fetchBookedSlots(date);
       } else {
-        setBookedTimeSlotsForDate(new Set()); // Clear if date is removed
+        setBookedTimeSlotsForDate(new Set()); // Clear if date or user is removed
       }
-    }, [date, fetchBookedSlots]);
+    }, [date, currentUser, fetchBookedSlots]);
 
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -154,26 +154,26 @@ export default function NewBookingPage() {
             setIsSubmitting(false);
             return;
         }
+        
+        const selectedFormattedDate = format(date, "yyyy-MM-dd"); // Ensure date is defined
+        const baseDateForSubmitParse = new Date(selectedFormattedDate); // Use actual date for parsing
 
-        if (date && startTime && endTime) {
-          const startDateTime = parse(startTime, 'HH:mm', new Date());
-          const endDateTime = parse(endTime, 'HH:mm', new Date());
+        const startDateTime = parse(startTime, 'HH:mm', baseDateForSubmitParse);
+        const endDateTime = parse(endTime, 'HH:mm', baseDateForSubmitParse);
 
-          if (endDateTime <= startDateTime) {
-            toast({
-              title: "Validation Error",
-              description: "End time must be after start time.",
-              variant: "destructive",
-            });
-            setIsSubmitting(false);
-            return;
-          }
+        if (endDateTime <= startDateTime) {
+          toast({
+            title: "Validation Error",
+            description: "End time must be after start time.",
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
         }
 
         // Check for overlap again before submitting (more robust check)
-        const selectedFormattedDate = format(date, "yyyy-MM-dd");
-        const newBookingStart = parse(startTime, "HH:mm", new Date(selectedFormattedDate));
-        const newBookingEnd = parse(endTime, "HH:mm", new Date(selectedFormattedDate));
+        const newBookingStart = startDateTime;
+        const newBookingEnd = endDateTime;
 
         let tempSlot = newBookingStart;
         let hasOverlap = false;
@@ -207,23 +207,21 @@ export default function NewBookingPage() {
         }
 
         try {
-            let clientIdToUse: string | null = null; // Changed to allow null initially
+            let clientIdToUse: string | null = null; 
             const userClientsRefPath = `Clients/${currentUser.uid}`;
             const clientsRef = ref(db, userClientsRefPath);
             const clientQuery = rtQuery(clientsRef, orderByChild('ClientName'), equalTo(clientName));
             const clientSnapshot = await get(clientQuery);
 
             if (clientSnapshot.exists()) {
-                // If multiple clients have the same name, this takes the first one.
-                // Consider a more robust way to handle this if exact unique names aren't enforced.
                 clientSnapshot.forEach((childSnapshot) => {
-                    if (!clientIdToUse) { // Take the first match's key
+                    if (!clientIdToUse) { 
                         clientIdToUse = childSnapshot.key as string;
                     }
                 });
             }
             
-            if (!clientIdToUse) { // Client does not exist, create new client
+            if (!clientIdToUse) { 
                 clientIdToUse = generateAlphanumericID(10); 
                 const now = new Date();
                 const createDate = now.toISOString().split('T')[0]; 
@@ -259,13 +257,11 @@ export default function NewBookingPage() {
                 description: "Booking Confirmed!",
             });
             
-            fetchBookedSlots(date); // Refresh booked slots for the current date
+            if(date) fetchBookedSlots(date); // Refresh booked slots for the current date
 
-            // Reset form fields
             setClientName('');
             setClientContact('');
             setServiceProcedure('');
-            // setDate(new Date()); // Keep date or reset as per preference
             setStartTime('');
             setEndTime('');
 
@@ -364,8 +360,8 @@ export default function NewBookingPage() {
                                             selected={date}
                                             onSelect={(selectedDay) => {
                                                 setDate(selectedDay);
-                                                setStartTime(''); // Reset time when date changes
-                                                setEndTime('');   // Reset time when date changes
+                                                setStartTime(''); 
+                                                setEndTime('');   
                                             }}
                                             disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
                                             initialFocus
@@ -412,20 +408,39 @@ export default function NewBookingPage() {
                                     <SelectContent>
                                         {isLoadingBookedSlots && <SelectItem value="loading" disabled>Loading slots...</SelectItem>}
                                         {!isLoadingBookedSlots && timeSlots.filter(slot => {
-                                             // End time must be after start time
-                                             if (!startTime) return true; // Show all if no start time selected yet
-                                             const currentSlotTime = parse(slot, "HH:mm", new Date());
-                                             const selectedStartTime = parse(startTime, "HH:mm", new Date());
+                                             if (!startTime) return true; 
+                                             const currentSlotTime = parse(slot, "HH:mm", new Date()); // Base date for comparison only
+                                             const selectedStartTime = parse(startTime, "HH:mm", new Date()); // Base date for comparison only
                                              return currentSlotTime > selectedStartTime;
-                                        }).map(slot => (
-                                            <SelectItem 
-                                                key={`end-${slot}`} 
-                                                value={slot}
-                                                disabled={bookedTimeSlotsForDate.has(slot)}
-                                            >
-                                                {slot} {bookedTimeSlotsForDate.has(slot) ? "(Booked)" : ""}
-                                            </SelectItem>
-                                        ))}
+                                        }).map(slot => {
+                                            let itemIsDisabled = false;
+                                            let itemLabelSuffix = "";
+                                            if (startTime && date) {
+                                                const newBookingStartForCheck = parse(startTime, "HH:mm", new Date(date));
+                                                const potentialEndTime = parse(slot, "HH:mm", new Date(date));
+                                                
+                                                let tempSlotCheck = newBookingStartForCheck;
+                                                while (tempSlotCheck < potentialEndTime) {
+                                                    if (bookedTimeSlotsForDate.has(format(tempSlotCheck, "HH:mm"))) {
+                                                        itemIsDisabled = true;
+                                                        itemLabelSuffix = "(Conflicts)";
+                                                        break;
+                                                    }
+                                                    tempSlotCheck = addMinutes(tempSlotCheck, 30);
+                                                }
+                                            } else {
+                                                itemIsDisabled = true; // Should be covered by overall select disabled state
+                                            }
+                                            return (
+                                                <SelectItem 
+                                                    key={`end-${slot}`} 
+                                                    value={slot}
+                                                    disabled={itemIsDisabled}
+                                                >
+                                                    {slot} {itemLabelSuffix}
+                                                </SelectItem>
+                                            );
+                                        })}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -454,3 +469,4 @@ export default function NewBookingPage() {
         </div>
     );
 }
+
