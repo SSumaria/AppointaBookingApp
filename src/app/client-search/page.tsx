@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link'; // Added
 import { User } from "lucide-react"; 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -224,7 +225,7 @@ export default function ClientSearchPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[200px]">Client Name</TableHead>
-                      <TableHead>Client ID</TableHead>
+                      <TableHead>Client ID (Internal)</TableHead>
                       <TableHead>Contact</TableHead>
                       <TableHead>Date Created</TableHead>
                       <TableHead>Time Created</TableHead>
@@ -233,7 +234,11 @@ export default function ClientSearchPage() {
                   <TableBody>
                     {searchResults.map((client) => (
                       <TableRow key={client.id}>
-                        <TableCell className="font-medium">{client.ClientName}</TableCell>
+                        <TableCell className="font-medium">
+                          <Link href={`/clients/${client.id}`} className="text-primary hover:underline">
+                            {client.ClientName}
+                          </Link>
+                        </TableCell>
                         <TableCell>{client.ClientID}</TableCell>
                         <TableCell>{client.ClientContact || 'N/A'}</TableCell>
                         <TableCell>{client.CreateDate}</TableCell>
@@ -258,5 +263,3 @@ export default function ClientSearchPage() {
     </div>
   );
 }
-
-    
