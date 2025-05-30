@@ -2,20 +2,21 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Calendar as CalendarIconLucide } from "@/components/ui/calendar"
-import { cn } from "@/lib/utils"
-import { format } from "date-fns"
-import { Calendar as CalendarIcon } from "lucide-react"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Separator } from "@/components/ui/separator"
-import { useToast } from "@/hooks/use-toast"
+import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar"; // Renamed to avoid conflict
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
 import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Firebase imports for Realtime Database
 import { ref, set, get, query as rtQuery, orderByChild, equalTo, push } from "firebase/database";
@@ -30,12 +31,26 @@ function generateAlphanumericID(length: number): string {
     return result;
 }
 
+const generateTimeSlots = () => {
+  const slots = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      const hour = h.toString().padStart(2, '0');
+      const minute = m.toString().padStart(2, '0');
+      slots.push(`${hour}:${minute}`);
+    }
+  }
+  return slots;
+};
+const timeSlots = generateTimeSlots();
+
 export default function NewBookingPage() {
     const [clientName, setClientName] = useState('');
     const [clientContact, setClientContact] = useState('');
     const [serviceProcedure, setServiceProcedure] = useState('');
     const [date, setDate] = useState<Date | undefined>(new Date());
-    const [time, setTime] = useState('');
+    const [startTime, setStartTime] = useState('');
+    const [endTime, setEndTime] = useState('');
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -64,7 +79,7 @@ export default function NewBookingPage() {
             return;
         }
 
-        if (!clientName || !serviceProcedure || !date || !time) {
+        if (!clientName || !serviceProcedure || !date || !startTime || !endTime) {
             toast({
                 title: "Error",
                 description: "Please fill in all required fields.",
@@ -72,6 +87,20 @@ export default function NewBookingPage() {
             });
             setIsSubmitting(false);
             return;
+        }
+
+        if (date && startTime && endTime) {
+          const startDateTime = new Date(`${format(date, 'yyyy-MM-dd')}T${startTime}`);
+          const endDateTime = new Date(`${format(date, 'yyyy-MM-dd')}T${endTime}`);
+          if (endDateTime <= startDateTime) {
+            toast({
+              title: "Validation Error",
+              description: "End time must be after start time.",
+              variant: "destructive",
+            });
+            setIsSubmitting(false);
+            return;
+          }
         }
 
         if (!db) {
@@ -86,49 +115,46 @@ export default function NewBookingPage() {
 
         try {
             let clientId: string;
-            // Clients are now stored under /Clients/[userID]/[clientID]
             const userClientsRefPath = `Clients/${currentUser.uid}`;
             const clientsRef = ref(db, userClientsRefPath);
             const clientQuery = rtQuery(clientsRef, orderByChild('ClientName'), equalTo(clientName));
             const clientSnapshot = await get(clientQuery);
 
             if (clientSnapshot.exists()) {
-                // Client exists, retrieve their ClientID (key of the snapshot child)
                 clientSnapshot.forEach((childSnapshot) => {
                     clientId = childSnapshot.key as string;
                 });
-                clientId = clientId!; // Ensure clientId is assigned
+                clientId = clientId!; 
             } else {
-                // Client does not exist for this user, create a new one
-                clientId = generateAlphanumericID(10);
+                clientId = generateAlphanumericID(10); // Use this as the key for the new client
                 const now = new Date();
                 const createDate = now.toISOString().split('T')[0];
                 const createTime = now.toLocaleTimeString();
                 
                 await set(ref(db, `${userClientsRefPath}/${clientId}`), {
-                    ClientID: clientId, // Store the ID within the object as well for convenience
+                    ClientID: clientId, 
                     ClientName: clientName,
                     ClientContact: clientContact,
                     CreateDate: createDate,
                     CreateTime: createTime,
-                    CreatedByUserID: currentUser.uid // Store the user ID for clarity
+                    CreatedByUserID: currentUser.uid 
                 });
             }
 
-            // Appointments are now stored under /Appointments/[userID]/[appointmentID]
             const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
             const appointmentsRef = ref(db, userAppointmentsRefPath);
-            const newAppointmentRef = push(appointmentsRef); // Generate a unique ID for the appointment
+            const newAppointmentRef = push(appointmentsRef); 
             const appointmentId = newAppointmentRef.key;
             const selectedDate = date ? format(date, 'yyyy-MM-dd') : '';
 
             await set(newAppointmentRef, {
-                AppointmentID: appointmentId, // Store the push key as the AppointmentID
-                ClientID: clientId, // This is the ID of the client under the user's client list
+                AppointmentID: appointmentId, 
+                ClientID: clientId, 
                 ServiceProcedure: serviceProcedure,
                 AppointmentDate: selectedDate,
-                AppointmentTime: time,
-                BookedByUserID: currentUser.uid // Store the user ID for clarity
+                AppointmentStartTime: startTime,
+                AppointmentEndTime: endTime,
+                BookedByUserID: currentUser.uid 
             });
 
             toast({
@@ -140,7 +166,8 @@ export default function NewBookingPage() {
             setClientContact('');
             setServiceProcedure('');
             setDate(new Date());
-            setTime('');
+            setStartTime('');
+            setEndTime('');
 
         } catch (error: any) {
             console.error("Error during booking:", error);
@@ -232,7 +259,7 @@ export default function NewBookingPage() {
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0" align="start">
-                                        <CalendarIconLucide
+                                        <CalendarIconLucideShadcn
                                             mode="single"
                                             selected={date}
                                             onSelect={setDate}
@@ -242,16 +269,31 @@ export default function NewBookingPage() {
                                     </PopoverContent>
                                 </Popover>
                             </div>
+                             <div className="flex-1">
+                                <Label htmlFor="startTime" className="font-medium">Appointment Start Time *</Label>
+                                <Select value={startTime} onValueChange={setStartTime} required>
+                                    <SelectTrigger className="w-full mt-1">
+                                        <SelectValue placeholder="Select start time" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {timeSlots.map(slot => (
+                                            <SelectItem key={`start-${slot}`} value={slot}>{slot}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                             <div className="flex-1">
-                                <Label htmlFor="time" className="font-medium">Appointment Time *</Label>
-                                <Input
-                                    type="time"
-                                    id="time"
-                                    value={time}
-                                    onChange={(e) => setTime(e.target.value)}
-                                    required
-                                    className="mt-1 w-full"
-                                />
+                                <Label htmlFor="endTime" className="font-medium">Appointment End Time *</Label>
+                                 <Select value={endTime} onValueChange={setEndTime} required>
+                                    <SelectTrigger className="w-full mt-1">
+                                        <SelectValue placeholder="Select end time" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {timeSlots.map(slot => (
+                                            <SelectItem key={`end-${slot}`} value={slot}>{slot}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         <Separator className="my-4" />
@@ -272,5 +314,3 @@ export default function NewBookingPage() {
         </div>
     );
 }
-
-    

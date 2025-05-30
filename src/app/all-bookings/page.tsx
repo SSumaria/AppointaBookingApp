@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import Link from 'next/link'; // Added Link import
+import Link from 'next/link';
 import {
   Popover,
   PopoverContent,
@@ -38,7 +38,8 @@ interface Booking {
   ClientName?: string; // Will be fetched
   ServiceProcedure: string;
   AppointmentDate: string;
-  AppointmentTime: string;
+  AppointmentStartTime: string; // Updated
+  AppointmentEndTime: string;   // Added
   BookedByUserID?: string;
 }
 
@@ -90,12 +91,12 @@ export default function AllBookingsPage() {
         const formattedFromDate = format(filterDateRange.from, "yyyy-MM-dd");
         const formattedToDate = format(filterDateRange.to, "yyyy-MM-dd");
         bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'), startAt(formattedFromDate), endAt(formattedToDate));
-      } else if (filterDateRange?.from) { // Case where only 'from' is selected (range of 1 day)
+      } else if (filterDateRange?.from) { 
         const formattedDate = format(filterDateRange.from, "yyyy-MM-dd");
         bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'), startAt(formattedDate), endAt(formattedDate));
       }
       else {
-        bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate')); // Fetch all, ordered by date
+        bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate')); 
       }
 
       const snapshot = await get(bookingsQuery);
@@ -120,7 +121,7 @@ export default function AllBookingsPage() {
       bookingsWithClientNames.sort((a, b) => {
         const dateComparison = b.AppointmentDate.localeCompare(a.AppointmentDate);
         if (dateComparison !== 0) return dateComparison;
-        return b.AppointmentTime.localeCompare(a.AppointmentTime);
+        return b.AppointmentStartTime.localeCompare(a.AppointmentStartTime); // Use AppointmentStartTime
       });
 
       setBookings(bookingsWithClientNames);
@@ -152,7 +153,7 @@ export default function AllBookingsPage() {
     if (currentUser) {
       fetchBookings();
     }
-  }, [currentUser, fetchBookings]);
+  }, [currentUser, fetchBookings]); // fetchBookings is now a dependency
 
   const handleFilterDateChange = (selectedRange: DateRange | undefined) => {
     setFilterDateRange(selectedRange);
@@ -160,6 +161,7 @@ export default function AllBookingsPage() {
   
   const clearFilter = () => {
     setFilterDateRange(undefined);
+    // fetchBookings(); // Fetch all bookings again when filter is cleared - handled by useEffect on filterDateRange
   };
 
   if (authLoading || !currentUser) {
@@ -257,7 +259,8 @@ export default function AllBookingsPage() {
                       <TableHead className="w-[200px]">Client Name</TableHead>
                       <TableHead>Service/Procedure</TableHead>
                       <TableHead>Date</TableHead>
-                      <TableHead>Time</TableHead>
+                      <TableHead>Start Time</TableHead>
+                      <TableHead>End Time</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -274,7 +277,8 @@ export default function AllBookingsPage() {
                         </TableCell>
                         <TableCell>{booking.ServiceProcedure}</TableCell>
                         <TableCell>{format(new Date(booking.AppointmentDate), "PPP")}</TableCell> 
-                        <TableCell>{booking.AppointmentTime}</TableCell>
+                        <TableCell>{booking.AppointmentStartTime}</TableCell>
+                        <TableCell>{booking.AppointmentEndTime}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
