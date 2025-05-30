@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import Link from 'next/link'; // Added Link import
 import {
   Popover,
   PopoverContent,
@@ -262,7 +263,15 @@ export default function AllBookingsPage() {
                   <TableBody>
                     {bookings.map((booking) => (
                       <TableRow key={booking.id}>
-                        <TableCell className="font-medium">{booking.ClientName || 'Loading...'}</TableCell>
+                        <TableCell className="font-medium">
+                          {booking.ClientName && booking.ClientID ? (
+                            <Link href={`/clients/${booking.ClientID}`} className="text-primary hover:underline">
+                              {booking.ClientName}
+                            </Link>
+                          ) : (
+                            booking.ClientName || 'Loading...'
+                          )}
+                        </TableCell>
                         <TableCell>{booking.ServiceProcedure}</TableCell>
                         <TableCell>{format(new Date(booking.AppointmentDate), "PPP")}</TableCell> 
                         <TableCell>{booking.AppointmentTime}</TableCell>
