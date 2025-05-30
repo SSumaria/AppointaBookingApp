@@ -33,13 +33,12 @@ function generateAlphanumericID(length: number): string {
 
 const generateTimeSlots = () => {
   const slots = [];
-  for (let h = 0; h < 24; h++) {
-    for (let m = 0; m < 60; m += 30) {
-      const hour = h.toString().padStart(2, '0');
-      const minute = m.toString().padStart(2, '0');
-      slots.push(`${hour}:${minute}`);
-    }
+  // Hours from 6 AM (06:00) up to (but not including) 9 PM (21:00)
+  for (let h = 6; h < 21; h++) { 
+    slots.push(`${h.toString().padStart(2, '0')}:00`);
+    slots.push(`${h.toString().padStart(2, '0')}:30`);
   }
+  slots.push("21:00"); // Add 9:00 PM
   return slots;
 };
 const timeSlots = generateTimeSlots();
@@ -122,39 +121,44 @@ export default function NewBookingPage() {
 
             if (clientSnapshot.exists()) {
                 clientSnapshot.forEach((childSnapshot) => {
-                    clientId = childSnapshot.key as string;
+                    // There should only be one client with this name per user,
+                    // but forEach is the way to access it from the snapshot.
+                    // We take the key of the first (and supposedly only) match.
+                    clientId = childSnapshot.key as string; 
                 });
-                clientId = clientId!; 
+                 clientId = clientId!; // Assert clientId is assigned
             } else {
-                clientId = generateAlphanumericID(10); // Use this as the key for the new client
+                // Client does not exist, create new client using a generated ID as the key
+                clientId = generateAlphanumericID(10); 
                 const now = new Date();
-                const createDate = now.toISOString().split('T')[0];
-                const createTime = now.toLocaleTimeString();
-                
+                const createDate = now.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+                const createTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }); // Format as HH:MM
+
                 await set(ref(db, `${userClientsRefPath}/${clientId}`), {
-                    ClientID: clientId, 
+                    ClientID: clientId, // Store the generated ID also as a field
                     ClientName: clientName,
                     ClientContact: clientContact,
                     CreateDate: createDate,
                     CreateTime: createTime,
-                    CreatedByUserID: currentUser.uid 
+                    CreatedByUserID: currentUser.uid // Store the user ID who created this client
                 });
             }
 
             const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
             const appointmentsRef = ref(db, userAppointmentsRefPath);
-            const newAppointmentRef = push(appointmentsRef); 
-            const appointmentId = newAppointmentRef.key;
+            const newAppointmentRef = push(appointmentsRef); // Generate a unique key for the new appointment
+            const appointmentId = newAppointmentRef.key; // Get the unique key
             const selectedDate = date ? format(date, 'yyyy-MM-dd') : '';
 
+
             await set(newAppointmentRef, {
-                AppointmentID: appointmentId, 
+                AppointmentID: appointmentId, // Store the unique key as AppointmentID
                 ClientID: clientId, 
                 ServiceProcedure: serviceProcedure,
                 AppointmentDate: selectedDate,
                 AppointmentStartTime: startTime,
                 AppointmentEndTime: endTime,
-                BookedByUserID: currentUser.uid 
+                BookedByUserID: currentUser.uid // Store the user ID who made the booking
             });
 
             toast({
@@ -162,6 +166,7 @@ export default function NewBookingPage() {
                 description: "Booking Confirmed!",
             });
 
+            // Reset form fields
             setClientName('');
             setClientContact('');
             setServiceProcedure('');
@@ -314,3 +319,6 @@ export default function NewBookingPage() {
         </div>
     );
 }
+
+
+    
