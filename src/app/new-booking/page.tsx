@@ -26,7 +26,7 @@ interface ExistingBooking {
   AppointmentStartTime: string;
   AppointmentEndTime: string;
   AppointmentDate: string;
-  BookingStatus?: string; // Added
+  BookingStatus?: string;
 }
 
 function generateAlphanumericID(length: number): string {
@@ -83,7 +83,8 @@ export default function NewBookingPage() {
       }
       setIsLoadingBookedSlots(true);
       const formattedDate = format(selectedDate, "yyyy-MM-dd");
-      const appointmentsRef = ref(db, `Appointments/${currentUser.uid}`);
+      const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
+      const appointmentsRef = ref(db, userAppointmentsRefPath);
       const appointmentsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'), equalTo(formattedDate));
 
       try {
@@ -92,10 +93,9 @@ export default function NewBookingPage() {
         if (snapshot.exists()) {
           snapshot.forEach((childSnapshot) => {
             const booking = childSnapshot.val() as ExistingBooking;
-            // Only consider "Booked" appointments for disabling slots
             if (booking.BookingStatus === "Booked") {
               try {
-                const baseDateForParse = new Date(formattedDate);
+                const baseDateForParse = new Date(formattedDate + "T00:00:00"); // Ensure date part is considered
                 const slotStartTime = parse(booking.AppointmentStartTime, "HH:mm", baseDateForParse);
                 const slotEndTime = parse(booking.AppointmentEndTime, "HH:mm", baseDateForParse);
 
@@ -159,7 +159,7 @@ export default function NewBookingPage() {
         }
 
         const selectedFormattedDate = format(date, "yyyy-MM-dd");
-        const baseDateForSubmitParse = new Date(selectedFormattedDate);
+        const baseDateForSubmitParse = new Date(selectedFormattedDate + "T00:00:00");
 
         const startDateTime = parse(startTime, 'HH:mm', baseDateForSubmitParse);
         const endDateTime = parse(endTime, 'HH:mm', baseDateForSubmitParse);
@@ -206,36 +206,25 @@ export default function NewBookingPage() {
         }
 
         try {
-            let clientIdToUse: string | null = null;
+            // Always create a new client from this form
             const userClientsRefPath = `Clients/${currentUser.uid}`;
-            const clientsRef = ref(db, userClientsRefPath);
-            const clientQuery = rtQuery(clientsRef, orderByChild('ClientName'), equalTo(clientName));
-            const clientSnapshot = await get(clientQuery);
+            const newClientRef = push(ref(db, userClientsRefPath)); // Generate new unique key for client
+            const clientIdToUse = newClientRef.key as string;       // This IS the ClientID for the new client
 
-            if (clientSnapshot.exists()) {
-                clientSnapshot.forEach((childSnapshot) => {
-                    if (!clientIdToUse) {
-                        clientIdToUse = childSnapshot.key as string;
-                    }
-                });
-            }
+            const now = new Date();
+            const createDate = now.toISOString().split('T')[0];
+            const createTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
-            if (!clientIdToUse) {
-                clientIdToUse = generateAlphanumericID(10);
-                const now = new Date();
-                const createDate = now.toISOString().split('T')[0];
-                const createTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+            await set(newClientRef, {
+                ClientID: clientIdToUse, // Store the key as ClientID field as well
+                ClientName: clientName,
+                ClientContact: clientContact,
+                CreateDate: createDate,
+                CreateTime: createTime,
+                CreatedByUserID: currentUser.uid
+            });
 
-                await set(ref(db, `${userClientsRefPath}/${clientIdToUse}`), {
-                    ClientID: clientIdToUse,
-                    ClientName: clientName,
-                    ClientContact: clientContact,
-                    CreateDate: createDate,
-                    CreateTime: createTime,
-                    CreatedByUserID: currentUser.uid
-                });
-            }
-
+            // Now create the appointment using this new clientIdToUse
             const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
             const appointmentsRefForUser = ref(db, userAppointmentsRefPath);
             const newAppointmentRef = push(appointmentsRefForUser);
@@ -243,12 +232,12 @@ export default function NewBookingPage() {
 
             await set(newAppointmentRef, {
                 AppointmentID: appointmentId,
-                ClientID: clientIdToUse,
+                ClientID: clientIdToUse, // Use the NEWLY created client's ID
                 ServiceProcedure: serviceProcedure,
                 AppointmentDate: selectedFormattedDate,
                 AppointmentStartTime: startTime,
                 AppointmentEndTime: endTime,
-                BookingStatus: "Booked", // Set default status
+                BookingStatus: "Booked",
                 BookedByUserID: currentUser.uid
             });
 
@@ -264,6 +253,7 @@ export default function NewBookingPage() {
             setServiceProcedure('');
             setStartTime('');
             setEndTime('');
+            // setDate(new Date()); // Optionally reset date, or keep it for next booking
 
         } catch (error: any) {
             console.error("Error during booking:", error);
@@ -375,7 +365,6 @@ export default function NewBookingPage() {
                                     value={startTime}
                                     onValueChange={setStartTime}
                                     disabled={isLoadingBookedSlots || !date}
-                                    required
                                 >
                                     <SelectTrigger className="w-full mt-1">
                                         <SelectValue placeholder={isLoadingBookedSlots ? "Loading..." : "Select start time"} />
@@ -400,7 +389,6 @@ export default function NewBookingPage() {
                                     value={endTime}
                                     onValueChange={setEndTime}
                                     disabled={isLoadingBookedSlots || !date || !startTime}
-                                    required
                                  >
                                     <SelectTrigger className="w-full mt-1">
                                         <SelectValue placeholder={isLoadingBookedSlots ? "Loading..." : "Select end time"} />
@@ -408,16 +396,22 @@ export default function NewBookingPage() {
                                     <SelectContent>
                                         {isLoadingBookedSlots && <SelectItem value="loading" disabled>Loading slots...</SelectItem>}
                                         {!isLoadingBookedSlots && timeSlots.filter(slot => {
-                                             if (!startTime) return true;
-                                             const currentSlotTime = parse(slot, "HH:mm", new Date());
-                                             const selectedStartTime = parse(startTime, "HH:mm", new Date());
+                                             if (!startTime) return true; // Show all if no start time selected
+                                             // Ensure end time is after start time
+                                             const baseDateForFilter = date ? new Date(date) : new Date(); // Use selected date or today if none
+                                             baseDateForFilter.setHours(0,0,0,0); // Normalize time part for parsing
+
+                                             const currentSlotTime = parse(slot, "HH:mm", baseDateForFilter);
+                                             const selectedStartTime = parse(startTime, "HH:mm", baseDateForFilter);
                                              return currentSlotTime > selectedStartTime;
                                         }).map(slot => {
                                             let itemIsDisabled = false;
                                             let itemLabelSuffix = "";
                                             if (startTime && date) {
-                                                const newBookingStartForCheck = parse(startTime, "HH:mm", new Date(date));
-                                                const potentialEndTime = parse(slot, "HH:mm", new Date(date));
+                                                const baseDateForCheck = new Date(date);
+                                                baseDateForCheck.setHours(0,0,0,0); // Normalize time for consistent parsing
+                                                const newBookingStartForCheck = parse(startTime, "HH:mm", baseDateForCheck);
+                                                const potentialEndTime = parse(slot, "HH:mm", baseDateForCheck);
 
                                                 let tempSlotCheck = newBookingStartForCheck;
                                                 while (tempSlotCheck < potentialEndTime) {
@@ -428,7 +422,7 @@ export default function NewBookingPage() {
                                                     }
                                                     tempSlotCheck = addMinutes(tempSlotCheck, 30);
                                                 }
-                                            } else {
+                                            } else if (!startTime){ // Disable if no start time is chosen (shouldn't happen due to outer filter)
                                                 itemIsDisabled = true;
                                             }
                                             return (
