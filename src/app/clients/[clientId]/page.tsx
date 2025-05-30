@@ -11,14 +11,15 @@ import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { User, Calendar as CalendarIconLucide, Briefcase, Mail, Phone, Clock } from "lucide-react";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils"; // Added for status styling
 
 // Firebase imports
 import { ref, get, query as rtQuery, orderByChild, equalTo } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
 
 interface Client {
-  id: string; // Firebase key
-  ClientID: string; 
+  id: string;
+  ClientID: string;
   ClientName: string;
   ClientContact?: string;
   CreateDate: string;
@@ -27,19 +28,20 @@ interface Client {
 }
 
 interface Booking {
-  id: string; // Firebase key of the appointment
-  AppointmentID: string; 
+  id: string;
+  AppointmentID: string;
   ClientID: string;
   ServiceProcedure: string;
   AppointmentDate: string;
-  AppointmentStartTime: string; // Updated
-  AppointmentEndTime: string;   // Added
+  AppointmentStartTime: string;
+  AppointmentEndTime: string;
+  BookingStatus?: string; // Added
   BookedByUserID?: string;
 }
 
 export default function ClientDetailsPage() {
   const params = useParams();
-  const clientId = params.clientId as string; 
+  const clientId = params.clientId as string;
   const router = useRouter();
   const { currentUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -78,13 +80,13 @@ export default function ClientDetailsPage() {
   }, [currentUser?.uid, clientId, toast]);
 
   const fetchClientBookings = useCallback(async () => {
-    if (!currentUser?.uid || !clientId) return; 
+    if (!currentUser?.uid || !clientId) return;
     setIsLoadingBookings(true);
     try {
       const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
       const appointmentsRef = ref(db, userAppointmentsRefPath);
       const bookingsQuery = rtQuery(appointmentsRef, orderByChild('ClientID'), equalTo(clientId));
-      
+
       const snapshot = await get(bookingsQuery);
       const fetchedBookings: Booking[] = [];
       if (snapshot.exists()) {
@@ -98,7 +100,7 @@ export default function ClientDetailsPage() {
       fetchedBookings.sort((a, b) => {
         const dateComparison = b.AppointmentDate.localeCompare(a.AppointmentDate);
         if (dateComparison !== 0) return dateComparison;
-        return b.AppointmentStartTime.localeCompare(a.AppointmentStartTime); // Use AppointmentStartTime
+        return b.AppointmentStartTime.localeCompare(a.AppointmentStartTime);
       });
       setBookings(fetchedBookings);
     } catch (error: any) {
@@ -184,7 +186,7 @@ export default function ClientDetailsPage() {
                 <h3 className="text-lg font-semibold text-muted-foreground">Client Information</h3>
                 {client.ClientContact && (
                   <p className="flex items-center">
-                    {client.ClientContact.includes('@') ? <Mail className="mr-2 h-5 w-5 text-primary/80" /> : <Phone className="mr-2 h-5 w-5 text-primary/80" />} 
+                    {client.ClientContact.includes('@') ? <Mail className="mr-2 h-5 w-5 text-primary/80" /> : <Phone className="mr-2 h-5 w-5 text-primary/80" />}
                     <span className="font-medium">Contact:</span> {client.ClientContact}
                   </p>
                 )}
@@ -218,6 +220,7 @@ export default function ClientDetailsPage() {
                       <TableHead>Date</TableHead>
                       <TableHead>Start Time</TableHead>
                       <TableHead>End Time</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -227,6 +230,15 @@ export default function ClientDetailsPage() {
                         <TableCell>{format(new Date(booking.AppointmentDate), "PPP")}</TableCell>
                         <TableCell>{booking.AppointmentStartTime}</TableCell>
                         <TableCell>{booking.AppointmentEndTime}</TableCell>
+                        <TableCell>
+                          <span className={cn(
+                            "px-2 py-1 rounded-full text-xs font-medium",
+                            booking.BookingStatus === "Booked" && "bg-green-100 text-green-800",
+                            booking.BookingStatus === "Cancelled" && "bg-red-100 text-red-800"
+                          )}>
+                            {booking.BookingStatus || "Booked"}
+                          </span>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -246,3 +258,4 @@ export default function ClientDetailsPage() {
     </div>
   );
 }
+

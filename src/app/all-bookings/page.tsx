@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import type { DateRange } from "react-day-picker";
-import { Calendar as CalendarIconLucide, ListFilter } from "lucide-react";
+import { Calendar as CalendarIconLucide, ListFilter, XCircle } from "lucide-react"; // Added XCircle
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -28,18 +28,31 @@ import { useToast } from "@/hooks/use-toast";
 import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { ref, get, query as rtQuery, orderByChild, startAt, endAt } from "firebase/database";
+import { ref, get, query as rtQuery, orderByChild, startAt, endAt, update } from "firebase/database"; // Added update
 import { db } from '@/lib/firebaseConfig';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
 
 interface Booking {
-  id: string; // Firebase key of the appointment
+  id: string;
   AppointmentID: string;
   ClientID: string;
-  ClientName?: string; // Will be fetched
+  ClientName?: string;
   ServiceProcedure: string;
   AppointmentDate: string;
-  AppointmentStartTime: string; // Updated
-  AppointmentEndTime: string;   // Added
+  AppointmentStartTime: string;
+  AppointmentEndTime: string;
+  BookingStatus?: string; // Added
   BookedByUserID?: string;
 }
 
@@ -91,12 +104,12 @@ export default function AllBookingsPage() {
         const formattedFromDate = format(filterDateRange.from, "yyyy-MM-dd");
         const formattedToDate = format(filterDateRange.to, "yyyy-MM-dd");
         bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'), startAt(formattedFromDate), endAt(formattedToDate));
-      } else if (filterDateRange?.from) { 
+      } else if (filterDateRange?.from) {
         const formattedDate = format(filterDateRange.from, "yyyy-MM-dd");
         bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'), startAt(formattedDate), endAt(formattedDate));
       }
       else {
-        bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate')); 
+        bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'));
       }
 
       const snapshot = await get(bookingsQuery);
@@ -110,18 +123,18 @@ export default function AllBookingsPage() {
           });
         });
       }
-      
+
       const bookingsWithClientNames = await Promise.all(
         fetchedBookings.map(async (booking) => {
           const clientName = await fetchClientName(booking.ClientID);
           return { ...booking, ClientName: clientName };
         })
       );
-      
+
       bookingsWithClientNames.sort((a, b) => {
         const dateComparison = b.AppointmentDate.localeCompare(a.AppointmentDate);
         if (dateComparison !== 0) return dateComparison;
-        return b.AppointmentStartTime.localeCompare(a.AppointmentStartTime); // Use AppointmentStartTime
+        return b.AppointmentStartTime.localeCompare(a.AppointmentStartTime);
       });
 
       setBookings(bookingsWithClientNames);
@@ -153,16 +166,39 @@ export default function AllBookingsPage() {
     if (currentUser) {
       fetchBookings();
     }
-  }, [currentUser, fetchBookings]); // fetchBookings is now a dependency
+  }, [currentUser, fetchBookings]);
 
   const handleFilterDateChange = (selectedRange: DateRange | undefined) => {
     setFilterDateRange(selectedRange);
   };
-  
+
   const clearFilter = () => {
     setFilterDateRange(undefined);
-    // fetchBookings(); // Fetch all bookings again when filter is cleared - handled by useEffect on filterDateRange
   };
+
+  const handleCancelBooking = async (bookingId: string) => {
+    if (!currentUser?.uid) {
+      toast({ title: "Error", description: "You must be logged in.", variant: "destructive" });
+      return;
+    }
+    try {
+      const bookingRefPath = `Appointments/${currentUser.uid}/${bookingId}`;
+      await update(ref(db, bookingRefPath), { BookingStatus: "Cancelled" });
+      toast({
+        title: "Booking Cancelled",
+        description: "The booking has been successfully cancelled.",
+      });
+      fetchBookings(); // Refresh the bookings list
+    } catch (error: any) {
+      console.error("Error cancelling booking:", error);
+      toast({
+        title: "Error Cancelling Booking",
+        description: error.message || "Could not cancel the booking.",
+        variant: "destructive",
+      });
+    }
+  };
+
 
   if (authLoading || !currentUser) {
     return (
@@ -250,7 +286,7 @@ export default function AllBookingsPage() {
               ) : bookings.length > 0 ? (
                 <Table>
                   <TableCaption>
-                    {filterDateRange?.from 
+                    {filterDateRange?.from
                       ? `A list of your bookings from ${format(filterDateRange.from, "PPP")}${filterDateRange.to ? ` to ${format(filterDateRange.to, "PPP")}` : ''}.`
                       : "A list of all your bookings."}
                   </TableCaption>
@@ -261,6 +297,8 @@ export default function AllBookingsPage() {
                       <TableHead>Date</TableHead>
                       <TableHead>Start Time</TableHead>
                       <TableHead>End Time</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -276,9 +314,43 @@ export default function AllBookingsPage() {
                           )}
                         </TableCell>
                         <TableCell>{booking.ServiceProcedure}</TableCell>
-                        <TableCell>{format(new Date(booking.AppointmentDate), "PPP")}</TableCell> 
+                        <TableCell>{format(new Date(booking.AppointmentDate), "PPP")}</TableCell>
                         <TableCell>{booking.AppointmentStartTime}</TableCell>
                         <TableCell>{booking.AppointmentEndTime}</TableCell>
+                        <TableCell>
+                          <span className={cn(
+                            "px-2 py-1 rounded-full text-xs font-medium",
+                            booking.BookingStatus === "Booked" && "bg-green-100 text-green-800",
+                            booking.BookingStatus === "Cancelled" && "bg-red-100 text-red-800"
+                          )}>
+                            {booking.BookingStatus || "Booked"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {booking.BookingStatus === "Booked" && (
+                             <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm">
+                                  <XCircle className="mr-1 h-4 w-4" /> Cancel
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This action will cancel the booking for {booking.ClientName} on {format(new Date(booking.AppointmentDate), "PPP")} at {booking.AppointmentStartTime}. This cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Keep Booking</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleCancelBooking(booking.id)}>
+                                    Confirm Cancellation
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -302,3 +374,4 @@ export default function AllBookingsPage() {
     </div>
   );
 }
+
