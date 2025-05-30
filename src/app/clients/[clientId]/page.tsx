@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import { User, Calendar as CalendarIcon, Briefcase, Mail, Phone, Clock, Tag } from "lucide-react";
+import { User, Calendar as CalendarIconLucide, Briefcase, Mail, Phone, Clock } from "lucide-react"; // Removed Tag icon
 import { format } from "date-fns";
 
 // Firebase imports
@@ -18,7 +18,7 @@ import { db } from '@/lib/firebaseConfig';
 
 interface Client {
   id: string; // Firebase key
-  ClientID: string;
+  ClientID: string; // Still fetched for internal use if needed, but not displayed
   ClientName: string;
   ClientContact?: string;
   CreateDate: string;
@@ -28,7 +28,7 @@ interface Client {
 
 interface Booking {
   id: string; // Firebase key of the appointment
-  AppointmentID: string;
+  AppointmentID: string; // Still fetched for internal use if needed, but not displayed
   ClientID: string;
   ServiceProcedure: string;
   AppointmentDate: string;
@@ -38,7 +38,7 @@ interface Booking {
 
 export default function ClientDetailsPage() {
   const params = useParams();
-  const clientId = params.clientId as string;
+  const clientId = params.clientId as string; // This is the Firebase key (id)
   const router = useRouter();
   const { currentUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -77,13 +77,12 @@ export default function ClientDetailsPage() {
   }, [currentUser?.uid, clientId, toast]);
 
   const fetchClientBookings = useCallback(async () => {
-    if (!currentUser?.uid || !clientId) return;
+    if (!currentUser?.uid || !clientId) return; // clientId is the Firebase key
     setIsLoadingBookings(true);
     try {
       const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
       const appointmentsRef = ref(db, userAppointmentsRefPath);
-      // Query appointments for this specific client
-      // The 'ClientID' in the Appointment object should match the Firebase key of the client.
+      // Query appointments for this specific client using their Firebase key (which is clientId here)
       const bookingsQuery = rtQuery(appointmentsRef, orderByChild('ClientID'), equalTo(clientId));
       
       const snapshot = await get(bookingsQuery);
@@ -184,14 +183,14 @@ export default function ClientDetailsPage() {
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3">
                 <h3 className="text-lg font-semibold text-muted-foreground">Client Information</h3>
-                <p className="flex items-center"><Tag className="mr-2 h-5 w-5 text-primary/80" /> <span className="font-medium">Internal Client ID:</span> {client.ClientID}</p>
+                {/* ClientID removed from display */}
                 {client.ClientContact && (
                   <p className="flex items-center">
                     {client.ClientContact.includes('@') ? <Mail className="mr-2 h-5 w-5 text-primary/80" /> : <Phone className="mr-2 h-5 w-5 text-primary/80" />} 
                     <span className="font-medium">Contact:</span> {client.ClientContact}
                   </p>
                 )}
-                <p className="flex items-center"><CalendarIcon className="mr-2 h-5 w-5 text-primary/80" /> <span className="font-medium">Date Created:</span> {format(new Date(client.CreateDate), "PPP")}</p>
+                <p className="flex items-center"><CalendarIconLucide className="mr-2 h-5 w-5 text-primary/80" /> <span className="font-medium">Date Created:</span> {format(new Date(client.CreateDate), "PPP")}</p>
                 <p className="flex items-center"><Clock className="mr-2 h-5 w-5 text-primary/80" /> <span className="font-medium">Time Created:</span> {client.CreateTime}</p>
               </div>
             </CardContent>
@@ -220,7 +219,7 @@ export default function ClientDetailsPage() {
                       <TableHead>Service/Procedure</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Time</TableHead>
-                      <TableHead>Appointment ID</TableHead>
+                      {/* Appointment ID column removed */}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -229,7 +228,7 @@ export default function ClientDetailsPage() {
                         <TableCell className="font-medium">{booking.ServiceProcedure}</TableCell>
                         <TableCell>{format(new Date(booking.AppointmentDate), "PPP")}</TableCell>
                         <TableCell>{booking.AppointmentTime}</TableCell>
-                        <TableCell>{booking.AppointmentID}</TableCell>
+                        {/* Appointment ID cell removed */}
                       </TableRow>
                     ))}
                   </TableBody>
