@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { User, Calendar as CalendarIconLucide, Briefcase, Mail, Phone, Clock } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils"; // Added for status styling
+import { cn } from "@/lib/utils";
 
 // Firebase imports
 import { ref, get, query as rtQuery, orderByChild, equalTo } from "firebase/database";
@@ -29,13 +29,13 @@ interface Client {
 
 interface Booking {
   id: string;
-  AppointmentID: string;
+  // AppointmentID: string; // Removed as per request
   ClientID: string;
   ServiceProcedure: string;
   AppointmentDate: string;
   AppointmentStartTime: string;
   AppointmentEndTime: string;
-  BookingStatus?: string; // Added
+  BookingStatus?: string;
   BookedByUserID?: string;
 }
 
@@ -233,10 +233,11 @@ export default function ClientDetailsPage() {
                         <TableCell>
                           <span className={cn(
                             "px-2 py-1 rounded-full text-xs font-medium",
-                            booking.BookingStatus === "Booked" && "bg-green-100 text-green-800",
-                            booking.BookingStatus === "Cancelled" && "bg-red-100 text-red-800"
+                            booking.BookingStatus === "Booked" && "bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-200",
+                            booking.BookingStatus === "Cancelled" && "bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-200",
+                            (!booking.BookingStatus || (booking.BookingStatus !== "Booked" && booking.BookingStatus !== "Cancelled")) && "bg-muted text-muted-foreground"
                           )}>
-                            {booking.BookingStatus || "Booked"}
+                            {booking.BookingStatus ? booking.BookingStatus : "Unknown"}
                           </span>
                         </TableCell>
                       </TableRow>
@@ -258,4 +259,3 @@ export default function ClientDetailsPage() {
     </div>
   );
 }
-

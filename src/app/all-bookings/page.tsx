@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import type { DateRange } from "react-day-picker";
-import { Calendar as CalendarIconLucide, ListFilter, XCircle } from "lucide-react"; // Added XCircle
+import { Calendar as CalendarIconLucide, ListFilter, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { ref, get, query as rtQuery, orderByChild, startAt, endAt, update } from "firebase/database"; // Added update
+import { ref, get, query as rtQuery, orderByChild, startAt, endAt, update } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
 import {
   AlertDialog,
@@ -52,7 +52,7 @@ interface Booking {
   AppointmentDate: string;
   AppointmentStartTime: string;
   AppointmentEndTime: string;
-  BookingStatus?: string; // Added
+  BookingStatus?: string;
   BookedByUserID?: string;
 }
 
@@ -320,10 +320,11 @@ export default function AllBookingsPage() {
                         <TableCell>
                           <span className={cn(
                             "px-2 py-1 rounded-full text-xs font-medium",
-                            booking.BookingStatus === "Booked" && "bg-green-100 text-green-800",
-                            booking.BookingStatus === "Cancelled" && "bg-red-100 text-red-800"
+                            booking.BookingStatus === "Booked" && "bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-200",
+                            booking.BookingStatus === "Cancelled" && "bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-200",
+                            (!booking.BookingStatus || (booking.BookingStatus !== "Booked" && booking.BookingStatus !== "Cancelled")) && "bg-muted text-muted-foreground"
                           )}>
-                            {booking.BookingStatus || "Booked"}
+                            {booking.BookingStatus ? booking.BookingStatus : "Unknown"}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -374,4 +375,3 @@ export default function AllBookingsPage() {
     </div>
   );
 }
-
