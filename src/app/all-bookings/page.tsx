@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import type { DateRange } from "react-day-picker";
 import { Calendar as CalendarIconLucide, ListFilter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -26,7 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { ref, get, query as rtQuery, orderByChild, equalTo } from "firebase/database";
+import { ref, get, query as rtQuery, orderByChild, startAt, endAt } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
 
 interface Booking {
@@ -42,9 +43,8 @@ interface Booking {
 
 export default function AllBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [filterDate, setFilterDate] = useState<Date | undefined>(undefined);
+  const [filterDateRange, setFilterDateRange] = useState<DateRange | undefined>(undefined);
   const [clientsCache, setClientsCache] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const { currentUser, loading: authLoading } = useAuth();
@@ -85,10 +85,15 @@ export default function AllBookingsPage() {
       const appointmentsRef = ref(db, userAppointmentsRefPath);
       let bookingsQuery;
 
-      if (filterDate) {
-        const formattedDate = format(filterDate, "yyyy-MM-dd");
-        bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'), equalTo(formattedDate));
-      } else {
+      if (filterDateRange?.from && filterDateRange?.to) {
+        const formattedFromDate = format(filterDateRange.from, "yyyy-MM-dd");
+        const formattedToDate = format(filterDateRange.to, "yyyy-MM-dd");
+        bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'), startAt(formattedFromDate), endAt(formattedToDate));
+      } else if (filterDateRange?.from) { // Case where only 'from' is selected (range of 1 day)
+        const formattedDate = format(filterDateRange.from, "yyyy-MM-dd");
+        bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'), startAt(formattedDate), endAt(formattedDate));
+      }
+      else {
         bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate')); // Fetch all, ordered by date
       }
 
@@ -104,7 +109,6 @@ export default function AllBookingsPage() {
         });
       }
       
-      // Fetch client names for each booking
       const bookingsWithClientNames = await Promise.all(
         fetchedBookings.map(async (booking) => {
           const clientName = await fetchClientName(booking.ClientID);
@@ -112,22 +116,19 @@ export default function AllBookingsPage() {
         })
       );
       
-      // Sort bookings by date and then time (descending for recent first, or ascending)
       bookingsWithClientNames.sort((a, b) => {
         const dateComparison = b.AppointmentDate.localeCompare(a.AppointmentDate);
         if (dateComparison !== 0) return dateComparison;
         return b.AppointmentTime.localeCompare(a.AppointmentTime);
       });
 
-
       setBookings(bookingsWithClientNames);
-      setFilteredBookings(bookingsWithClientNames); // Initially, all fetched bookings are shown
-      if (bookingsWithClientNames.length === 0 && filterDate) {
+      if (bookingsWithClientNames.length === 0 && filterDateRange?.from) {
          toast({
           title: "No Bookings",
-          description: `No bookings found for ${format(filterDate, "PPP")}.`,
+          description: `No bookings found for the selected date range.`,
         });
-      } else if (bookingsWithClientNames.length === 0 && !filterDate){
+      } else if (bookingsWithClientNames.length === 0 && !filterDateRange?.from){
          toast({
           title: "No Bookings",
           description: "You have no bookings yet.",
@@ -144,24 +145,21 @@ export default function AllBookingsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentUser?.uid, filterDate, fetchClientName, toast]);
+  }, [currentUser?.uid, filterDateRange, fetchClientName, toast]);
 
   useEffect(() => {
     if (currentUser) {
       fetchBookings();
     }
-  }, [currentUser, fetchBookings]); // Removed filterDate from here to avoid double fetch on initial load with filterDate
+  }, [currentUser, fetchBookings]);
 
-  const handleFilterDateChange = (selectedDate: Date | undefined) => {
-    setFilterDate(selectedDate);
-    // Fetching will be triggered by the main useEffect watching `currentUser` and `fetchBookings` (which depends on `filterDate`)
+  const handleFilterDateChange = (selectedRange: DateRange | undefined) => {
+    setFilterDateRange(selectedRange);
   };
   
   const clearFilter = () => {
-    setFilterDate(undefined);
-     // Fetching will be triggered by the main useEffect watching `currentUser` and `fetchBookings` (which depends on `filterDate`)
+    setFilterDateRange(undefined);
   };
-
 
   if (authLoading || !currentUser) {
     return (
@@ -194,7 +192,7 @@ export default function AllBookingsPage() {
                 <ListFilter className="mr-2 h-6 w-6" /> All Bookings
               </CardTitle>
               <CardDescription>
-                View and filter all your bookings.
+                View and filter all your bookings by date range.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -204,24 +202,36 @@ export default function AllBookingsPage() {
                     <Button
                       variant={"outline"}
                       className={cn(
-                        "w-full sm:w-[280px] justify-start text-left font-normal",
-                        !filterDate && "text-muted-foreground"
+                        "w-full sm:w-[300px] justify-start text-left font-normal",
+                        !filterDateRange?.from && "text-muted-foreground"
                       )}
                     >
                       <CalendarIconLucide className="mr-2 h-4 w-4" />
-                      {filterDate ? format(filterDate, "PPP") : <span>Filter by date</span>}
+                      {filterDateRange?.from ? (
+                        filterDateRange.to ? (
+                          <>
+                            {format(filterDateRange.from, "LLL dd, y")} -{" "}
+                            {format(filterDateRange.to, "LLL dd, y")}
+                          </>
+                        ) : (
+                          format(filterDateRange.from, "LLL dd, y")
+                        )
+                      ) : (
+                        <span>Filter by date range</span>
+                      )}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
                     <Calendar
-                      mode="single"
-                      selected={filterDate}
-                      onSelect={(date) => handleFilterDateChange(date)}
+                      mode="range"
+                      selected={filterDateRange}
+                      onSelect={handleFilterDateChange}
                       initialFocus
+                      numberOfMonths={1}
                     />
                   </PopoverContent>
                 </Popover>
-                {filterDate && (
+                {filterDateRange?.from && (
                   <Button variant="ghost" onClick={clearFilter}>Clear Filter</Button>
                 )}
               </div>
@@ -234,11 +244,11 @@ export default function AllBookingsPage() {
                   </svg>
                   <p className="mt-2 text-muted-foreground">Loading bookings...</p>
                 </div>
-              ) : filteredBookings.length > 0 ? (
+              ) : bookings.length > 0 ? (
                 <Table>
                   <TableCaption>
-                    {filterDate 
-                      ? `A list of your bookings for ${format(filterDate, "PPP")}.`
+                    {filterDateRange?.from 
+                      ? `A list of your bookings from ${format(filterDateRange.from, "PPP")}${filterDateRange.to ? ` to ${format(filterDateRange.to, "PPP")}` : ''}.`
                       : "A list of all your bookings."}
                   </TableCaption>
                   <TableHeader>
@@ -250,11 +260,11 @@ export default function AllBookingsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredBookings.map((booking) => (
+                    {bookings.map((booking) => (
                       <TableRow key={booking.id}>
                         <TableCell className="font-medium">{booking.ClientName || 'Loading...'}</TableCell>
                         <TableCell>{booking.ServiceProcedure}</TableCell>
-                        <TableCell>{booking.AppointmentDate}</TableCell>
+                        <TableCell>{format(new Date(booking.AppointmentDate), "PPP")}</TableCell> 
                         <TableCell>{booking.AppointmentTime}</TableCell>
                       </TableRow>
                     ))}
@@ -263,8 +273,8 @@ export default function AllBookingsPage() {
               ) : (
                 <div className="text-center py-10">
                   <p className="text-muted-foreground">
-                    {filterDate
-                      ? `No bookings found for ${format(filterDate, "PPP")}.`
+                    {filterDateRange?.from
+                      ? `No bookings found for the selected date range.`
                       : "You have no bookings yet."}
                   </p>
                 </div>
@@ -279,4 +289,3 @@ export default function AllBookingsPage() {
     </div>
   );
 }
-
