@@ -1,11 +1,11 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar"; // Keep for shadcn calendar
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format, addMinutes, parse } from "date-fns";
-import { Calendar as CalendarIcon, Clock } from "lucide-react"; // For input icons
+import { Calendar as CalendarIcon, Clock, User, PhoneEmail } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,8 +18,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// Firebase imports for Realtime Database
-import { ref, set, get, query as rtQuery, orderByChild, equalTo, push } from "firebase/database";
+import { ref, set, get, query as rtQuery, orderByChild, equalTo, push, startAt, endAt } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
 
 interface ExistingBooking {
@@ -29,10 +28,15 @@ interface ExistingBooking {
   BookingStatus?: string;
 }
 
-interface ExistingClientData {
-    ClientID: string;
+interface ClientData { // Renamed from ExistingClientData for clarity
+    ClientID: string; // The stored custom ClientID
     ClientName: string;
     ClientContact?: string;
+    // Firebase key will be used as 'id' in ClientSuggestion
+}
+
+interface ClientSuggestion extends ClientData {
+  id: string; // Firebase key
 }
 
 
@@ -42,7 +46,7 @@ const generateTimeSlots = () => {
   currentTime.setHours(6, 0, 0, 0); // Start at 6:00 AM
 
   const endTimeLimit = new Date();
-  endTimeLimit.setHours(21, 0, 0, 0); // Slots up to 21:00
+  endTimeLimit.setHours(21, 0, 0, 0); // Slots up to 21:00 (9 PM)
 
   while (currentTime <= endTimeLimit) {
     slots.push(format(currentTime, "HH:mm"));
@@ -68,6 +72,13 @@ export default function NewBookingPage() {
     const { currentUser, loading: authLoading } = useAuth();
     const router = useRouter();
 
+    // Autocomplete state
+    const [suggestions, setSuggestions] = useState<ClientSuggestion[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [selectedClientFirebaseKey, setSelectedClientFirebaseKey] = useState<string | null>(null);
+    const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const suggestionsRef = useRef<HTMLDivElement>(null); // Ref for suggestions container
+
     useEffect(() => {
       if (!authLoading && !currentUser) {
         router.push('/login');
@@ -91,7 +102,7 @@ export default function NewBookingPage() {
         if (snapshot.exists()) {
           snapshot.forEach((childSnapshot) => {
             const booking = childSnapshot.val() as ExistingBooking;
-            if (booking.BookingStatus === "Booked") {
+            if (booking.BookingStatus === "Booked") { // Only consider booked appointments
               try {
                 const baseDateForParse = new Date(formattedDate + "T00:00:00"); 
                 const slotStartTime = parse(booking.AppointmentStartTime, "HH:mm", baseDateForParse);
@@ -130,44 +141,96 @@ export default function NewBookingPage() {
       }
     }, [date, currentUser, fetchBookedSlots]);
 
+    const handleClientNameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const query = e.target.value;
+        setClientName(query);
+        setSelectedClientFirebaseKey(null); // Reset selected client if name is typed
+
+        if (debounceTimeoutRef.current) {
+            clearTimeout(debounceTimeoutRef.current);
+        }
+
+        if (query.trim().length > 0) {
+            debounceTimeoutRef.current = setTimeout(async () => {
+                if (!currentUser?.uid) return;
+                const userClientsRefPath = `Clients/${currentUser.uid}`;
+                const clientsRef = ref(db, userClientsRefPath);
+                const searchQuery = rtQuery(
+                    clientsRef,
+                    orderByChild('ClientName'),
+                    startAt(query),
+                    endAt(query + '\uf8ff')
+                );
+                try {
+                    const snapshot = await get(searchQuery);
+                    const fetchedSuggestions: ClientSuggestion[] = [];
+                    if (snapshot.exists()) {
+                        snapshot.forEach((childSnapshot) => {
+                            fetchedSuggestions.push({
+                                id: childSnapshot.key as string,
+                                ...childSnapshot.val() as ClientData,
+                            });
+                        });
+                    }
+                    setSuggestions(fetchedSuggestions.slice(0, 5)); // Limit to 5 suggestions
+                    setShowSuggestions(true);
+                } catch (error) {
+                    console.error("Error fetching client suggestions:", error);
+                    setSuggestions([]);
+                }
+            }, 300); // 300ms debounce
+        } else {
+            setSuggestions([]);
+            setShowSuggestions(false);
+        }
+    };
+
+    const handleSuggestionClick = (suggestion: ClientSuggestion) => {
+        setClientName(suggestion.ClientName);
+        setClientContact(suggestion.ClientContact || '');
+        setSelectedClientFirebaseKey(suggestion.id);
+        setShowSuggestions(false);
+        setSuggestions([]);
+    };
+
+    // Close suggestions when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
+                setShowSuggestions(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [suggestionsRef]);
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
 
         if (!currentUser) {
-            toast({
-                title: "Authentication Error",
-                description: "You must be logged in to create a booking.",
-                variant: "destructive",
-            });
+            toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" });
             setIsSubmitting(false);
             router.push('/login');
             return;
         }
 
         if (!clientName || !serviceProcedure || !date || !startTime || !endTime) {
-            toast({
-                title: "Error",
-                description: "Please fill in all required fields.",
-                variant: "destructive",
-            });
+            toast({ title: "Error", description: "Please fill in all required fields.", variant: "destructive" });
             setIsSubmitting(false);
             return;
         }
 
         const selectedFormattedDate = format(date, "yyyy-MM-dd");
         const baseDateForSubmitParse = new Date(selectedFormattedDate + "T00:00:00");
-
         const startDateTime = parse(startTime, 'HH:mm', baseDateForSubmitParse);
         const endDateTime = parse(endTime, 'HH:mm', baseDateForSubmitParse);
 
         if (endDateTime <= startDateTime) {
-          toast({
-            title: "Validation Error",
-            description: "End time must be after start time.",
-            variant: "destructive",
-          });
+          toast({ title: "Validation Error", description: "End time must be after start time.", variant: "destructive" });
           setIsSubmitting(false);
           return;
         }
@@ -183,82 +246,73 @@ export default function NewBookingPage() {
         }
 
         if(hasOverlap) {
-            toast({
-                title: "Booking Conflict",
-                description: "The selected time range overlaps with an existing booking. Please choose different times or date.",
-                variant: "destructive",
-            });
+            toast({ title: "Booking Conflict", description: "The selected time range overlaps with an existing booking.", variant: "destructive" });
             setIsSubmitting(false);
             return;
         }
-
 
         if (!db) {
-            toast({
-                title: "Error",
-                description: "Firebase Realtime Database is not initialized. Please check your configuration.",
-                variant: "destructive",
-            });
+            toast({ title: "Error", description: "Database not initialized.", variant: "destructive" });
             setIsSubmitting(false);
             return;
         }
 
-        let clientIdToUse: string | null = null;
-        let existingClientName: string | null = null;
+        let clientIdToUse: string | null = selectedClientFirebaseKey; // Prioritize explicitly selected client
+        let clientNameToDisplay = clientName.trim();
 
         try {
-            // Check for existing client
-            const userClientsRefPath = `Clients/${currentUser.uid}`;
-            const clientsRef = ref(db, userClientsRefPath);
-            const clientsSnapshot = await get(clientsRef);
+            if (!clientIdToUse) { // If no client was selected from suggestions, try to find or create new
+                const userClientsRefPath = `Clients/${currentUser.uid}`;
+                const clientsDbRef = ref(db, userClientsRefPath); // Corrected ref
+                const clientsSnapshot = await get(clientsDbRef);
 
-            const inputNameLower = clientName.trim().toLowerCase();
-            const inputContactLower = clientContact.trim().toLowerCase();
+                const inputNameLower = clientName.trim().toLowerCase();
+                const inputContactLower = clientContact.trim().toLowerCase();
+                let foundExisting = false;
 
-            if (clientsSnapshot.exists()) {
-                clientsSnapshot.forEach((childSnapshot) => {
-                    const clientData = childSnapshot.val() as ExistingClientData;
-                    const dbNameLower = (clientData.ClientName || "").trim().toLowerCase();
-                    const dbContactLower = (clientData.ClientContact || "").trim().toLowerCase();
+                if (clientsSnapshot.exists()) {
+                    clientsSnapshot.forEach((childSnapshot) => {
+                        const clientData = childSnapshot.val() as ClientData;
+                        const dbNameLower = (clientData.ClientName || "").trim().toLowerCase();
+                        const dbContactLower = (clientData.ClientContact || "").trim().toLowerCase();
 
-                    if (inputContactLower) { // If contact is provided, both name and contact must match
-                        if (dbNameLower === inputNameLower && dbContactLower === inputContactLower) {
-                            clientIdToUse = childSnapshot.key; // Firebase key is the ClientID
-                            existingClientName = clientData.ClientName;
-                            return true; // Found a match, exit forEach
+                        if (inputContactLower) { 
+                            if (dbNameLower === inputNameLower && dbContactLower === inputContactLower) {
+                                clientIdToUse = childSnapshot.key; 
+                                clientNameToDisplay = clientData.ClientName;
+                                foundExisting = true;
+                                return true; 
+                            }
+                        } else { 
+                            if (dbNameLower === inputNameLower && (!dbContactLower || dbContactLower === "")) {
+                                clientIdToUse = childSnapshot.key;
+                                clientNameToDisplay = clientData.ClientName;
+                                foundExisting = true;
+                                return true; 
+                            }
                         }
-                    } else { // If contact is not provided, match on name only if DB contact is also empty
-                        if (dbNameLower === inputNameLower && !dbContactLower) {
-                            clientIdToUse = childSnapshot.key;
-                            existingClientName = clientData.ClientName;
-                            return true; // Found a match, exit forEach
-                        }
-                    }
-                });
+                    });
+                }
+
+                if (!foundExisting) {
+                    const newClientRef = push(clientsDbRef);
+                    clientIdToUse = newClientRef.key as string;
+                    const now = new Date();
+                    await set(newClientRef, {
+                        ClientID: clientIdToUse, // Store Firebase key as ClientID field as well for consistency
+                        ClientName: clientName.trim(),
+                        ClientContact: clientContact.trim(),
+                        CreateDate: format(now, "yyyy-MM-dd"),
+                        CreateTime: format(now, "HH:mm"),
+                        CreatedByUserID: currentUser.uid
+                    });
+                    clientNameToDisplay = clientName.trim();
+                }
+            } else {
+                 // If selectedClientFirebaseKey was set, clientNameToDisplay is already the clientName from state
+                 // which was set when the suggestion was clicked.
             }
 
-            // If no existing client found, create a new one
-            if (!clientIdToUse) {
-                const newClientRef = push(clientsRef); // Generate new unique key for client
-                clientIdToUse = newClientRef.key as string;
-
-                const now = new Date();
-                const createDate = now.toISOString().split('T')[0];
-                const createTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-
-                await set(newClientRef, {
-                    ClientID: clientIdToUse, // Store the key as ClientID field as well
-                    ClientName: clientName.trim(),
-                    ClientContact: clientContact.trim(),
-                    CreateDate: createDate,
-                    CreateTime: createTime,
-                    CreatedByUserID: currentUser.uid
-                });
-                existingClientName = clientName.trim(); // For the toast message
-            }
-
-
-            // Now create the appointment using clientIdToUse
             const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
             const appointmentsRefForUser = ref(db, userAppointmentsRefPath);
             const newAppointmentRef = push(appointmentsRefForUser);
@@ -275,28 +329,22 @@ export default function NewBookingPage() {
                 BookedByUserID: currentUser.uid
             });
 
-            toast({
-                title: "Success",
-                description: `Booking Confirmed for ${existingClientName || clientName.trim()}!`,
-            });
-
-            if(date) fetchBookedSlots(date); // Refresh booked slots for the current date
-
-            // Reset form fields (optional, based on desired UX)
+            toast({ title: "Success", description: `Booking Confirmed for ${clientNameToDisplay}!` });
+            if(date) fetchBookedSlots(date); 
+            
+            // Optionally reset form fields
             // setClientName('');
             // setClientContact('');
             // setServiceProcedure('');
             // setStartTime('');
             // setEndTime('');
-            // setDate(new Date()); 
+            // setDate(new Date());
+            // setSelectedClientFirebaseKey(null);
+            // setShowSuggestions(false);
 
         } catch (error: any) {
             console.error("Error during booking:", error);
-            toast({
-                title: "Error creating booking",
-                description: error.message || "An unexpected error occurred.",
-                variant: "destructive",
-            });
+            toast({ title: "Error creating booking", description: error.message || "An unexpected error occurred.", variant: "destructive" });
         } finally {
             setIsSubmitting(false);
         }
@@ -329,17 +377,32 @@ export default function NewBookingPage() {
                 <div className="container max-w-2xl mx-auto">
                     <h1 className="text-3xl font-bold mb-8 text-center text-primary">New Booking</h1>
                     <form onSubmit={handleSubmit} className="space-y-6 bg-card p-8 rounded-lg shadow-xl">
-                        <div>
+                        <div className="relative" ref={suggestionsRef}>
                             <Label htmlFor="clientName" className="font-medium">Client Name *</Label>
                             <Input
                                 type="text"
                                 id="clientName"
                                 value={clientName}
-                                onChange={(e) => setClientName(e.target.value)}
+                                onChange={handleClientNameChange}
+                                onFocus={() => clientName.trim().length > 0 && suggestions.length > 0 && setShowSuggestions(true)}
                                 required
+                                autoComplete="off"
                                 className="mt-1"
-                                placeholder="Enter client's full name"
+                                placeholder="Start typing client's name..."
                             />
+                            {showSuggestions && suggestions.length > 0 && (
+                                <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                    {suggestions.map((suggestion) => (
+                                        <div
+                                            key={suggestion.id}
+                                            className="px-3 py-2 hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                                            onClick={() => handleSuggestionClick(suggestion)}
+                                        >
+                                            {suggestion.ClientName} {suggestion.ClientContact && `(${suggestion.ClientContact})`}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         <div>
                             <Label htmlFor="clientContact" className="font-medium">Client Contact (Phone or Email)</Label>
@@ -349,7 +412,7 @@ export default function NewBookingPage() {
                                 value={clientContact}
                                 onChange={(e) => setClientContact(e.target.value)}
                                 className="mt-1"
-                                placeholder="Enter phone or email (optional, helps find existing clients)"
+                                placeholder="Client's phone or email"
                             />
                         </div>
                         <div>
@@ -385,7 +448,7 @@ export default function NewBookingPage() {
                                             selected={date}
                                             onSelect={(selectedDay) => {
                                                 setDate(selectedDay);
-                                                setStartTime(''); // Reset times when date changes
+                                                setStartTime(''); 
                                                 setEndTime('');
                                             }}
                                             disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
@@ -434,7 +497,6 @@ export default function NewBookingPage() {
                                              if (!startTime) return true; 
                                              const baseDateForFilter = date ? new Date(date) : new Date(); 
                                              baseDateForFilter.setHours(0,0,0,0); 
-
                                              const currentSlotTime = parse(slot, "HH:mm", baseDateForFilter);
                                              const selectedStartTime = parse(startTime, "HH:mm", baseDateForFilter);
                                              return currentSlotTime > selectedStartTime;
@@ -446,7 +508,6 @@ export default function NewBookingPage() {
                                                 baseDateForCheck.setHours(0,0,0,0); 
                                                 const newBookingStartForCheck = parse(startTime, "HH:mm", baseDateForCheck);
                                                 const potentialEndTime = parse(slot, "HH:mm", baseDateForCheck);
-
                                                 let tempSlotCheck = newBookingStartForCheck;
                                                 while (tempSlotCheck < potentialEndTime) {
                                                     if (bookedTimeSlotsForDate.has(format(tempSlotCheck, "HH:mm"))) {
@@ -497,6 +558,3 @@ export default function NewBookingPage() {
         </div>
     );
 }
-
-
-    
