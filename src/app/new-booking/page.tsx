@@ -2,10 +2,10 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar";
+import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar"; // Keep for shadcn calendar
 import { cn } from "@/lib/utils";
 import { format, addMinutes, parse } from "date-fns";
-import { Calendar as CalendarIcon, Clock } from "lucide-react";
+import { Calendar as CalendarIcon, Clock } from "lucide-react"; // For input icons
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,14 +29,12 @@ interface ExistingBooking {
   BookingStatus?: string;
 }
 
-function generateAlphanumericID(length: number): string {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    return result;
+interface ExistingClientData {
+    ClientID: string;
+    ClientName: string;
+    ClientContact?: string;
 }
+
 
 const generateTimeSlots = () => {
   const slots = [];
@@ -44,7 +42,7 @@ const generateTimeSlots = () => {
   currentTime.setHours(6, 0, 0, 0); // Start at 6:00 AM
 
   const endTimeLimit = new Date();
-  endTimeLimit.setHours(21, 0, 0, 0); // End at 9:00 PM (slot itself will be 21:00, meaning booking can end at 21:00)
+  endTimeLimit.setHours(21, 0, 0, 0); // Slots up to 21:00
 
   while (currentTime <= endTimeLimit) {
     slots.push(format(currentTime, "HH:mm"));
@@ -95,7 +93,7 @@ export default function NewBookingPage() {
             const booking = childSnapshot.val() as ExistingBooking;
             if (booking.BookingStatus === "Booked") {
               try {
-                const baseDateForParse = new Date(formattedDate + "T00:00:00"); // Ensure date part is considered
+                const baseDateForParse = new Date(formattedDate + "T00:00:00"); 
                 const slotStartTime = parse(booking.AppointmentStartTime, "HH:mm", baseDateForParse);
                 const slotEndTime = parse(booking.AppointmentEndTime, "HH:mm", baseDateForParse);
 
@@ -205,26 +203,62 @@ export default function NewBookingPage() {
             return;
         }
 
+        let clientIdToUse: string | null = null;
+        let existingClientName: string | null = null;
+
         try {
-            // Always create a new client from this form
+            // Check for existing client
             const userClientsRefPath = `Clients/${currentUser.uid}`;
-            const newClientRef = push(ref(db, userClientsRefPath)); // Generate new unique key for client
-            const clientIdToUse = newClientRef.key as string;       // This IS the ClientID for the new client
+            const clientsRef = ref(db, userClientsRefPath);
+            const clientsSnapshot = await get(clientsRef);
 
-            const now = new Date();
-            const createDate = now.toISOString().split('T')[0];
-            const createTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+            const inputNameLower = clientName.trim().toLowerCase();
+            const inputContactLower = clientContact.trim().toLowerCase();
 
-            await set(newClientRef, {
-                ClientID: clientIdToUse, // Store the key as ClientID field as well
-                ClientName: clientName,
-                ClientContact: clientContact,
-                CreateDate: createDate,
-                CreateTime: createTime,
-                CreatedByUserID: currentUser.uid
-            });
+            if (clientsSnapshot.exists()) {
+                clientsSnapshot.forEach((childSnapshot) => {
+                    const clientData = childSnapshot.val() as ExistingClientData;
+                    const dbNameLower = (clientData.ClientName || "").trim().toLowerCase();
+                    const dbContactLower = (clientData.ClientContact || "").trim().toLowerCase();
 
-            // Now create the appointment using this new clientIdToUse
+                    if (inputContactLower) { // If contact is provided, both name and contact must match
+                        if (dbNameLower === inputNameLower && dbContactLower === inputContactLower) {
+                            clientIdToUse = childSnapshot.key; // Firebase key is the ClientID
+                            existingClientName = clientData.ClientName;
+                            return true; // Found a match, exit forEach
+                        }
+                    } else { // If contact is not provided, match on name only if DB contact is also empty
+                        if (dbNameLower === inputNameLower && !dbContactLower) {
+                            clientIdToUse = childSnapshot.key;
+                            existingClientName = clientData.ClientName;
+                            return true; // Found a match, exit forEach
+                        }
+                    }
+                });
+            }
+
+            // If no existing client found, create a new one
+            if (!clientIdToUse) {
+                const newClientRef = push(clientsRef); // Generate new unique key for client
+                clientIdToUse = newClientRef.key as string;
+
+                const now = new Date();
+                const createDate = now.toISOString().split('T')[0];
+                const createTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+                await set(newClientRef, {
+                    ClientID: clientIdToUse, // Store the key as ClientID field as well
+                    ClientName: clientName.trim(),
+                    ClientContact: clientContact.trim(),
+                    CreateDate: createDate,
+                    CreateTime: createTime,
+                    CreatedByUserID: currentUser.uid
+                });
+                existingClientName = clientName.trim(); // For the toast message
+            }
+
+
+            // Now create the appointment using clientIdToUse
             const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
             const appointmentsRefForUser = ref(db, userAppointmentsRefPath);
             const newAppointmentRef = push(appointmentsRefForUser);
@@ -232,7 +266,7 @@ export default function NewBookingPage() {
 
             await set(newAppointmentRef, {
                 AppointmentID: appointmentId,
-                ClientID: clientIdToUse, // Use the NEWLY created client's ID
+                ClientID: clientIdToUse, 
                 ServiceProcedure: serviceProcedure,
                 AppointmentDate: selectedFormattedDate,
                 AppointmentStartTime: startTime,
@@ -243,17 +277,18 @@ export default function NewBookingPage() {
 
             toast({
                 title: "Success",
-                description: "Booking Confirmed!",
+                description: `Booking Confirmed for ${existingClientName || clientName.trim()}!`,
             });
 
-            if(date) fetchBookedSlots(date);
+            if(date) fetchBookedSlots(date); // Refresh booked slots for the current date
 
-            setClientName('');
-            setClientContact('');
-            setServiceProcedure('');
-            setStartTime('');
-            setEndTime('');
-            // setDate(new Date()); // Optionally reset date, or keep it for next booking
+            // Reset form fields (optional, based on desired UX)
+            // setClientName('');
+            // setClientContact('');
+            // setServiceProcedure('');
+            // setStartTime('');
+            // setEndTime('');
+            // setDate(new Date()); 
 
         } catch (error: any) {
             console.error("Error during booking:", error);
@@ -314,7 +349,7 @@ export default function NewBookingPage() {
                                 value={clientContact}
                                 onChange={(e) => setClientContact(e.target.value)}
                                 className="mt-1"
-                                placeholder="Enter phone or email"
+                                placeholder="Enter phone or email (optional, helps find existing clients)"
                             />
                         </div>
                         <div>
@@ -350,7 +385,7 @@ export default function NewBookingPage() {
                                             selected={date}
                                             onSelect={(selectedDay) => {
                                                 setDate(selectedDay);
-                                                setStartTime('');
+                                                setStartTime(''); // Reset times when date changes
                                                 setEndTime('');
                                             }}
                                             disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
@@ -396,10 +431,9 @@ export default function NewBookingPage() {
                                     <SelectContent>
                                         {isLoadingBookedSlots && <SelectItem value="loading" disabled>Loading slots...</SelectItem>}
                                         {!isLoadingBookedSlots && timeSlots.filter(slot => {
-                                             if (!startTime) return true; // Show all if no start time selected
-                                             // Ensure end time is after start time
-                                             const baseDateForFilter = date ? new Date(date) : new Date(); // Use selected date or today if none
-                                             baseDateForFilter.setHours(0,0,0,0); // Normalize time part for parsing
+                                             if (!startTime) return true; 
+                                             const baseDateForFilter = date ? new Date(date) : new Date(); 
+                                             baseDateForFilter.setHours(0,0,0,0); 
 
                                              const currentSlotTime = parse(slot, "HH:mm", baseDateForFilter);
                                              const selectedStartTime = parse(startTime, "HH:mm", baseDateForFilter);
@@ -409,7 +443,7 @@ export default function NewBookingPage() {
                                             let itemLabelSuffix = "";
                                             if (startTime && date) {
                                                 const baseDateForCheck = new Date(date);
-                                                baseDateForCheck.setHours(0,0,0,0); // Normalize time for consistent parsing
+                                                baseDateForCheck.setHours(0,0,0,0); 
                                                 const newBookingStartForCheck = parse(startTime, "HH:mm", baseDateForCheck);
                                                 const potentialEndTime = parse(slot, "HH:mm", baseDateForCheck);
 
@@ -422,7 +456,7 @@ export default function NewBookingPage() {
                                                     }
                                                     tempSlotCheck = addMinutes(tempSlotCheck, 30);
                                                 }
-                                            } else if (!startTime){ // Disable if no start time is chosen (shouldn't happen due to outer filter)
+                                            } else if (!startTime){ 
                                                 itemIsDisabled = true;
                                             }
                                             return (
@@ -464,3 +498,5 @@ export default function NewBookingPage() {
     );
 }
 
+
+    
