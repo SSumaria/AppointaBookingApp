@@ -1,11 +1,11 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar"; // Renamed to avoid conflict
+import React, { useState, useEffect, useCallback } from 'react';
+import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar"; 
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { format, addMinutes, parse } from "date-fns";
+import { Calendar as CalendarIcon, Clock } from "lucide-react"; // Added Clock
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +22,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ref, set, get, query as rtQuery, orderByChild, equalTo, push } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
 
+interface ExistingBooking {
+  AppointmentStartTime: string;
+  AppointmentEndTime: string;
+  AppointmentDate: string;
+}
+
 function generateAlphanumericID(length: number): string {
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
@@ -33,12 +39,16 @@ function generateAlphanumericID(length: number): string {
 
 const generateTimeSlots = () => {
   const slots = [];
-  // Hours from 6 AM (06:00) up to (but not including) 9 PM (21:00)
-  for (let h = 6; h < 21; h++) { 
-    slots.push(`${h.toString().padStart(2, '0')}:00`);
-    slots.push(`${h.toString().padStart(2, '0')}:30`);
+  let currentTime = new Date();
+  currentTime.setHours(6, 0, 0, 0); // Start at 6:00 AM
+
+  const endTimeLimit = new Date();
+  endTimeLimit.setHours(21, 0, 0, 0); // End at 9:00 PM
+
+  while (currentTime <= endTimeLimit) {
+    slots.push(format(currentTime, "HH:mm"));
+    currentTime = addMinutes(currentTime, 30);
   }
-  slots.push("21:00"); // Add 9:00 PM
   return slots;
 };
 const timeSlots = generateTimeSlots();
@@ -52,6 +62,9 @@ export default function NewBookingPage() {
     const [endTime, setEndTime] = useState('');
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    const [bookedTimeSlotsForDate, setBookedTimeSlotsForDate] = useState<Set<string>>(new Set());
+    const [isLoadingBookedSlots, setIsLoadingBookedSlots] = useState(false);
 
     const { currentUser, loading: authLoading } = useAuth();
     const router = useRouter();
@@ -61,6 +74,60 @@ export default function NewBookingPage() {
         router.push('/login');
       }
     }, [currentUser, authLoading, router]);
+
+    const fetchBookedSlots = useCallback(async (selectedDate: Date) => {
+      if (!currentUser || !selectedDate) {
+        setBookedTimeSlotsForDate(new Set());
+        return;
+      }
+      setIsLoadingBookedSlots(true);
+      const formattedDate = format(selectedDate, "yyyy-MM-dd");
+      const appointmentsRef = ref(db, `Appointments/${currentUser.uid}`);
+      const appointmentsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'), equalTo(formattedDate));
+
+      try {
+        const snapshot = await get(appointmentsQuery);
+        const newBookedSlots = new Set<string>();
+        if (snapshot.exists()) {
+          snapshot.forEach((childSnapshot) => {
+            const booking = childSnapshot.val() as ExistingBooking;
+            try {
+              // Ensure date part is consistent for parsing
+              const baseDateStr = "2000-01-01"; // Dummy date for time parsing
+              const slotStartTime = parse(`${baseDateStr} ${booking.AppointmentStartTime}`, "yyyy-MM-dd HH:mm", new Date());
+              const slotEndTime = parse(`${baseDateStr} ${booking.AppointmentEndTime}`, "yyyy-MM-dd HH:mm", new Date());
+              
+              let currentSlotTime = slotStartTime;
+              while (currentSlotTime < slotEndTime) {
+                newBookedSlots.add(format(currentSlotTime, "HH:mm"));
+                currentSlotTime = addMinutes(currentSlotTime, 30);
+              }
+            } catch (parseError) {
+              console.error("Error parsing booking times:", booking, parseError);
+            }
+          });
+        }
+        setBookedTimeSlotsForDate(newBookedSlots);
+      } catch (error) {
+        console.error("Error fetching booked slots:", error);
+        toast({
+          title: "Error loading booked slots",
+          description: "Could not fetch existing bookings for this date.",
+          variant: "destructive",
+        });
+        setBookedTimeSlotsForDate(new Set()); // Clear on error
+      } finally {
+        setIsLoadingBookedSlots(false);
+      }
+    }, [currentUser, toast]);
+
+    useEffect(() => {
+      if (date) {
+        fetchBookedSlots(date);
+      } else {
+        setBookedTimeSlotsForDate(new Set()); // Clear if date is removed
+      }
+    }, [date, fetchBookedSlots]);
 
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -89,8 +156,9 @@ export default function NewBookingPage() {
         }
 
         if (date && startTime && endTime) {
-          const startDateTime = new Date(`${format(date, 'yyyy-MM-dd')}T${startTime}`);
-          const endDateTime = new Date(`${format(date, 'yyyy-MM-dd')}T${endTime}`);
+          const startDateTime = parse(startTime, 'HH:mm', new Date());
+          const endDateTime = parse(endTime, 'HH:mm', new Date());
+
           if (endDateTime <= startDateTime) {
             toast({
               title: "Validation Error",
@@ -101,6 +169,32 @@ export default function NewBookingPage() {
             return;
           }
         }
+
+        // Check for overlap again before submitting (more robust check)
+        const selectedFormattedDate = format(date, "yyyy-MM-dd");
+        const newBookingStart = parse(startTime, "HH:mm", new Date(selectedFormattedDate));
+        const newBookingEnd = parse(endTime, "HH:mm", new Date(selectedFormattedDate));
+
+        let tempSlot = newBookingStart;
+        let hasOverlap = false;
+        while(tempSlot < newBookingEnd) {
+            if(bookedTimeSlotsForDate.has(format(tempSlot, "HH:mm"))) {
+                hasOverlap = true;
+                break;
+            }
+            tempSlot = addMinutes(tempSlot, 30);
+        }
+
+        if(hasOverlap) {
+            toast({
+                title: "Booking Conflict",
+                description: "The selected time range overlaps with an existing booking. Please choose different times or date.",
+                variant: "destructive",
+            });
+            setIsSubmitting(false);
+            return;
+        }
+
 
         if (!db) {
             toast({
@@ -113,64 +207,65 @@ export default function NewBookingPage() {
         }
 
         try {
-            let clientId: string;
+            let clientIdToUse: string | null = null; // Changed to allow null initially
             const userClientsRefPath = `Clients/${currentUser.uid}`;
             const clientsRef = ref(db, userClientsRefPath);
             const clientQuery = rtQuery(clientsRef, orderByChild('ClientName'), equalTo(clientName));
             const clientSnapshot = await get(clientQuery);
 
             if (clientSnapshot.exists()) {
+                // If multiple clients have the same name, this takes the first one.
+                // Consider a more robust way to handle this if exact unique names aren't enforced.
                 clientSnapshot.forEach((childSnapshot) => {
-                    // There should only be one client with this name per user,
-                    // but forEach is the way to access it from the snapshot.
-                    // We take the key of the first (and supposedly only) match.
-                    clientId = childSnapshot.key as string; 
+                    if (!clientIdToUse) { // Take the first match's key
+                        clientIdToUse = childSnapshot.key as string;
+                    }
                 });
-                 clientId = clientId!; // Assert clientId is assigned
-            } else {
-                // Client does not exist, create new client using a generated ID as the key
-                clientId = generateAlphanumericID(10); 
+            }
+            
+            if (!clientIdToUse) { // Client does not exist, create new client
+                clientIdToUse = generateAlphanumericID(10); 
                 const now = new Date();
-                const createDate = now.toISOString().split('T')[0]; // Format as YYYY-MM-DD
-                const createTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }); // Format as HH:MM
+                const createDate = now.toISOString().split('T')[0]; 
+                const createTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }); 
 
-                await set(ref(db, `${userClientsRefPath}/${clientId}`), {
-                    ClientID: clientId, // Store the generated ID also as a field
+                await set(ref(db, `${userClientsRefPath}/${clientIdToUse}`), {
+                    ClientID: clientIdToUse, 
                     ClientName: clientName,
                     ClientContact: clientContact,
                     CreateDate: createDate,
                     CreateTime: createTime,
-                    CreatedByUserID: currentUser.uid // Store the user ID who created this client
+                    CreatedByUserID: currentUser.uid 
                 });
             }
 
             const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
-            const appointmentsRef = ref(db, userAppointmentsRefPath);
-            const newAppointmentRef = push(appointmentsRef); // Generate a unique key for the new appointment
-            const appointmentId = newAppointmentRef.key; // Get the unique key
-            const selectedDate = date ? format(date, 'yyyy-MM-dd') : '';
-
-
+            const appointmentsRefForUser = ref(db, userAppointmentsRefPath);
+            const newAppointmentRef = push(appointmentsRefForUser); 
+            const appointmentId = newAppointmentRef.key; 
+            
             await set(newAppointmentRef, {
-                AppointmentID: appointmentId, // Store the unique key as AppointmentID
-                ClientID: clientId, 
+                AppointmentID: appointmentId, 
+                ClientID: clientIdToUse, 
                 ServiceProcedure: serviceProcedure,
-                AppointmentDate: selectedDate,
+                AppointmentDate: selectedFormattedDate,
                 AppointmentStartTime: startTime,
                 AppointmentEndTime: endTime,
-                BookedByUserID: currentUser.uid // Store the user ID who made the booking
+                BookedByUserID: currentUser.uid 
             });
 
             toast({
                 title: "Success",
                 description: "Booking Confirmed!",
             });
+            
+            fetchBookedSlots(date); // Refresh booked slots for the current date
 
             // Reset form fields
             setClientName('');
             setClientContact('');
             setServiceProcedure('');
-            setDate(new Date());
+            // setDate(new Date()); // Keep date or reset as per preference
             setStartTime('');
             setEndTime('');
 
@@ -267,7 +362,11 @@ export default function NewBookingPage() {
                                         <CalendarIconLucideShadcn
                                             mode="single"
                                             selected={date}
-                                            onSelect={setDate}
+                                            onSelect={(selectedDay) => {
+                                                setDate(selectedDay);
+                                                setStartTime(''); // Reset time when date changes
+                                                setEndTime('');   // Reset time when date changes
+                                            }}
                                             disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
                                             initialFocus
                                         />
@@ -276,33 +375,69 @@ export default function NewBookingPage() {
                             </div>
                              <div className="flex-1">
                                 <Label htmlFor="startTime" className="font-medium">Appointment Start Time *</Label>
-                                <Select value={startTime} onValueChange={setStartTime} required>
+                                <Select 
+                                    value={startTime} 
+                                    onValueChange={setStartTime} 
+                                    disabled={isLoadingBookedSlots || !date}
+                                    required
+                                >
                                     <SelectTrigger className="w-full mt-1">
-                                        <SelectValue placeholder="Select start time" />
+                                        <SelectValue placeholder={isLoadingBookedSlots ? "Loading..." : "Select start time"} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {timeSlots.map(slot => (
-                                            <SelectItem key={`start-${slot}`} value={slot}>{slot}</SelectItem>
+                                        {isLoadingBookedSlots && <SelectItem value="loading" disabled>Loading slots...</SelectItem>}
+                                        {!isLoadingBookedSlots && timeSlots.map(slot => (
+                                            <SelectItem 
+                                                key={`start-${slot}`} 
+                                                value={slot}
+                                                disabled={bookedTimeSlotsForDate.has(slot)}
+                                            >
+                                                {slot} {bookedTimeSlotsForDate.has(slot) ? "(Booked)" : ""}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div className="flex-1">
                                 <Label htmlFor="endTime" className="font-medium">Appointment End Time *</Label>
-                                 <Select value={endTime} onValueChange={setEndTime} required>
+                                 <Select 
+                                    value={endTime} 
+                                    onValueChange={setEndTime} 
+                                    disabled={isLoadingBookedSlots || !date || !startTime}
+                                    required
+                                 >
                                     <SelectTrigger className="w-full mt-1">
-                                        <SelectValue placeholder="Select end time" />
+                                        <SelectValue placeholder={isLoadingBookedSlots ? "Loading..." : "Select end time"} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {timeSlots.map(slot => (
-                                            <SelectItem key={`end-${slot}`} value={slot}>{slot}</SelectItem>
+                                        {isLoadingBookedSlots && <SelectItem value="loading" disabled>Loading slots...</SelectItem>}
+                                        {!isLoadingBookedSlots && timeSlots.filter(slot => {
+                                             // End time must be after start time
+                                             if (!startTime) return true; // Show all if no start time selected yet
+                                             const currentSlotTime = parse(slot, "HH:mm", new Date());
+                                             const selectedStartTime = parse(startTime, "HH:mm", new Date());
+                                             return currentSlotTime > selectedStartTime;
+                                        }).map(slot => (
+                                            <SelectItem 
+                                                key={`end-${slot}`} 
+                                                value={slot}
+                                                disabled={bookedTimeSlotsForDate.has(slot)}
+                                            >
+                                                {slot} {bookedTimeSlotsForDate.has(slot) ? "(Booked)" : ""}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             </div>
                         </div>
+                         {isLoadingBookedSlots && (
+                            <div className="flex items-center text-sm text-muted-foreground">
+                                <Clock className="mr-2 h-4 w-4 animate-spin" />
+                                Checking available slots...
+                            </div>
+                        )}
                         <Separator className="my-4" />
-                        <Button type="submit" disabled={isSubmitting} className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-semibold py-3">
+                        <Button type="submit" disabled={isSubmitting || isLoadingBookedSlots} className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-semibold py-3">
                              {isSubmitting ? (
                                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -319,6 +454,3 @@ export default function NewBookingPage() {
         </div>
     );
 }
-
-
-    
