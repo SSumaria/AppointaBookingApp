@@ -145,9 +145,26 @@ export default function AllBookingsPage() {
       if (snapshot.exists()) {
         snapshot.forEach((childSnapshot) => {
           const data = childSnapshot.val();
+          let processedNotes: Note[] = [];
+          if (data.Notes) {
+            if (Array.isArray(data.Notes)) {
+              processedNotes = data.Notes.filter((n: any) => n && typeof n.text === 'string' && typeof n.timestamp === 'number' && typeof n.id === 'string');
+            } else if (typeof data.Notes === 'object' && !Array.isArray(data.Notes)) {
+              // Handle cases where Firebase might return an object for an array (e.g. sparse array or non-0-indexed keys)
+              processedNotes = Object.values(data.Notes as Record<string, Note>).filter((n: any) => n && typeof n.text === 'string' && typeof n.timestamp === 'number' && typeof n.id === 'string');
+            } else if (typeof data.Notes === 'string' && data.Notes.trim() !== '') {
+              // Handle legacy string notes: convert to a single Note object in an array
+              processedNotes = [{ 
+                id: generateNoteId(), 
+                text: data.Notes, 
+                timestamp: data.timestamp || Date.now() // Use booking's own timestamp if available, else current time
+              }];
+            }
+          }
           fetchedBookings.push({
             id: childSnapshot.key as string,
             ...data,
+            Notes: processedNotes, // Ensure Notes is always Note[]
           });
         });
       }
@@ -236,14 +253,24 @@ export default function AllBookingsPage() {
     const newNoteText = newNoteInputValue.trim();
 
     const newNote: Note = {
-      id: generateNoteId(), // Using client-side generated ID
+      id: generateNoteId(), 
       text: newNoteText,
       timestamp: Date.now(),
     };
 
     try {
       const bookingRefPath = `Appointments/${currentUser.uid}/${bookingId}`;
-      const currentNotes = editingBooking.Notes || [];
+      // Ensure currentNotes is an array before spreading
+      let currentNotes: Note[] = [];
+      if (editingBooking.Notes) {
+        if (Array.isArray(editingBooking.Notes)) {
+          currentNotes = editingBooking.Notes;
+        } else if (typeof editingBooking.Notes === 'object') { // Should not happen if fetchBookings is correct
+          currentNotes = Object.values(editingBooking.Notes as Record<string, Note>);
+        }
+        // If it was a string, fetchBookings should have converted it.
+      }
+      
       const updatedNotes = [...currentNotes, newNote];
 
       await update(ref(db, bookingRefPath), { Notes: updatedNotes });
@@ -251,11 +278,15 @@ export default function AllBookingsPage() {
         title: "Note Added",
         description: "The new note has been added to the booking.",
       });
-      setNewNoteInputValue(''); // Clear input
-      // Optimistically update local state for immediate UI feedback in dialog
+      setNewNoteInputValue(''); 
+
       setEditingBooking(prev => prev ? {...prev, Notes: updatedNotes} : null);
-      // Or refetch all bookings for consistency
-      fetchBookings();
+      
+      // Update the main bookings list as well for consistency
+      setBookings(prevBookings => prevBookings.map(b => 
+          b.id === bookingId ? { ...b, Notes: updatedNotes } : b
+      ));
+
     } catch (error: any) {
       console.error("Error adding note:", error);
       toast({
@@ -398,7 +429,7 @@ export default function AllBookingsPage() {
                                   className="h-6 w-6 p-0"
                                   onClick={() => {
                                     setEditingBooking(booking);
-                                    setNewNoteInputValue(''); // Clear for new note
+                                    setNewNoteInputValue(''); 
                                   }}
                                 >
                                   <Edit className="h-4 w-4" />
@@ -521,5 +552,3 @@ export default function AllBookingsPage() {
     </div>
   );
 }
-
-    
