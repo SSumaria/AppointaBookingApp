@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import type { DateRange } from "react-day-picker";
-import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit } from "lucide-react";
+import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { ref, get, query as rtQuery, orderByChild, startAt, endAt, update } from "firebase/database";
+import { ref, get, query as rtQuery, orderByChild, startAt, endAt, update, push as firebasePush } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
 import {
   AlertDialog,
@@ -52,7 +52,14 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
+
+interface Note {
+  id: string;
+  text: string;
+  timestamp: number;
+}
 
 interface Booking {
   id: string;
@@ -64,9 +71,15 @@ interface Booking {
   AppointmentStartTime: string;
   AppointmentEndTime: string;
   BookingStatus?: string;
-  Notes?: string;
+  Notes?: Note[];
   BookedByUserID?: string;
 }
+
+// Helper to generate a simple unique ID for notes
+const generateNoteId = () => {
+  return Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9);
+};
+
 
 export default function AllBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -78,7 +91,7 @@ export default function AllBookingsPage() {
   const router = useRouter();
 
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
-  const [noteInputValue, setNoteInputValue] = useState('');
+  const [newNoteInputValue, setNewNoteInputValue] = useState('');
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
@@ -203,7 +216,7 @@ export default function AllBookingsPage() {
         title: "Booking Cancelled",
         description: "The booking has been successfully cancelled.",
       });
-      fetchBookings(); 
+      fetchBookings();
     } catch (error: any) {
       console.error("Error cancelling booking:", error);
       toast({
@@ -214,29 +227,40 @@ export default function AllBookingsPage() {
     }
   };
 
-  const handleSaveNote = async () => {
-    if (!currentUser?.uid || !editingBooking) {
-      toast({ title: "Error", description: "Cannot save note. No booking selected or user not logged in.", variant: "destructive" });
+  const handleAddNote = async () => {
+    if (!currentUser?.uid || !editingBooking || !newNoteInputValue.trim()) {
+      toast({ title: "Error", description: "Cannot add note. No booking selected, user not logged in, or note is empty.", variant: "destructive" });
       return;
     }
     const bookingId = editingBooking.id;
-    const newNote = noteInputValue;
-  
+    const newNoteText = newNoteInputValue.trim();
+
+    const newNote: Note = {
+      id: generateNoteId(), // Using client-side generated ID
+      text: newNoteText,
+      timestamp: Date.now(),
+    };
+
     try {
-      const noteRefPath = `Appointments/${currentUser.uid}/${bookingId}`;
-      await update(ref(db, noteRefPath), { Notes: newNote.trim() });
+      const bookingRefPath = `Appointments/${currentUser.uid}/${bookingId}`;
+      const currentNotes = editingBooking.Notes || [];
+      const updatedNotes = [...currentNotes, newNote];
+
+      await update(ref(db, bookingRefPath), { Notes: updatedNotes });
       toast({
-        title: "Note Saved",
-        description: "The booking note has been updated.",
+        title: "Note Added",
+        description: "The new note has been added to the booking.",
       });
-      setEditingBooking(null); 
-      setNoteInputValue('');   
-      fetchBookings();       
+      setNewNoteInputValue(''); // Clear input
+      // Optimistically update local state for immediate UI feedback in dialog
+      setEditingBooking(prev => prev ? {...prev, Notes: updatedNotes} : null);
+      // Or refetch all bookings for consistency
+      fetchBookings();
     } catch (error: any) {
-      console.error("Error saving note:", error);
+      console.error("Error adding note:", error);
       toast({
-        title: "Error Saving Note",
-        description: error.message || "Could not save the note.",
+        title: "Error Adding Note",
+        description: error.message || "Could not add the note.",
         variant: "destructive",
       });
     }
@@ -266,16 +290,16 @@ export default function AllBookingsPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <Dialog open={!!editingBooking} onOpenChange={(isOpen) => { if (!isOpen) setEditingBooking(null); }}>
+      <Dialog open={!!editingBooking} onOpenChange={(isOpen) => { if (!isOpen) { setEditingBooking(null); setNewNoteInputValue('');} }}>
         <main className="flex-grow py-10">
-          <div className="container max-w-6xl mx-auto"> 
+          <div className="container max-w-6xl mx-auto">
             <Card className="shadow-xl">
               <CardHeader>
                 <CardTitle className="text-2xl font-bold flex items-center text-primary">
                   <ListFilter className="mr-2 h-6 w-6" /> All Bookings
                 </CardTitle>
                 <CardDescription>
-                  View and filter all your bookings by date range. Click the <Edit className="inline h-4 w-4" /> icon to add or edit notes.
+                  View and filter all your bookings by date range. Click the <Edit className="inline h-4 w-4" /> icon to manage notes.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -341,7 +365,7 @@ export default function AllBookingsPage() {
                         <TableHead>Date</TableHead>
                         <TableHead>Start</TableHead>
                         <TableHead>End</TableHead>
-                        <TableHead className="w-[200px]">Notes</TableHead> 
+                        <TableHead className="w-[200px]">Latest Note</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
@@ -364,8 +388,8 @@ export default function AllBookingsPage() {
                           <TableCell>{booking.AppointmentEndTime}</TableCell>
                           <TableCell className="text-sm text-muted-foreground ">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="truncate max-w-[120px]" title={booking.Notes || 'N/A'}>
-                                {booking.Notes || 'N/A'}
+                              <span className="truncate max-w-[120px]" title={booking.Notes && booking.Notes.length > 0 ? booking.Notes[booking.Notes.length - 1].text : 'N/A'}>
+                                {booking.Notes && booking.Notes.length > 0 ? booking.Notes[booking.Notes.length - 1].text : 'N/A'}
                               </span>
                               <DialogTrigger asChild>
                                 <Button
@@ -374,7 +398,7 @@ export default function AllBookingsPage() {
                                   className="h-6 w-6 p-0"
                                   onClick={() => {
                                     setEditingBooking(booking);
-                                    setNoteInputValue(booking.Notes || '');
+                                    setNewNoteInputValue(''); // Clear for new note
                                   }}
                                 >
                                   <Edit className="h-4 w-4" />
@@ -434,40 +458,62 @@ export default function AllBookingsPage() {
             </Card>
           </div>
         </main>
-      
-        {/* DialogContent for Editing Notes - Conditionally rendered */}
-        {editingBooking && ( 
-          <DialogContent className="sm:max-w-[425px]">
+
+        {editingBooking && (
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>
-                Edit Note for {editingBooking.ClientName}
+                Manage Notes for {editingBooking.ClientName}
               </DialogTitle>
               <DialogDescription>
                 Appointment on {format(new Date(editingBooking.AppointmentDate), "PPP")} at {editingBooking.AppointmentStartTime} - {editingBooking.AppointmentEndTime}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="notes-input" className="text-right col-span-1">
-                  Notes
+              {editingBooking.Notes && editingBooking.Notes.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm">Existing Notes:</h4>
+                  <ScrollArea className="h-[150px] w-full rounded-md border p-3">
+                    <ul className="space-y-2">
+                      {editingBooking.Notes.slice().sort((a,b) => b.timestamp - a.timestamp).map((note) => (
+                        <li key={note.id} className="text-xs p-2 bg-muted/50 rounded">
+                          <p className="whitespace-pre-wrap">{note.text}</p>
+                          <p className="text-muted-foreground text-right text-[10px] mt-1">
+                            {format(new Date(note.timestamp), "MMM d, yyyy h:mm a")}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </ScrollArea>
+                </div>
+              )}
+               {(editingBooking.Notes?.length === 0 || !editingBooking.Notes) && (
+                <p className="text-sm text-muted-foreground">No existing notes for this booking.</p>
+              )}
+
+              <div className="grid grid-cols-1 items-center gap-2 mt-4">
+                <Label htmlFor="new-notes-input" className="font-medium">
+                  Add New Note
                 </Label>
                 <Textarea
-                  id="notes-input"
-                  value={noteInputValue}
-                  onChange={(e) => setNoteInputValue(e.target.value)}
-                  placeholder="Add your notes here..."
-                  rows={4}
+                  id="new-notes-input"
+                  value={newNoteInputValue}
+                  onChange={(e) => setNewNoteInputValue(e.target.value)}
+                  placeholder="Type your new note here..."
+                  rows={3}
                   className="col-span-3"
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setEditingBooking(null)}>Cancel</Button>
-              <Button onClick={handleSaveNote}>Save Note</Button>
+              <Button variant="outline" onClick={() => { setEditingBooking(null); setNewNoteInputValue('');} }>Close</Button>
+              <Button onClick={handleAddNote} disabled={!newNoteInputValue.trim()}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Note
+              </Button>
             </DialogFooter>
           </DialogContent>
         )}
-      </Dialog> {/* End of Dialog root wrapper */}
+      </Dialog>
 
       <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
         © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
@@ -475,3 +521,5 @@ export default function AllBookingsPage() {
     </div>
   );
 }
+
+    

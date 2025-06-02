@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format, addMinutes, parse } from "date-fns";
-import { Calendar as CalendarIcon, Clock, User, StickyNote } from "lucide-react"; // Added StickyNote
+import { Calendar as CalendarIcon, Clock, User, StickyNote } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ref, set, get, query as rtQuery, orderByChild, equalTo, push, startAt, endAt } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
 
-interface Booking { // Added Notes here for consistency, though not directly used on this page's display beyond form
+interface Note {
+  id: string;
+  text: string;
+  timestamp: number;
+}
+
+interface Booking {
   id: string;
   AppointmentID: string;
   ClientID: string;
@@ -31,10 +37,10 @@ interface Booking { // Added Notes here for consistency, though not directly use
   AppointmentEndTime: string;
   BookingStatus?: string;
   BookedByUserID?: string;
-  Notes?: string;
+  Notes?: Note[];
 }
 
-interface ExistingBooking { // Used for fetching booked slots
+interface ExistingBooking {
   AppointmentStartTime: string;
   AppointmentEndTime: string;
   AppointmentDate: string;
@@ -68,6 +74,11 @@ const generateTimeSlots = () => {
 };
 const timeSlots = generateTimeSlots();
 
+// Helper to generate a simple unique ID for notes
+const generateNoteId = () => {
+  return Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9);
+};
+
 export default function NewBookingPage() {
     const [clientName, setClientName] = useState('');
     const [clientContact, setClientContact] = useState('');
@@ -75,7 +86,7 @@ export default function NewBookingPage() {
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [startTime, setStartTime] = useState('');
     const [endTime, setEndTime] = useState('');
-    const [notes, setNotes] = useState(''); // New state for notes
+    const [notesInput, setNotesInput] = useState('');
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -117,7 +128,7 @@ export default function NewBookingPage() {
             const booking = childSnapshot.val() as ExistingBooking;
             if (booking.BookingStatus === "Booked") {
               try {
-                const baseDateForParse = new Date(formattedDate + "T00:00:00"); 
+                const baseDateForParse = new Date(formattedDate + "T00:00:00");
                 const slotStartTime = parse(booking.AppointmentStartTime, "HH:mm", baseDateForParse);
                 const slotEndTime = parse(booking.AppointmentEndTime, "HH:mm", baseDateForParse);
 
@@ -157,7 +168,7 @@ export default function NewBookingPage() {
     const handleClientNameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const query = e.target.value;
         setClientName(query);
-        setSelectedClientFirebaseKey(null); 
+        setSelectedClientFirebaseKey(null);
 
         if (debounceTimeoutRef.current) {
             clearTimeout(debounceTimeoutRef.current);
@@ -185,13 +196,13 @@ export default function NewBookingPage() {
                             });
                         });
                     }
-                    setSuggestions(fetchedSuggestions.slice(0, 5)); 
+                    setSuggestions(fetchedSuggestions.slice(0, 5));
                     setShowSuggestions(true);
                 } catch (error) {
                     console.error("Error fetching client suggestions:", error);
                     setSuggestions([]);
                 }
-            }, 300); 
+            }, 300);
         } else {
             setSuggestions([]);
             setShowSuggestions(false);
@@ -271,12 +282,20 @@ export default function NewBookingPage() {
 
         let clientIdToUse: string | null = selectedClientFirebaseKey;
         let clientNameToDisplay = clientName.trim();
+        const finalNotes: Note[] = [];
+        if (notesInput.trim()) {
+          finalNotes.push({
+            id: generateNoteId(),
+            text: notesInput.trim(),
+            timestamp: Date.now(),
+          });
+        }
 
         try {
-            if (!clientIdToUse) { 
+            if (!clientIdToUse) {
                 const userClientsRefPath = `Clients/${currentUser.uid}`;
-                const clientsDbRef = ref(db, userClientsRefPath); 
-                const clientsSnapshot = await get(clientsDbRef);
+                const clientsDbRef = ref(db, userClientsRefPath);
+                const clientsSnapshot = await get(rtQuery(clientsDbRef, orderByChild('ClientName')));
 
                 const inputNameLower = clientName.trim().toLowerCase();
                 const inputContactLower = clientContact.trim().toLowerCase();
@@ -288,19 +307,19 @@ export default function NewBookingPage() {
                         const dbNameLower = (clientData.ClientName || "").trim().toLowerCase();
                         const dbContactLower = (clientData.ClientContact || "").trim().toLowerCase();
 
-                        if (inputContactLower) { 
+                        if (inputContactLower) {
                             if (dbNameLower === inputNameLower && dbContactLower === inputContactLower) {
-                                clientIdToUse = childSnapshot.key; 
+                                clientIdToUse = childSnapshot.key;
                                 clientNameToDisplay = clientData.ClientName;
                                 foundExisting = true;
-                                return true; 
+                                return true;
                             }
-                        } else { 
+                        } else {
                             if (dbNameLower === inputNameLower && (!dbContactLower || dbContactLower === "")) {
                                 clientIdToUse = childSnapshot.key;
                                 clientNameToDisplay = clientData.ClientName;
                                 foundExisting = true;
-                                return true; 
+                                return true;
                             }
                         }
                     });
@@ -311,7 +330,7 @@ export default function NewBookingPage() {
                     clientIdToUse = newClientRef.key as string;
                     const now = new Date();
                     await set(newClientRef, {
-                        ClientID: clientIdToUse, 
+                        ClientID: clientIdToUse,
                         ClientName: clientName.trim(),
                         ClientContact: clientContact.trim(),
                         CreateDate: format(now, "yyyy-MM-dd"),
@@ -329,28 +348,28 @@ export default function NewBookingPage() {
 
             await set(newAppointmentRef, {
                 AppointmentID: appointmentId,
-                ClientID: clientIdToUse, 
+                ClientID: clientIdToUse,
                 ServiceProcedure: serviceProcedure,
                 AppointmentDate: selectedFormattedDate,
                 AppointmentStartTime: startTime,
                 AppointmentEndTime: endTime,
                 BookingStatus: "Booked",
-                Notes: notes.trim(), // Save notes
+                Notes: finalNotes,
                 BookedByUserID: currentUser.uid
             });
 
             toast({ title: "Success", description: `Booking Confirmed for ${clientNameToDisplay}!` });
-            if(date) fetchBookedSlots(date); 
-            
-            // setClientName('');
-            // setClientContact('');
-            // setServiceProcedure('');
-            // setNotes(''); // Reset notes field
-            // setStartTime('');
-            // setEndTime('');
-            // setDate(new Date());
-            // setSelectedClientFirebaseKey(null);
-            // setShowSuggestions(false);
+            if(date) fetchBookedSlots(date);
+
+            setClientName('');
+            setClientContact('');
+            setServiceProcedure('');
+            setNotesInput('');
+            setStartTime('');
+            setEndTime('');
+            // setDate(new Date()); // Keep date or reset as per preference
+            setSelectedClientFirebaseKey(null);
+            setShowSuggestions(false);
 
         } catch (error: any) {
             console.error("Error during booking:", error);
@@ -458,7 +477,7 @@ export default function NewBookingPage() {
                                             selected={date}
                                             onSelect={(selectedDay) => {
                                                 setDate(selectedDay);
-                                                setStartTime(''); 
+                                                setStartTime('');
                                                 setEndTime('');
                                             }}
                                             disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
@@ -504,9 +523,9 @@ export default function NewBookingPage() {
                                     <SelectContent>
                                         {isLoadingBookedSlots && <SelectItem value="loading" disabled>Loading slots...</SelectItem>}
                                         {!isLoadingBookedSlots && timeSlots.filter(slot => {
-                                             if (!startTime) return true; 
-                                             const baseDateForFilter = date ? new Date(date) : new Date(); 
-                                             baseDateForFilter.setHours(0,0,0,0); 
+                                             if (!startTime) return true;
+                                             const baseDateForFilter = date ? new Date(date) : new Date();
+                                             baseDateForFilter.setHours(0,0,0,0);
                                              const currentSlotTime = parse(slot, "HH:mm", baseDateForFilter);
                                              const selectedStartTime = parse(startTime, "HH:mm", baseDateForFilter);
                                              return currentSlotTime > selectedStartTime;
@@ -515,7 +534,7 @@ export default function NewBookingPage() {
                                             let itemLabelSuffix = "";
                                             if (startTime && date) {
                                                 const baseDateForCheck = new Date(date);
-                                                baseDateForCheck.setHours(0,0,0,0); 
+                                                baseDateForCheck.setHours(0,0,0,0);
                                                 const newBookingStartForCheck = parse(startTime, "HH:mm", baseDateForCheck);
                                                 const potentialEndTime = parse(slot, "HH:mm", baseDateForCheck);
                                                 let tempSlotCheck = newBookingStartForCheck;
@@ -527,7 +546,7 @@ export default function NewBookingPage() {
                                                     }
                                                     tempSlotCheck = addMinutes(tempSlotCheck, 30);
                                                 }
-                                            } else if (!startTime){ 
+                                            } else if (!startTime){
                                                 itemIsDisabled = true;
                                             }
                                             return (
@@ -557,8 +576,8 @@ export default function NewBookingPage() {
                             </Label>
                             <Textarea
                                 id="bookingNotes"
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
+                                value={notesInput}
+                                onChange={(e) => setNotesInput(e.target.value)}
                                 className="mt-1"
                                 placeholder="Add any relevant notes for this booking..."
                                 rows={3}
@@ -582,3 +601,5 @@ export default function NewBookingPage() {
         </div>
     );
 }
+
+    

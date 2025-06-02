@@ -9,12 +9,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import { User, Calendar as CalendarIconLucide, Briefcase, Mail, Phone, Clock, StickyNote } from "lucide-react"; // Added StickyNote
+import { User, Calendar as CalendarIconLucide, Briefcase, Mail, Phone, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 import { ref, get, query as rtQuery, orderByChild, equalTo } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
+
+interface Note {
+  id: string;
+  text: string;
+  timestamp: number;
+}
 
 interface Client {
   id: string;
@@ -34,7 +40,7 @@ interface Booking {
   AppointmentStartTime: string;
   AppointmentEndTime: string;
   BookingStatus?: string;
-  Notes?: string; // Added Notes
+  Notes?: Note[];
   BookedByUserID?: string;
 }
 
@@ -84,7 +90,9 @@ export default function ClientDetailsPage() {
     try {
       const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
       const appointmentsRef = ref(db, userAppointmentsRefPath);
+      // The ClientID stored in appointments should be the Firebase key of the client document
       const bookingsQuery = rtQuery(appointmentsRef, orderByChild('ClientID'), equalTo(clientId));
+
 
       const snapshot = await get(bookingsQuery);
       const fetchedBookings: Booking[] = [];
@@ -219,7 +227,7 @@ export default function ClientDetailsPage() {
                       <TableHead>Date</TableHead>
                       <TableHead>Start</TableHead>
                       <TableHead>End</TableHead>
-                      <TableHead className="w-[200px]">Notes</TableHead>
+                      <TableHead className="w-[200px]">Latest Note</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -230,8 +238,8 @@ export default function ClientDetailsPage() {
                         <TableCell>{format(new Date(booking.AppointmentDate), "PPP")}</TableCell>
                         <TableCell>{booking.AppointmentStartTime}</TableCell>
                         <TableCell>{booking.AppointmentEndTime}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground max-w-xs truncate" title={booking.Notes}>
-                            {booking.Notes || 'N/A'}
+                        <TableCell className="text-sm text-muted-foreground max-w-xs truncate" title={booking.Notes && booking.Notes.length > 0 ? booking.Notes[booking.Notes.length -1].text : 'N/A'}>
+                            {booking.Notes && booking.Notes.length > 0 ? booking.Notes[booking.Notes.length -1].text : 'N/A'}
                         </TableCell>
                         <TableCell>
                           <span className={cn(
@@ -262,3 +270,5 @@ export default function ClientDetailsPage() {
     </div>
   );
 }
+
+    
