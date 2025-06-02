@@ -266,177 +266,177 @@ export default function AllBookingsPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="flex-grow py-10">
-        <div className="container max-w-6xl mx-auto"> 
-          <Card className="shadow-xl">
-            <CardHeader>
-              <CardTitle className="text-2xl font-bold flex items-center text-primary">
-                <ListFilter className="mr-2 h-6 w-6" /> All Bookings
-              </CardTitle>
-              <CardDescription>
-                View and filter all your bookings by date range. Click the <Edit className="inline h-4 w-4" /> icon to add or edit notes.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col sm:flex-row items-center gap-4 mb-6">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full sm:w-[300px] justify-start text-left font-normal",
-                        !filterDateRange?.from && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIconLucide className="mr-2 h-4 w-4" />
-                      {filterDateRange?.from ? (
-                        filterDateRange.to ? (
-                          <>
-                            {format(filterDateRange.from, "LLL dd, y")} -{" "}
-                            {format(filterDateRange.to, "LLL dd, y")}
-                          </>
-                        ) : (
-                          format(filterDateRange.from, "LLL dd, y")
-                        )
-                      ) : (
-                        <span>Filter by date range</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="range"
-                      selected={filterDateRange}
-                      onSelect={handleFilterDateChange}
-                      initialFocus
-                      numberOfMonths={1}
-                    />
-                  </PopoverContent>
-                </Popover>
-                {filterDateRange?.from && (
-                  <Button variant="ghost" onClick={clearFilter}>Clear Filter</Button>
-                )}
-              </div>
-
-              {isLoading ? (
-                <div className="text-center py-10">
-                  <svg className="animate-spin mx-auto h-10 w-10 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <p className="mt-2 text-muted-foreground">Loading bookings...</p>
-                </div>
-              ) : bookings.length > 0 ? (
-                <Table>
-                  <TableCaption>
-                    {filterDateRange?.from
-                      ? `A list of your bookings from ${format(filterDateRange.from, "PPP")}${filterDateRange.to ? ` to ${format(filterDateRange.to, "PPP")}` : ''}.`
-                      : "A list of all your bookings."}
-                  </TableCaption>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[150px]">Client Name</TableHead>
-                      <TableHead className="w-[200px]">Service/Procedure</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Start</TableHead>
-                      <TableHead>End</TableHead>
-                      <TableHead className="w-[200px]">Notes</TableHead> 
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {bookings.map((booking) => (
-                      <TableRow key={booking.id}>
-                        <TableCell className="font-medium">
-                          {booking.ClientName && booking.ClientID ? (
-                            <Link href={`/clients/${booking.ClientID}`} className="text-primary hover:underline">
-                              {booking.ClientName}
-                            </Link>
-                          ) : (
-                            booking.ClientName || 'Loading...'
-                          )}
-                        </TableCell>
-                        <TableCell>{booking.ServiceProcedure}</TableCell>
-                        <TableCell>{format(new Date(booking.AppointmentDate), "PPP")}</TableCell>
-                        <TableCell>{booking.AppointmentStartTime}</TableCell>
-                        <TableCell>{booking.AppointmentEndTime}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground ">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="truncate max-w-[120px]" title={booking.Notes || 'N/A'}>
-                              {booking.Notes || 'N/A'}
-                            </span>
-                            <DialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 p-0"
-                                onClick={() => {
-                                  setEditingBooking(booking);
-                                  setNoteInputValue(booking.Notes || '');
-                                }}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </DialogTrigger>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className={cn(
-                            "px-2 py-1 rounded-full text-xs font-medium",
-                            booking.BookingStatus === "Booked" && "bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-200",
-                            booking.BookingStatus === "Cancelled" && "bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-200",
-                            (!booking.BookingStatus || (booking.BookingStatus !== "Booked" && booking.BookingStatus !== "Cancelled")) && "bg-muted text-muted-foreground"
-                          )}>
-                            {booking.BookingStatus ? booking.BookingStatus : "Unknown"}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          {booking.BookingStatus === "Booked" && (
-                             <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="sm">
-                                  <XCircle className="mr-1 h-4 w-4" /> Cancel
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This action will cancel the booking for {booking.ClientName} on {format(new Date(booking.AppointmentDate), "PPP")} at {booking.AppointmentStartTime}. This cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Keep Booking</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleCancelBooking(booking.id)}>
-                                    Confirm Cancellation
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-10">
-                  <p className="text-muted-foreground">
-                    {filterDateRange?.from
-                      ? `No bookings found for the selected date range.`
-                      : "You have no bookings yet."}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-
-      {/* Dialog for Editing Notes - Root is always rendered */}
       <Dialog open={!!editingBooking} onOpenChange={(isOpen) => { if (!isOpen) setEditingBooking(null); }}>
-        {editingBooking && ( // Conditionally render DialogContent
+        <main className="flex-grow py-10">
+          <div className="container max-w-6xl mx-auto"> 
+            <Card className="shadow-xl">
+              <CardHeader>
+                <CardTitle className="text-2xl font-bold flex items-center text-primary">
+                  <ListFilter className="mr-2 h-6 w-6" /> All Bookings
+                </CardTitle>
+                <CardDescription>
+                  View and filter all your bookings by date range. Click the <Edit className="inline h-4 w-4" /> icon to add or edit notes.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col sm:flex-row items-center gap-4 mb-6">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full sm:w-[300px] justify-start text-left font-normal",
+                          !filterDateRange?.from && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIconLucide className="mr-2 h-4 w-4" />
+                        {filterDateRange?.from ? (
+                          filterDateRange.to ? (
+                            <>
+                              {format(filterDateRange.from, "LLL dd, y")} -{" "}
+                              {format(filterDateRange.to, "LLL dd, y")}
+                            </>
+                          ) : (
+                            format(filterDateRange.from, "LLL dd, y")
+                          )
+                        ) : (
+                          <span>Filter by date range</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="range"
+                        selected={filterDateRange}
+                        onSelect={handleFilterDateChange}
+                        initialFocus
+                        numberOfMonths={1}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {filterDateRange?.from && (
+                    <Button variant="ghost" onClick={clearFilter}>Clear Filter</Button>
+                  )}
+                </div>
+
+                {isLoading ? (
+                  <div className="text-center py-10">
+                    <svg className="animate-spin mx-auto h-10 w-10 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p className="mt-2 text-muted-foreground">Loading bookings...</p>
+                  </div>
+                ) : bookings.length > 0 ? (
+                  <Table>
+                    <TableCaption>
+                      {filterDateRange?.from
+                        ? `A list of your bookings from ${format(filterDateRange.from, "PPP")}${filterDateRange.to ? ` to ${format(filterDateRange.to, "PPP")}` : ''}.`
+                        : "A list of all your bookings."}
+                    </TableCaption>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[150px]">Client Name</TableHead>
+                        <TableHead className="w-[200px]">Service/Procedure</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Start</TableHead>
+                        <TableHead>End</TableHead>
+                        <TableHead className="w-[200px]">Notes</TableHead> 
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {bookings.map((booking) => (
+                        <TableRow key={booking.id}>
+                          <TableCell className="font-medium">
+                            {booking.ClientName && booking.ClientID ? (
+                              <Link href={`/clients/${booking.ClientID}`} className="text-primary hover:underline">
+                                {booking.ClientName}
+                              </Link>
+                            ) : (
+                              booking.ClientName || 'Loading...'
+                            )}
+                          </TableCell>
+                          <TableCell>{booking.ServiceProcedure}</TableCell>
+                          <TableCell>{format(new Date(booking.AppointmentDate), "PPP")}</TableCell>
+                          <TableCell>{booking.AppointmentStartTime}</TableCell>
+                          <TableCell>{booking.AppointmentEndTime}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground ">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="truncate max-w-[120px]" title={booking.Notes || 'N/A'}>
+                                {booking.Notes || 'N/A'}
+                              </span>
+                              <DialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 p-0"
+                                  onClick={() => {
+                                    setEditingBooking(booking);
+                                    setNoteInputValue(booking.Notes || '');
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </DialogTrigger>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className={cn(
+                              "px-2 py-1 rounded-full text-xs font-medium",
+                              booking.BookingStatus === "Booked" && "bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-200",
+                              booking.BookingStatus === "Cancelled" && "bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-200",
+                              (!booking.BookingStatus || (booking.BookingStatus !== "Booked" && booking.BookingStatus !== "Cancelled")) && "bg-muted text-muted-foreground"
+                            )}>
+                              {booking.BookingStatus ? booking.BookingStatus : "Unknown"}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            {booking.BookingStatus === "Booked" && (
+                               <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="destructive" size="sm">
+                                    <XCircle className="mr-1 h-4 w-4" /> Cancel
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This action will cancel the booking for {booking.ClientName} on {format(new Date(booking.AppointmentDate), "PPP")} at {booking.AppointmentStartTime}. This cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Keep Booking</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleCancelBooking(booking.id)}>
+                                      Confirm Cancellation
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="text-center py-10">
+                    <p className="text-muted-foreground">
+                      {filterDateRange?.from
+                        ? `No bookings found for the selected date range.`
+                        : "You have no bookings yet."}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+      
+        {/* DialogContent for Editing Notes - Conditionally rendered */}
+        {editingBooking && ( 
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>
@@ -467,7 +467,7 @@ export default function AllBookingsPage() {
             </DialogFooter>
           </DialogContent>
         )}
-      </Dialog>
+      </Dialog> {/* End of Dialog root wrapper */}
 
       <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
         © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
