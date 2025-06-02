@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import type { DateRange } from "react-day-picker";
-import { Calendar as CalendarIconLucide, ListFilter, XCircle, StickyNote } from "lucide-react"; // Added StickyNote
+import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit } from "lucide-react"; // Added Edit
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,17 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from '@/components/ui/label';
 
 
 interface Booking {
@@ -53,7 +64,7 @@ interface Booking {
   AppointmentStartTime: string;
   AppointmentEndTime: string;
   BookingStatus?: string;
-  Notes?: string; // Added Notes
+  Notes?: string;
   BookedByUserID?: string;
 }
 
@@ -65,6 +76,10 @@ export default function AllBookingsPage() {
   const { toast } = useToast();
   const { currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
+
+  // State for editing notes
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+  const [noteInputValue, setNoteInputValue] = useState('');
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
@@ -200,6 +215,34 @@ export default function AllBookingsPage() {
     }
   };
 
+  const handleSaveNote = async () => {
+    if (!currentUser?.uid || !editingBooking) {
+      toast({ title: "Error", description: "Cannot save note. No booking selected or user not logged in.", variant: "destructive" });
+      return;
+    }
+    const bookingId = editingBooking.id;
+    const newNote = noteInputValue;
+  
+    try {
+      const noteRefPath = `Appointments/${currentUser.uid}/${bookingId}`;
+      await update(ref(db, noteRefPath), { Notes: newNote.trim() });
+      toast({
+        title: "Note Saved",
+        description: "The booking note has been updated.",
+      });
+      setEditingBooking(null); 
+      setNoteInputValue('');   
+      fetchBookings();       
+    } catch (error: any) {
+      console.error("Error saving note:", error);
+      toast({
+        title: "Error Saving Note",
+        description: error.message || "Could not save the note.",
+        variant: "destructive",
+      });
+    }
+  };
+
 
   if (authLoading || !currentUser) {
     return (
@@ -225,14 +268,14 @@ export default function AllBookingsPage() {
     <div className="min-h-screen flex flex-col">
       <Header />
       <main className="flex-grow py-10">
-        <div className="container max-w-6xl mx-auto"> {/* Increased max-width for notes */}
+        <div className="container max-w-6xl mx-auto"> 
           <Card className="shadow-xl">
             <CardHeader>
               <CardTitle className="text-2xl font-bold flex items-center text-primary">
                 <ListFilter className="mr-2 h-6 w-6" /> All Bookings
               </CardTitle>
               <CardDescription>
-                View and filter all your bookings by date range.
+                View and filter all your bookings by date range. Click the <Edit className="inline h-4 w-4" /> icon to add or edit notes.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -298,7 +341,7 @@ export default function AllBookingsPage() {
                       <TableHead>Date</TableHead>
                       <TableHead>Start</TableHead>
                       <TableHead>End</TableHead>
-                      <TableHead className="w-[150px]">Notes</TableHead>
+                      <TableHead className="w-[200px]">Notes</TableHead> 
                       <TableHead>Status</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -319,8 +362,25 @@ export default function AllBookingsPage() {
                         <TableCell>{format(new Date(booking.AppointmentDate), "PPP")}</TableCell>
                         <TableCell>{booking.AppointmentStartTime}</TableCell>
                         <TableCell>{booking.AppointmentEndTime}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground max-w-xs truncate" title={booking.Notes}>
-                            {booking.Notes || 'N/A'}
+                        <TableCell className="text-sm text-muted-foreground ">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate max-w-[120px]" title={booking.Notes || 'N/A'}>
+                              {booking.Notes || 'N/A'}
+                            </span>
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 p-0"
+                                onClick={() => {
+                                  setEditingBooking(booking);
+                                  setNoteInputValue(booking.Notes || '');
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </DialogTrigger>
+                          </div>
                         </TableCell>
                         <TableCell>
                           <span className={cn(
@@ -374,9 +434,46 @@ export default function AllBookingsPage() {
           </Card>
         </div>
       </main>
+
+      {/* Dialog for Editing Notes */}
+      {editingBooking && (
+        <Dialog open={!!editingBooking} onOpenChange={(isOpen) => { if (!isOpen) setEditingBooking(null); }}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>
+                Edit Note for {editingBooking.ClientName}
+              </DialogTitle>
+              <DialogDescription>
+                Appointment on {format(new Date(editingBooking.AppointmentDate), "PPP")} at {editingBooking.AppointmentStartTime} - {editingBooking.AppointmentEndTime}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="notes-input" className="text-right col-span-1">
+                  Notes
+                </Label>
+                <Textarea
+                  id="notes-input"
+                  value={noteInputValue}
+                  onChange={(e) => setNoteInputValue(e.target.value)}
+                  placeholder="Add your notes here..."
+                  rows={4}
+                  className="col-span-3"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingBooking(null)}>Cancel</Button>
+              <Button onClick={handleSaveNote}>Save Note</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
         © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
       </footer>
     </div>
   );
 }
+
