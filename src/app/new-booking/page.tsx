@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format, addMinutes, parse } from "date-fns";
-import { Calendar as CalendarIcon, Clock, User, PhoneEmail } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, User, StickyNote } from "lucide-react"; // Added StickyNote
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,18 +21,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ref, set, get, query as rtQuery, orderByChild, equalTo, push, startAt, endAt } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
 
-interface ExistingBooking {
+interface Booking { // Added Notes here for consistency, though not directly used on this page's display beyond form
+  id: string;
+  AppointmentID: string;
+  ClientID: string;
+  ServiceProcedure: string;
+  AppointmentDate: string;
+  AppointmentStartTime: string;
+  AppointmentEndTime: string;
+  BookingStatus?: string;
+  BookedByUserID?: string;
+  Notes?: string;
+}
+
+interface ExistingBooking { // Used for fetching booked slots
   AppointmentStartTime: string;
   AppointmentEndTime: string;
   AppointmentDate: string;
   BookingStatus?: string;
 }
 
-interface ClientData { // Renamed from ExistingClientData for clarity
-    ClientID: string; // The stored custom ClientID
+interface ClientData {
+    ClientID: string;
     ClientName: string;
     ClientContact?: string;
-    // Firebase key will be used as 'id' in ClientSuggestion
 }
 
 interface ClientSuggestion extends ClientData {
@@ -63,6 +75,7 @@ export default function NewBookingPage() {
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [startTime, setStartTime] = useState('');
     const [endTime, setEndTime] = useState('');
+    const [notes, setNotes] = useState(''); // New state for notes
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -77,7 +90,7 @@ export default function NewBookingPage() {
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [selectedClientFirebaseKey, setSelectedClientFirebaseKey] = useState<string | null>(null);
     const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const suggestionsRef = useRef<HTMLDivElement>(null); // Ref for suggestions container
+    const suggestionsRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
       if (!authLoading && !currentUser) {
@@ -102,7 +115,7 @@ export default function NewBookingPage() {
         if (snapshot.exists()) {
           snapshot.forEach((childSnapshot) => {
             const booking = childSnapshot.val() as ExistingBooking;
-            if (booking.BookingStatus === "Booked") { // Only consider booked appointments
+            if (booking.BookingStatus === "Booked") {
               try {
                 const baseDateForParse = new Date(formattedDate + "T00:00:00"); 
                 const slotStartTime = parse(booking.AppointmentStartTime, "HH:mm", baseDateForParse);
@@ -144,7 +157,7 @@ export default function NewBookingPage() {
     const handleClientNameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const query = e.target.value;
         setClientName(query);
-        setSelectedClientFirebaseKey(null); // Reset selected client if name is typed
+        setSelectedClientFirebaseKey(null); 
 
         if (debounceTimeoutRef.current) {
             clearTimeout(debounceTimeoutRef.current);
@@ -172,13 +185,13 @@ export default function NewBookingPage() {
                             });
                         });
                     }
-                    setSuggestions(fetchedSuggestions.slice(0, 5)); // Limit to 5 suggestions
+                    setSuggestions(fetchedSuggestions.slice(0, 5)); 
                     setShowSuggestions(true);
                 } catch (error) {
                     console.error("Error fetching client suggestions:", error);
                     setSuggestions([]);
                 }
-            }, 300); // 300ms debounce
+            }, 300); 
         } else {
             setSuggestions([]);
             setShowSuggestions(false);
@@ -193,7 +206,6 @@ export default function NewBookingPage() {
         setSuggestions([]);
     };
 
-    // Close suggestions when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
@@ -257,13 +269,13 @@ export default function NewBookingPage() {
             return;
         }
 
-        let clientIdToUse: string | null = selectedClientFirebaseKey; // Prioritize explicitly selected client
+        let clientIdToUse: string | null = selectedClientFirebaseKey;
         let clientNameToDisplay = clientName.trim();
 
         try {
-            if (!clientIdToUse) { // If no client was selected from suggestions, try to find or create new
+            if (!clientIdToUse) { 
                 const userClientsRefPath = `Clients/${currentUser.uid}`;
-                const clientsDbRef = ref(db, userClientsRefPath); // Corrected ref
+                const clientsDbRef = ref(db, userClientsRefPath); 
                 const clientsSnapshot = await get(clientsDbRef);
 
                 const inputNameLower = clientName.trim().toLowerCase();
@@ -299,7 +311,7 @@ export default function NewBookingPage() {
                     clientIdToUse = newClientRef.key as string;
                     const now = new Date();
                     await set(newClientRef, {
-                        ClientID: clientIdToUse, // Store Firebase key as ClientID field as well for consistency
+                        ClientID: clientIdToUse, 
                         ClientName: clientName.trim(),
                         ClientContact: clientContact.trim(),
                         CreateDate: format(now, "yyyy-MM-dd"),
@@ -308,9 +320,6 @@ export default function NewBookingPage() {
                     });
                     clientNameToDisplay = clientName.trim();
                 }
-            } else {
-                 // If selectedClientFirebaseKey was set, clientNameToDisplay is already the clientName from state
-                 // which was set when the suggestion was clicked.
             }
 
             const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
@@ -326,16 +335,17 @@ export default function NewBookingPage() {
                 AppointmentStartTime: startTime,
                 AppointmentEndTime: endTime,
                 BookingStatus: "Booked",
+                Notes: notes.trim(), // Save notes
                 BookedByUserID: currentUser.uid
             });
 
             toast({ title: "Success", description: `Booking Confirmed for ${clientNameToDisplay}!` });
             if(date) fetchBookedSlots(date); 
             
-            // Optionally reset form fields
             // setClientName('');
             // setClientContact('');
             // setServiceProcedure('');
+            // setNotes(''); // Reset notes field
             // setStartTime('');
             // setEndTime('');
             // setDate(new Date());
@@ -540,6 +550,20 @@ export default function NewBookingPage() {
                                 Checking available slots...
                             </div>
                         )}
+                        <div>
+                            <Label htmlFor="bookingNotes" className="font-medium flex items-center">
+                                <StickyNote className="mr-2 h-4 w-4" />
+                                Booking Notes
+                            </Label>
+                            <Textarea
+                                id="bookingNotes"
+                                value={notes}
+                                onChange={(e) => setNotes(e.target.value)}
+                                className="mt-1"
+                                placeholder="Add any relevant notes for this booking..."
+                                rows={3}
+                            />
+                        </div>
                         <Separator className="my-4" />
                         <Button type="submit" disabled={isSubmitting || isLoadingBookedSlots} className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-semibold py-3">
                              {isSubmitting ? (

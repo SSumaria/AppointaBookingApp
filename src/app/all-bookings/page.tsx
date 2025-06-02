@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import type { DateRange } from "react-day-picker";
-import { Calendar as CalendarIconLucide, ListFilter, XCircle } from "lucide-react";
+import { Calendar as CalendarIconLucide, ListFilter, XCircle, StickyNote } from "lucide-react"; // Added StickyNote
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,7 @@ interface Booking {
   AppointmentStartTime: string;
   AppointmentEndTime: string;
   BookingStatus?: string;
+  Notes?: string; // Added Notes
   BookedByUserID?: string;
 }
 
@@ -188,7 +189,7 @@ export default function AllBookingsPage() {
         title: "Booking Cancelled",
         description: "The booking has been successfully cancelled.",
       });
-      fetchBookings(); // Refresh the bookings list
+      fetchBookings(); 
     } catch (error: any) {
       console.error("Error cancelling booking:", error);
       toast({
@@ -224,7 +225,7 @@ export default function AllBookingsPage() {
     <div className="min-h-screen flex flex-col">
       <Header />
       <main className="flex-grow py-10">
-        <div className="container max-w-5xl mx-auto">
+        <div className="container max-w-6xl mx-auto"> {/* Increased max-width for notes */}
           <Card className="shadow-xl">
             <CardHeader>
               <CardTitle className="text-2xl font-bold flex items-center text-primary">
@@ -292,11 +293,12 @@ export default function AllBookingsPage() {
                   </TableCaption>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[200px]">Client Name</TableHead>
-                      <TableHead>Service/Procedure</TableHead>
+                      <TableHead className="w-[150px]">Client Name</TableHead>
+                      <TableHead className="w-[200px]">Service/Procedure</TableHead>
                       <TableHead>Date</TableHead>
-                      <TableHead>Start Time</TableHead>
-                      <TableHead>End Time</TableHead>
+                      <TableHead>Start</TableHead>
+                      <TableHead>End</TableHead>
+                      <TableHead className="w-[150px]">Notes</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -317,6 +319,9 @@ export default function AllBookingsPage() {
                         <TableCell>{format(new Date(booking.AppointmentDate), "PPP")}</TableCell>
                         <TableCell>{booking.AppointmentStartTime}</TableCell>
                         <TableCell>{booking.AppointmentEndTime}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground max-w-xs truncate" title={booking.Notes}>
+                            {booking.Notes || 'N/A'}
+                        </TableCell>
                         <TableCell>
                           <span className={cn(
                             "px-2 py-1 rounded-full text-xs font-medium",

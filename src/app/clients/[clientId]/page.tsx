@@ -9,11 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import { User, Calendar as CalendarIconLucide, Briefcase, Mail, Phone, Clock } from "lucide-react";
+import { User, Calendar as CalendarIconLucide, Briefcase, Mail, Phone, Clock, StickyNote } from "lucide-react"; // Added StickyNote
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
-// Firebase imports
 import { ref, get, query as rtQuery, orderByChild, equalTo } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
 
@@ -29,13 +28,13 @@ interface Client {
 
 interface Booking {
   id: string;
-  // AppointmentID: string; // Removed as per request
   ClientID: string;
   ServiceProcedure: string;
   AppointmentDate: string;
   AppointmentStartTime: string;
   AppointmentEndTime: string;
   BookingStatus?: string;
+  Notes?: string; // Added Notes
   BookedByUserID?: string;
 }
 
@@ -216,10 +215,11 @@ export default function ClientDetailsPage() {
                   <TableCaption>A list of all bookings for {client.ClientName}.</TableCaption>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Service/Procedure</TableHead>
+                      <TableHead className="w-[200px]">Service/Procedure</TableHead>
                       <TableHead>Date</TableHead>
-                      <TableHead>Start Time</TableHead>
-                      <TableHead>End Time</TableHead>
+                      <TableHead>Start</TableHead>
+                      <TableHead>End</TableHead>
+                      <TableHead className="w-[200px]">Notes</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -230,6 +230,9 @@ export default function ClientDetailsPage() {
                         <TableCell>{format(new Date(booking.AppointmentDate), "PPP")}</TableCell>
                         <TableCell>{booking.AppointmentStartTime}</TableCell>
                         <TableCell>{booking.AppointmentEndTime}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground max-w-xs truncate" title={booking.Notes}>
+                            {booking.Notes || 'N/A'}
+                        </TableCell>
                         <TableCell>
                           <span className={cn(
                             "px-2 py-1 rounded-full text-xs font-medium",
