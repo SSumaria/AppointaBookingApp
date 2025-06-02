@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import type { DateRange } from "react-day-picker";
-import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit } from "lucide-react"; // Added Edit
+import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -77,7 +77,6 @@ export default function AllBookingsPage() {
   const { currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  // State for editing notes
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [noteInputValue, setNoteInputValue] = useState('');
 
@@ -435,9 +434,9 @@ export default function AllBookingsPage() {
         </div>
       </main>
 
-      {/* Dialog for Editing Notes */}
-      {editingBooking && (
-        <Dialog open={!!editingBooking} onOpenChange={(isOpen) => { if (!isOpen) setEditingBooking(null); }}>
+      {/* Dialog for Editing Notes - Root is always rendered */}
+      <Dialog open={!!editingBooking} onOpenChange={(isOpen) => { if (!isOpen) setEditingBooking(null); }}>
+        {editingBooking && ( // Conditionally render DialogContent
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>
@@ -467,8 +466,8 @@ export default function AllBookingsPage() {
               <Button onClick={handleSaveNote}>Save Note</Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
-      )}
+        )}
+      </Dialog>
 
       <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
         © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
@@ -476,4 +475,3 @@ export default function AllBookingsPage() {
     </div>
   );
 }
-
