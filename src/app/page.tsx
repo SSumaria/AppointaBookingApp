@@ -2,26 +2,48 @@
 "use client";
 
 import Link from 'next/link';
-import { Calendar, Clock, Users } from "lucide-react"; // Kept specific icons for this page
+import { Calendar, Clock, Users, ExternalLink } from "lucide-react"; 
 import { Button } from "@/components/ui/button";
-import Header from '@/components/layout/Header'; // Added
-import { useAuth } from '@/context/AuthContext'; // Added
-import { useRouter } from 'next/navigation'; // Added
-import React from 'react'; // Added for useEffect
+import Header from '@/components/layout/Header'; 
+import { useAuth } from '@/context/AuthContext'; 
+import { useRouter } from 'next/navigation'; 
+import React, { useState, useEffect } from 'react'; 
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
 
 
 export default function HomePage() {
-  const { currentUser, loading } = useAuth(); // Added
-  const router = useRouter(); // Added
+  const { currentUser, loading } = useAuth(); 
+  const router = useRouter(); 
+  const [publicBookingLink, setPublicBookingLink] = useState('');
+  const { toast } = useToast();
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!loading && !currentUser) {
       router.push('/login');
+    } else if (currentUser && typeof window !== 'undefined') {
+      setPublicBookingLink(`${window.location.origin}/book/${currentUser.uid}`);
     }
   }, [currentUser, loading, router]);
 
+  const handleCopyToClipboard = () => {
+    navigator.clipboard.writeText(publicBookingLink).then(() => {
+      toast({
+        title: "Link Copied!",
+        description: "Your public booking link has been copied to the clipboard.",
+      });
+    }).catch(err => {
+      console.error("Failed to copy link: ", err);
+      toast({
+        title: "Copy Failed",
+        description: "Could not copy the link. Please try again manually.",
+        variant: "destructive",
+      });
+    });
+  };
+
   if (loading || !currentUser) {
-    // You can render a loading spinner or a skeleton UI here
     return (
         <div className="min-h-screen flex flex-col">
             <Header />
@@ -44,8 +66,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header /> {/* Replaced old header */}
-      {/* Main Content */}
+      <Header /> 
       <main className="flex-grow py-12">
         <div className="container max-w-5xl mx-auto text-center">
           <h1 className="text-4xl font-extrabold text-primary mb-4">
@@ -62,7 +83,29 @@ export default function HomePage() {
           </Link>
         </div>
 
-        {/* Features Section */}
+        {publicBookingLink && (
+          <div className="container max-w-3xl mx-auto mt-12">
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold flex items-center">
+                  <ExternalLink className="mr-2 h-5 w-5 text-primary" />
+                  Your Public Booking Link
+                </CardTitle>
+                <CardDescription>
+                  Share this link with your clients to allow them to book appointments with you directly.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex items-center space-x-2">
+                <Input type="text" value={publicBookingLink} readOnly className="flex-grow" />
+                <Button onClick={handleCopyToClipboard} variant="outline">Copy Link</Button>
+              </CardContent>
+              <CardFooter className="text-xs text-muted-foreground pt-4">
+                Anyone with this link can view your available slots and make bookings.
+              </CardFooter>
+            </Card>
+          </div>
+        )}
+
         <div className="container max-w-5xl mx-auto mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="p-6 bg-card rounded-lg shadow-lg hover:shadow-xl transition-shadow">
             <Calendar className="h-10 w-10 text-primary mb-4" />
@@ -88,10 +131,12 @@ export default function HomePage() {
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
         © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
       </footer>
     </div>
   );
 }
+
+
+    
