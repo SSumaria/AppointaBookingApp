@@ -62,25 +62,51 @@ export default function PublicBookingPage() {
 
   useEffect(() => {
     const checkServiceProvider = async () => {
+      console.log(`PublicBookingPage: Checking service provider with ID: ${serviceProviderUserId}`);
       if (!serviceProviderUserId) {
+        console.log("PublicBookingPage: No serviceProviderUserId, setting exists to false.");
         setServiceProviderExists(false);
         return;
       }
-      // Check if the provider exists by trying to read a non-sensitive part of their data
+      if (!db) {
+        console.error("PublicBookingPage: Firebase DB is not initialized. Cannot check service provider.");
+        setServiceProviderExists(false); // Cannot verify if DB is not available
+        toast({ title: "Error", description: "Booking system is currently unavailable. Please try again later.", variant: "destructive" });
+        return;
+      }
+
       try {
-        const snapshot = await get(ref(db, `Clients/${serviceProviderUserId}`)); 
-        setServiceProviderExists(snapshot.exists()); 
-         if (!snapshot.exists()) {
-            const apptSnapshot = await get(ref(db, `Appointments/${serviceProviderUserId}`));
-            setServiceProviderExists(apptSnapshot.exists());
+        // Try checking Appointments path first, as it has public read access
+        const apptRef = ref(db, `Appointments/${serviceProviderUserId}`);
+        console.log(`PublicBookingPage: Checking path: Appointments/${serviceProviderUserId}`);
+        const apptSnapshot = await get(apptRef);
+        if (apptSnapshot.exists()) {
+          console.log(`PublicBookingPage: Provider found based on Appointments data for ID: ${serviceProviderUserId}`);
+          setServiceProviderExists(true);
+          return;
         }
-      } catch (error) {
-        console.error("Error checking service provider:", error);
+        console.log(`PublicBookingPage: No data found in Appointments for ID: ${serviceProviderUserId}.`);
+
+        // As a fallback, try checking Clients path (though rules might restrict unauthenticated access)
+        const clientRef = ref(db, `Clients/${serviceProviderUserId}`);
+        console.log(`PublicBookingPage: Checking path: Clients/${serviceProviderUserId}`);
+        const clientSnapshot = await get(clientRef);
+        if (clientSnapshot.exists()) {
+          console.log(`PublicBookingPage: Provider found based on Clients data for ID: ${serviceProviderUserId}`);
+          setServiceProviderExists(true);
+          return;
+        }
+        console.log(`PublicBookingPage: No data found in Clients for ID: ${serviceProviderUserId}. Provider assumed not to exist.`);
         setServiceProviderExists(false);
+
+      } catch (error) {
+        console.error(`PublicBookingPage: Error checking service provider for ID ${serviceProviderUserId}:`, error);
+        setServiceProviderExists(false);
+        toast({ title: "Error", description: "Could not verify service provider information.", variant: "destructive" });
       }
     };
     checkServiceProvider();
-  }, [serviceProviderUserId]);
+  }, [serviceProviderUserId, toast]);
 
 
   const fetchBookedSlots = useCallback(async (selectedDate: Date) => {
@@ -132,7 +158,7 @@ export default function PublicBookingPage() {
   }, [serviceProviderUserId, toast, serviceProviderExists]);
 
   useEffect(() => {
-    if (date && serviceProviderUserId && serviceProviderExists) {
+    if (date && serviceProviderUserId && serviceProviderExists === true) { // Only fetch if provider exists
       fetchBookedSlots(date);
     } else {
       setBookedTimeSlotsForDate(new Set());
@@ -149,8 +175,8 @@ export default function PublicBookingPage() {
         setIsSubmitting(false);
         return;
     }
-    if (!serviceProviderExists){
-        toast({ title: "Error", description: "Service provider not found.", variant: "destructive" });
+    if (!serviceProviderExists){ // Check the state here
+        toast({ title: "Error", description: "Service provider not found or booking system unavailable.", variant: "destructive" });
         setIsSubmitting(false);
         return;
     }
@@ -204,12 +230,12 @@ export default function PublicBookingPage() {
         const now = new Date();
 
         await set(newClientRef, {
-            ClientID: newClientId, 
+            ClientID: newClientId,
             ClientName: clientName.trim(),
             ClientContact: clientContact.trim(),
             CreateDate: format(now, "yyyy-MM-dd"),
             CreateTime: format(now, "HH:mm"),
-            CreatedByUserID: serviceProviderUserId 
+            CreatedByUserID: serviceProviderUserId
         });
 
         const providerAppointmentsRefPath = `Appointments/${serviceProviderUserId}`;
@@ -219,17 +245,17 @@ export default function PublicBookingPage() {
 
         await set(newAppointmentRef, {
             AppointmentID: appointmentId,
-            ClientID: newClientId, 
+            ClientID: newClientId,
             ServiceProcedure: serviceProcedure,
             AppointmentDate: selectedFormattedDate,
             AppointmentStartTime: startTime,
             AppointmentEndTime: endTime,
             BookingStatus: "Booked", // Default status for new public bookings
-            BookedByUserID: serviceProviderUserId 
+            BookedByUserID: serviceProviderUserId
         });
 
         toast({ title: "Booking Confirmed!", description: `Your appointment for ${serviceProcedure} has been booked.` });
-        if(date) fetchBookedSlots(date); 
+        if(date) fetchBookedSlots(date);
 
         setClientName('');
         setClientContact('');
@@ -350,7 +376,7 @@ export default function PublicBookingPage() {
                                                 selected={date}
                                                 onSelect={(selectedDay) => {
                                                     setDate(selectedDay);
-                                                    setStartTime(''); 
+                                                    setStartTime('');
                                                     setEndTime('');
                                                 }}
                                                 disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
@@ -396,7 +422,7 @@ export default function PublicBookingPage() {
                                         <SelectContent>
                                             {isLoadingBookedSlots && <SelectItem value="loading" disabled>Loading slots...</SelectItem>}
                                             {!isLoadingBookedSlots && timeSlots.filter(slot => {
-                                                if (!startTime) return true; 
+                                                if (!startTime) return true;
                                                 const baseDateForFilter = date ? new Date(date) : new Date();
                                                 baseDateForFilter.setHours(0,0,0,0);
                                                 const currentSlotTime = parse(slot, "HH:mm", baseDateForFilter);
@@ -419,7 +445,7 @@ export default function PublicBookingPage() {
                                                         }
                                                         tempSlotCheck = addMinutes(tempSlotCheck, 30);
                                                     }
-                                                } else if (!startTime){ 
+                                                } else if (!startTime){
                                                     itemIsDisabled = true;
                                                 }
                                                 return (
