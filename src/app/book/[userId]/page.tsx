@@ -67,25 +67,13 @@ export default function PublicBookingPage() {
         return;
       }
       // Check if the provider exists by trying to read a non-sensitive part of their data
-      // For example, check if their top-level user node in Appointments exists
-      // This is a simplified check. In production, you might have a 'users' collection.
       try {
-        const providerAppointmentsRef = ref(db, `Appointments/${serviceProviderUserId}`);
-        // Try a shallow read or check for a specific known key if possible to minimize data transfer
-        // For this example, just checking existence by trying to get a snapshot.
-        // A more robust check would be to query a `users` collection for the provider's ID.
-        // For now, we assume if they have an "Appointments" node, they are a valid provider.
-        // This is a placeholder check. A real app might have a /Users/{userId}/publicProfile node.
-        const snapshot = await get(ref(db, `Clients/${serviceProviderUserId}`)); // Check against Clients node as a proxy
-        setServiceProviderExists(snapshot.exists()); // if provider has any client records, assume they exist.
-                                                    // A more direct check on a user profile node would be better.
+        const snapshot = await get(ref(db, `Clients/${serviceProviderUserId}`)); 
+        setServiceProviderExists(snapshot.exists()); 
          if (!snapshot.exists()) {
-            // Try appointments as a fallback check
             const apptSnapshot = await get(ref(db, `Appointments/${serviceProviderUserId}`));
             setServiceProviderExists(apptSnapshot.exists());
         }
-
-
       } catch (error) {
         console.error("Error checking service provider:", error);
         setServiceProviderExists(false);
@@ -197,7 +185,6 @@ export default function PublicBookingPage() {
     if(hasOverlap) {
         toast({ title: "Booking Conflict", description: "The selected time range is no longer available or overlaps with an existing booking.", variant: "destructive" });
         setIsSubmitting(false);
-        // Re-fetch slots in case availability changed
         if (date) fetchBookedSlots(date);
         return;
     }
@@ -217,12 +204,12 @@ export default function PublicBookingPage() {
         const now = new Date();
 
         await set(newClientRef, {
-            ClientID: newClientId, // Store the Firebase key as ClientID
+            ClientID: newClientId, 
             ClientName: clientName.trim(),
             ClientContact: clientContact.trim(),
             CreateDate: format(now, "yyyy-MM-dd"),
             CreateTime: format(now, "HH:mm"),
-            CreatedByUserID: serviceProviderUserId // Associate this client with the service provider
+            CreatedByUserID: serviceProviderUserId 
         });
 
         const providerAppointmentsRefPath = `Appointments/${serviceProviderUserId}`;
@@ -232,26 +219,23 @@ export default function PublicBookingPage() {
 
         await set(newAppointmentRef, {
             AppointmentID: appointmentId,
-            ClientID: newClientId, // Link to the newly created client's Firebase key
+            ClientID: newClientId, 
             ServiceProcedure: serviceProcedure,
             AppointmentDate: selectedFormattedDate,
             AppointmentStartTime: startTime,
             AppointmentEndTime: endTime,
             BookingStatus: "Booked",
-            // Notes can be added later by the provider if needed
-            BookedByUserID: serviceProviderUserId // The provider who owns this booking
+            BookedByUserID: serviceProviderUserId 
         });
 
         toast({ title: "Booking Confirmed!", description: `Your appointment for ${serviceProcedure} has been booked.` });
-        if(date) fetchBookedSlots(date); // Refresh booked slots for the current view
+        if(date) fetchBookedSlots(date); 
 
-        // Reset form
         setClientName('');
         setClientContact('');
         setServiceProcedure('');
         setStartTime('');
         setEndTime('');
-        // setDate(new Date()); // Optionally reset date or keep it
 
     } catch (error: any) {
         console.error("Error during public booking:", error);
@@ -366,7 +350,7 @@ export default function PublicBookingPage() {
                                                 selected={date}
                                                 onSelect={(selectedDay) => {
                                                     setDate(selectedDay);
-                                                    setStartTime(''); // Reset times when date changes
+                                                    setStartTime(''); 
                                                     setEndTime('');
                                                 }}
                                                 disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
@@ -412,7 +396,7 @@ export default function PublicBookingPage() {
                                         <SelectContent>
                                             {isLoadingBookedSlots && <SelectItem value="loading" disabled>Loading slots...</SelectItem>}
                                             {!isLoadingBookedSlots && timeSlots.filter(slot => {
-                                                if (!startTime) return true; // Show all if start time not yet selected
+                                                if (!startTime) return true; 
                                                 const baseDateForFilter = date ? new Date(date) : new Date();
                                                 baseDateForFilter.setHours(0,0,0,0);
                                                 const currentSlotTime = parse(slot, "HH:mm", baseDateForFilter);
@@ -435,7 +419,7 @@ export default function PublicBookingPage() {
                                                         }
                                                         tempSlotCheck = addMinutes(tempSlotCheck, 30);
                                                     }
-                                                } else if (!startTime){ // Disable if start time isn't picked
+                                                } else if (!startTime){ 
                                                     itemIsDisabled = true;
                                                 }
                                                 return (
@@ -477,5 +461,6 @@ export default function PublicBookingPage() {
     </div>
   );
 }
+    
 
     
