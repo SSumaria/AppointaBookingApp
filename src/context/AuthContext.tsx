@@ -6,8 +6,11 @@ import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, si
 import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth } from '@/lib/firebaseConfig';
+import { auth } from '@/lib/firebaseConfig'; // auth can be undefined if firebaseConfig fails
 import { useToast } from '@/hooks/use-toast';
+
+// Log the imported auth object immediately
+console.log("--- AuthContext.tsx --- Imported 'auth' from firebaseConfig:", auth ? "DEFINED" : "UNDEFINED");
 
 interface AuthContextType {
   currentUser: FirebaseUser | null;
@@ -33,21 +36,46 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  console.log("--- AuthProvider MOUNTING (AuthContext.tsx) --- 'auth' object is:", auth ? "DEFINED" : "UNDEFINED");
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
+    console.log("--- AuthProvider useEffect (AuthContext.tsx) --- Setting up onAuthStateChanged. 'auth' is:", auth ? "DEFINED" : "UNDEFINED");
+    if (!auth) {
+      console.error("--- AuthProvider useEffect (AuthContext.tsx) --- Firebase 'auth' service is UNDEFINED. Cannot set up onAuthStateChanged. This indicates a Firebase initialization problem in firebaseConfig.ts. The public booking page may redirect if it relies on auth state, even if it shouldn't.");
+      setLoading(false); // Stop loading if auth is not available
+      // Potentially, if on a public page, we should not redirect here.
+      // The redirect might be happening due to router.push in other functions if they are called.
+      return; 
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log("--- AuthProvider onAuthStateChanged (AuthContext.tsx) --- User state changed:", user ? user.uid : null);
       setCurrentUser(user);
       setLoading(false);
+      console.log("--- AuthProvider onAuthStateChanged (AuthContext.tsx) --- Loading set to false. Current user:", user ? user.uid : null);
+    }, (error) => {
+      console.error("--- AuthProvider onAuthStateChanged ERROR (AuthContext.tsx) ---", error);
+      setCurrentUser(null);
+      setLoading(false);
+      toast({
+        title: "Auth State Error",
+        description: "Could not verify authentication status. Please try refreshing.",
+        variant: "destructive",
+      });
     });
-    return () => unsubscribe();
-  }, []);
+    
+    return () => {
+      console.log("--- AuthProvider useEffect CLEANUP (AuthContext.tsx) --- Unsubscribing from onAuthStateChanged.");
+      unsubscribe();
+    };
+  }, []); // Empty dependency array: runs once on mount and cleans up on unmount
 
   const handleAuthError = (error: AuthError, defaultMessage: string) => {
-    console.error("Authentication error:", error);
+    console.error("Authentication error (AuthContext.tsx):", error.code, error.message);
     let message = defaultMessage;
     if (error.code) {
         switch (error.code) {
@@ -73,6 +101,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             case 'auth/popup-closed-by-user':
                 message = 'Google Sign-In popup closed by user.';
                 break;
+            case 'auth/cancelled-popup-request':
+            case 'auth/popup-blocked':
+                 message = 'Google Sign-In popup was blocked or cancelled. Please enable popups for this site.';
+                 break;
             default:
                 message = error.message || defaultMessage;
         }
@@ -86,64 +118,80 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }
 
   const signUpWithEmail = async (email: string, pass: string): Promise<FirebaseUser | null> => {
+    if (!auth) {
+      toast({ title: 'Error', description: 'Firebase authentication is not initialized.', variant: 'destructive' });
+      return null;
+    }
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-      setCurrentUser(userCredential.user);
+      // onAuthStateChanged will handle setCurrentUser
       toast({ title: 'Registration Successful', description: 'Welcome!' });
       router.push('/');
       return userCredential.user;
     } catch (error) {
       return handleAuthError(error as AuthError, 'Failed to register.');
     } finally {
-      setLoading(false);
+      // setLoading(false); // onAuthStateChanged handles this
     }
   };
 
   const signInWithEmail = async (email: string, pass: string): Promise<FirebaseUser | null> => {
+     if (!auth) {
+      toast({ title: 'Error', description: 'Firebase authentication is not initialized.', variant: 'destructive' });
+      return null;
+    }
     setLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
-      setCurrentUser(userCredential.user);
+      // onAuthStateChanged will handle setCurrentUser
       toast({ title: 'Login Successful', description: 'Welcome back!' });
       router.push('/');
       return userCredential.user;
     } catch (error) {
       return handleAuthError(error as AuthError, 'Failed to sign in.');
     } finally {
-      setLoading(false);
+      // setLoading(false); // onAuthStateChanged handles this
     }
   };
 
   const signInWithGoogle = async (): Promise<FirebaseUser | null> => {
+     if (!auth) {
+      toast({ title: 'Error', description: 'Firebase authentication is not initialized.', variant: 'destructive' });
+      return null;
+    }
     setLoading(true);
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      setCurrentUser(result.user);
+      // onAuthStateChanged will handle setCurrentUser
       toast({ title: 'Google Sign-In Successful', description: 'Welcome!' });
       router.push('/');
       return result.user;
     } catch (error) {
       return handleAuthError(error as AuthError, 'Failed to sign in with Google.');
     } finally {
-      setLoading(false);
+      // setLoading(false); // onAuthStateChanged handles this
     }
   };
 
   const logout = async (): Promise<void> => {
+    if (!auth) {
+      toast({ title: 'Error', description: 'Firebase authentication is not initialized.', variant: 'destructive' });
+      return;
+    }
     setLoading(true);
     try {
       await signOut(auth);
-      setCurrentUser(null);
+      // onAuthStateChanged will handle setCurrentUser(null)
       toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
-      router.push('/login');
+      router.push('/login'); // Explicit redirect after logout
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error("Logout error (AuthContext.tsx):", error);
       toast({ title: 'Logout Error', description: (error as AuthError).message || 'Failed to log out.', variant: 'destructive' });
-    } finally {
-      setLoading(false);
+       setLoading(false); // Ensure loading is false on error too
     }
+    // onAuthStateChanged will set loading to false
   };
 
   const value = {
@@ -155,5 +203,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
   };
 
-  return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>;
+  // Conditionally render children only if Firebase auth is somehow available (even if user is null)
+  // or if we are not in loading state due to auth init failure
+  // Children are always rendered, but their behavior might depend on currentUser and loading.
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

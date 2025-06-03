@@ -4,7 +4,7 @@ import { getDatabase, type Database } from "firebase/database";
 import { getAuth, type Auth } from "firebase/auth";
 
 // --- Start of Diagnostic Logging ---
-console.log("--- Firebase Config START (firebaseConfig.ts) ---");
+console.log("--- Firebase Config START (firebaseConfig.ts) --- MODULE EXECUTING ---");
 
 const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
@@ -13,10 +13,15 @@ const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 const messagingSenderId = process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID;
 const appIdEnv = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
 const measurementId = process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID;
-const databaseURL = "https://bookerpro-e5c9f-default-rtdb.firebaseio.com/";
+const databaseURL = "https://bookerpro-e5c9f-default-rtdb.firebaseio.com/"; // Ensure this is correct
 
-console.log("RAW NEXT_PUBLIC_FIREBASE_API_KEY (firebaseConfig.ts):", process.env.NEXT_PUBLIC_FIREBASE_API_KEY); // Log raw value
+console.log("RAW NEXT_PUBLIC_FIREBASE_API_KEY (firebaseConfig.ts):", process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
 console.log("Processed apiKey variable (firebaseConfig.ts):", apiKey ? "EXISTS" : "MISSING_OR_EMPTY");
+console.log("typeof window (firebaseConfig.ts):", typeof window);
+if (typeof window !== 'undefined') {
+  console.log("window.location.pathname (firebaseConfig.ts):", window.location.pathname);
+}
+
 
 const firebaseConfig = {
   apiKey: apiKey,
@@ -34,10 +39,13 @@ console.log("Constructed firebaseConfig object (firebaseConfig.ts):", JSON.strin
 if (!firebaseConfig.apiKey) {
   const errorMessage = "CRITICAL FIREBASE CONFIG ERROR (firebaseConfig.ts): NEXT_PUBLIC_FIREBASE_API_KEY is missing, undefined, or empty. Firebase cannot initialize. Application will not function. Please check your .env.local file and ensure the Next.js development server was restarted after any changes.";
   console.error(errorMessage);
+  
   // For public pages like /book/[userId], if the API key is missing, we MUST stop execution.
   // Throwing an error here should halt the script and prevent redirects.
   if (typeof window !== 'undefined' && window.location.pathname.startsWith('/book/')) {
-    throw new Error(errorMessage);
+    // Alert the user directly on the page for public booking if possible.
+    // document.body.innerHTML = `<div style="color: red; font-size: 20px; padding: 20px;">${errorMessage}</div>`;
+    throw new Error(errorMessage + " (This error is thrown for /book/ routes specifically)");
   }
   // For other pages, the app might attempt to continue, but auth/db will inevitably fail.
 }
@@ -50,10 +58,10 @@ try {
   if (!getApps().length) {
     console.log("Attempting to initialize Firebase app (firebaseConfig.ts)...");
     app = initializeApp(firebaseConfig);
-    console.log("Firebase app INITIALIZED successfully (firebaseConfig.ts).");
+    console.log("Firebase app INITIALIZED successfully (firebaseConfig.ts). App Name:", app.name);
   } else {
     app = getApp();
-    console.log("Firebase app ALREADY INITIALIZED. Getting existing app (firebaseConfig.ts).");
+    console.log("Firebase app ALREADY INITIALIZED. Getting existing app (firebaseConfig.ts). App Name:", app.name);
   }
 
   console.log("Attempting to get Database and Auth services (firebaseConfig.ts)...");
@@ -63,9 +71,11 @@ try {
 
 } catch (error: any) {
   console.error("FATAL ERROR during Firebase initialization or service retrieval (firebaseConfig.ts):", error.message, error.stack);
+  const initErrorMessage = `Firebase initialization failed: ${error.message}. The public booking page cannot operate. Check API key and other Firebase config values.`;
   // If initialization fails, it's critical, especially for public pages.
   if (typeof window !== 'undefined' && window.location.pathname.startsWith('/book/')) {
-    throw new Error(`Firebase initialization failed: ${error.message}. The public booking page cannot operate. Check API key and other Firebase config values.`);
+    // document.body.innerHTML = `<div style="color: red; font-size: 20px; padding: 20px;">${initErrorMessage}</div>`;
+    throw new Error(initErrorMessage + " (This error is thrown for /book/ routes specifically after init attempt)");
   }
   // Assign undefined to app, db, authInstance if they fail to initialize to prevent further errors if code attempts to use them
   // This helps in gracefully degrading or showing errors in other parts of the app.
@@ -77,7 +87,7 @@ try {
   authInstance = undefined;
 }
 
-console.log("--- Firebase Config END (firebaseConfig.ts) ---");
+console.log("--- Firebase Config END (firebaseConfig.ts) --- Exporting app, db, authInstance:", { appExists: !!app, dbExists: !!db, authInstanceExists: !!authInstance });
 
 // Export the potentially undefined services. Consumer modules (like AuthContext) should handle this.
 export { app, db, authInstance as auth, firebaseConfig };
