@@ -81,7 +81,8 @@ export default function PublicBookingPage() {
       }
 
       let providerFound = false;
-      let attemptedPathForError = ""; // To help identify which path failed if permission denied
+      let attemptedPathForError = ""; 
+
       try {
         // Path 1: Appointments (Prioritized for public read as per rules)
         const apptRefPath = `Appointments/${serviceProviderUserId}`;
@@ -99,7 +100,7 @@ export default function PublicBookingPage() {
             console.log(`PublicBookingPage: Data node EXISTS in Appointments for ID '${serviceProviderUserId}', but it's EMPTY. Considering provider not yet confirmed by this path.`);
           }
         } else {
-          console.log(`PublicBookingPage: NO data node found at Appointments path for ID '${serviceProviderUserId}'.`);
+          console.log(`PublicBookingPage: NO data node found at Appointments path for ID '${serviceProviderUserId}'. This means snapshot.exists() was false.`);
         }
 
         // Path 2: Clients (Fallback check, also requires public read in rules if used by unauthenticated context)
@@ -119,7 +120,7 @@ export default function PublicBookingPage() {
               console.log(`PublicBookingPage: Data node EXISTS in Clients for ID '${serviceProviderUserId}', but it's EMPTY.`);
             }
           } else {
-            console.log(`PublicBookingPage: NO data node found at Clients path for ID '${serviceProviderUserId}'.`);
+            console.log(`PublicBookingPage: NO data node found at Clients path for ID '${serviceProviderUserId}'. This means snapshot.exists() was false.`);
           }
         }
         
@@ -127,7 +128,7 @@ export default function PublicBookingPage() {
             console.log(`PublicBookingPage: Provider VERIFIED for ID '${serviceProviderUserId}'. Setting serviceProviderExists to true.`);
             setServiceProviderExists(true);
         } else {
-            console.log(`PublicBookingPage: Provider NOT VERIFIED for ID '${serviceProviderUserId}' after checking both Appointments and Clients paths. Setting serviceProviderExists to false.`);
+            console.log(`PublicBookingPage: Provider NOT VERIFIED for ID '${serviceProviderUserId}' after checking both Appointments and Clients paths (both returned no data or empty data). Setting serviceProviderExists to false.`);
             setServiceProviderExists(false);
         }
 
@@ -142,17 +143,23 @@ export default function PublicBookingPage() {
         
         if (error.code === 'PERMISSION_DENIED') {
              console.error(`PublicBookingPage: CRITICAL - PERMISSION DENIED while checking service provider ID '${serviceProviderUserId}'. Attempted path: '${attemptedPathForError}'. Ensure Realtime Database rules allow public read to this specific path (e.g., '/${attemptedPathForError}'). Error: ${detailedErrorMessage}${errorCode}`, error);
+             toast({ 
+                title: "Error Verifying Provider", 
+                description: `Database access was denied. Please check your Firebase Realtime Database rules for path '${attemptedPathForError}'. Details: ${detailedErrorMessage}${errorCode}`, 
+                variant: "destructive",
+                duration: 10000 
+            });
         } else {
             console.error(`PublicBookingPage: Error during database check for service provider ID '${serviceProviderUserId}'${errorCode}: ${detailedErrorMessage}`, error);
+             toast({ 
+                title: "Error Verifying Provider", 
+                description: `Could not verify service provider. Details: ${detailedErrorMessage}${errorCode}`, 
+                variant: "destructive",
+                duration: 10000
+            });
         }
         
         setServiceProviderExists(false);
-        toast({ 
-            title: "Error Verifying Provider", 
-            description: `Could not verify service provider. ${error.code === 'PERMISSION_DENIED' ? 'Database access was denied. Please check your Firebase Realtime Database rules to ensure public read access is allowed for the provider data. ' : ''}Details: ${detailedErrorMessage}${errorCode}`, 
-            variant: "destructive",
-            duration: 10000 // Longer duration for important errors
-        });
       }
     };
 
