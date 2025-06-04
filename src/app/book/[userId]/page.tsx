@@ -48,6 +48,7 @@ export default function PublicBookingPage() {
   console.log("--- PublicBookingPage (/book/[userId]/page.tsx) --- COMPONENT RENDERING ---");
   const params = useParams();
   const serviceProviderUserId = params.userId as string;
+  console.log(`PublicBookingPage: Service Provider User ID from URL params: '${serviceProviderUserId}'`);
   const router = useRouter();
 
   const [clientName, setClientName] = useState('');
@@ -80,10 +81,12 @@ export default function PublicBookingPage() {
       }
 
       let providerFound = false;
+      let attemptedPathForError = ""; // To help identify which path failed if permission denied
       try {
         // Path 1: Appointments (Prioritized for public read as per rules)
         const apptRefPath = `Appointments/${serviceProviderUserId}`;
-        console.log(`PublicBookingPage: Attempting to read from Appointments path: '${apptRefPath}'`);
+        attemptedPathForError = apptRefPath;
+        console.log(`PublicBookingPage: Attempting to read from Appointments path: '${apptRefPath}' (Rule should be ".read": true for Appointments/$uid)`);
         const apptRef = ref(db, apptRefPath);
         const apptSnapshot = await get(apptRef);
 
@@ -102,7 +105,8 @@ export default function PublicBookingPage() {
         // Path 2: Clients (Fallback check, also requires public read in rules if used by unauthenticated context)
         if (!providerFound) {
           const clientRefPath = `Clients/${serviceProviderUserId}`;
-          console.log(`PublicBookingPage: Attempting to read from Clients path: '${clientRefPath}'`);
+          attemptedPathForError = clientRefPath;
+          console.log(`PublicBookingPage: Attempting to read from Clients path: '${clientRefPath}' (Rule should be ".read": true for Clients/$uid)`);
           const clientRef = ref(db, clientRefPath);
           const clientSnapshot = await get(clientRef);
 
@@ -136,9 +140,19 @@ export default function PublicBookingPage() {
         }
         const errorCode = error.code ? ` (Code: ${error.code})` : '';
         
-        console.error(`PublicBookingPage: Error during database check for service provider ID '${serviceProviderUserId}'${errorCode}: ${detailedErrorMessage}`, error);
+        if (error.code === 'PERMISSION_DENIED') {
+             console.error(`PublicBookingPage: CRITICAL - PERMISSION DENIED while checking service provider ID '${serviceProviderUserId}'. Attempted path: '${attemptedPathForError}'. Ensure Realtime Database rules allow public read to this specific path (e.g., '/${attemptedPathForError}'). Error: ${detailedErrorMessage}${errorCode}`, error);
+        } else {
+            console.error(`PublicBookingPage: Error during database check for service provider ID '${serviceProviderUserId}'${errorCode}: ${detailedErrorMessage}`, error);
+        }
+        
         setServiceProviderExists(false);
-        toast({ title: "Error Verifying Provider", description: `Could not verify service provider information. Please ensure the link is correct or try again later. Details: ${detailedErrorMessage}${errorCode}`, variant: "destructive" });
+        toast({ 
+            title: "Error Verifying Provider", 
+            description: `Could not verify service provider. ${error.code === 'PERMISSION_DENIED' ? 'Database access was denied. Please check your Firebase Realtime Database rules to ensure public read access is allowed for the provider data. ' : ''}Details: ${detailedErrorMessage}${errorCode}`, 
+            variant: "destructive",
+            duration: 10000 // Longer duration for important errors
+        });
       }
     };
 
@@ -146,7 +160,7 @@ export default function PublicBookingPage() {
         checkServiceProvider();
     } else {
         console.log("PublicBookingPage: useEffect for checkServiceProvider - serviceProviderUserId is currently not defined. Waiting for it to be populated by params.");
-        if (serviceProviderExists === null) { // Only set to false if it was never decided
+        if (serviceProviderExists === null) { 
           setServiceProviderExists(false);
         }
     }
@@ -206,7 +220,7 @@ export default function PublicBookingPage() {
   useEffect(() => {
     if (date && serviceProviderUserId && serviceProviderExists === true) {
       fetchBookedSlots(date);
-    } else if (serviceProviderExists === false) { // Explicitly clear if provider doesn't exist
+    } else if (serviceProviderExists === false) { 
       setBookedTimeSlotsForDate(new Set());
     }
   }, [date, serviceProviderUserId, fetchBookedSlots, serviceProviderExists]);
@@ -291,25 +305,24 @@ export default function PublicBookingPage() {
 
         await set(newAppointmentRef, {
             AppointmentID: appointmentId,
-            ClientID: newClientId, // Link to the newly created client
+            ClientID: newClientId, 
             ServiceProcedure: serviceProcedure,
             AppointmentDate: selectedFormattedDate,
             AppointmentStartTime: startTime,
             AppointmentEndTime: endTimeInput,
             BookingStatus: "Booked",
-            BookedByUserID: serviceProviderUserId // Important for security rules
+            BookedByUserID: serviceProviderUserId 
         });
 
         toast({ title: "Booking Confirmed!", description: `Your appointment for ${serviceProcedure} has been booked.` });
-        if(date) fetchBookedSlots(date); // Refresh slots after successful booking
+        if(date) fetchBookedSlots(date); 
 
-        // Reset form fields
         setClientName('');
         setClientContact('');
         setServiceProcedure('');
         setStartTime('');
         setEndTimeInput('');
-        // Optionally reset date: setDate(new Date());
+        
 
     } catch (error: any) {
         console.error("Error during public booking submission:", error);
@@ -319,7 +332,7 @@ export default function PublicBookingPage() {
     }
   };
 
-  if (serviceProviderExists === null) { // Initial loading state for provider check
+  if (serviceProviderExists === null) { 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-muted/40 p-4">
             <svg className="animate-spin mx-auto h-12 w-12 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -334,14 +347,15 @@ export default function PublicBookingPage() {
     );
   }
 
-  if (!serviceProviderExists) { // Provider explicitly not found
+  if (!serviceProviderExists) { 
      return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-muted/40 p-4">
             <Card className="w-full max-w-md shadow-xl p-6 text-center">
                 <CardTitle className="text-2xl font-bold text-destructive mb-4">Service Provider Not Found</CardTitle>
                 <CardDescription>
-                    The booking link is invalid or the service provider could not
-                    be found. Please check the link and try again.
+                    The booking link is invalid, the service provider could not
+                    be found, or access to their information was denied. Please check the link and try again.
+                    If this issue persists, the service provider may need to adjust their settings.
                 </CardDescription>
             </Card>
             <footer className="bg-transparent py-4 text-center text-sm text-muted-foreground mt-auto fixed bottom-0">
@@ -351,7 +365,6 @@ export default function PublicBookingPage() {
     );
   }
 
-  // Provider exists, render the booking form
   return (
     <div className="min-h-screen flex flex-col bg-muted/40">
         <header className="bg-background py-4 shadow-sm sticky top-0 z-50">
@@ -426,10 +439,10 @@ export default function PublicBookingPage() {
                                                 selected={date}
                                                 onSelect={(selectedDay) => {
                                                     setDate(selectedDay);
-                                                    setStartTime(''); // Reset time when date changes
+                                                    setStartTime(''); 
                                                     setEndTimeInput('');
                                                 }}
-                                                disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))} // Disable past dates
+                                                disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))} 
                                                 initialFocus
                                             />
                                         </PopoverContent>
@@ -451,7 +464,7 @@ export default function PublicBookingPage() {
                                                 <SelectItem
                                                     key={`start-${slot}`}
                                                     value={slot}
-                                                    disabled={bookedTimeSlotsForDate.has(slot)} // Check if slot is in the booked set
+                                                    disabled={bookedTimeSlotsForDate.has(slot)} 
                                                 >
                                                     {slot} {bookedTimeSlotsForDate.has(slot) ? "(Unavailable)" : ""}
                                                 </SelectItem>
@@ -464,7 +477,7 @@ export default function PublicBookingPage() {
                                     <Select
                                         value={endTimeInput}
                                         onValueChange={setEndTimeInput}
-                                        disabled={isLoadingBookedSlots || !date || !startTime} // Also disable if no start time selected
+                                        disabled={isLoadingBookedSlots || !date || !startTime} 
                                     >
                                         <SelectTrigger className="w-full mt-1">
                                             <SelectValue placeholder={isLoadingBookedSlots ? "Loading..." : "Select end time"} />
@@ -472,23 +485,23 @@ export default function PublicBookingPage() {
                                         <SelectContent>
                                             {isLoadingBookedSlots && <SelectItem value="loading" disabled>Loading slots...</SelectItem>}
                                             {!isLoadingBookedSlots && timeSlots.filter(slot => {
-                                                if (!startTime) return true; // Show all if no start time yet
-                                                const baseDateForFilter = date ? new Date(date) : new Date(); // Use selected date or today as base
+                                                if (!startTime) return true; 
+                                                const baseDateForFilter = date ? new Date(date) : new Date(); 
                                                 baseDateForFilter.setHours(0,0,0,0);
                                                 const currentSlotTime = parse(slot, "HH:mm", baseDateForFilter);
                                                 const selectedStartTime = parse(startTime, "HH:mm", baseDateForFilter);
-                                                return currentSlotTime > selectedStartTime; // Only show slots after selected start time
+                                                return currentSlotTime > selectedStartTime; 
                                             }).map(slot => {
                                                 let itemIsDisabled = false;
                                                 let itemLabelSuffix = "";
-                                                // Logic to check for conflicts if this slot is chosen as end time
+                                                
                                                 if (startTime && date) {
-                                                    const baseDateForCheck = new Date(date); // Base for parsing
+                                                    const baseDateForCheck = new Date(date); 
                                                     baseDateForCheck.setHours(0,0,0,0);
                                                     const newBookingStartForCheck = parse(startTime, "HH:mm", baseDateForCheck);
                                                     const potentialEndTime = parse(slot, "HH:mm", baseDateForCheck);
                                                     let tempSlotCheck = newBookingStartForCheck;
-                                                    while (tempSlotCheck < potentialEndTime) { // Check all 30-min intervals within the new booking
+                                                    while (tempSlotCheck < potentialEndTime) { 
                                                         if (bookedTimeSlotsForDate.has(format(tempSlotCheck, "HH:mm"))) {
                                                             itemIsDisabled = true;
                                                             itemLabelSuffix = "(Conflicts)";
@@ -496,7 +509,7 @@ export default function PublicBookingPage() {
                                                         }
                                                         tempSlotCheck = addMinutes(tempSlotCheck, 30);
                                                     }
-                                                } else if (!startTime){ // Disable if no start time selected
+                                                } else if (!startTime){ 
                                                     itemIsDisabled = true;
                                                 }
 
@@ -514,7 +527,7 @@ export default function PublicBookingPage() {
                                     </Select>
                                 </div>
                             </div>
-                            {isLoadingBookedSlots && date && ( // Show loading indicator only if date is selected
+                            {isLoadingBookedSlots && date && ( 
                                 <div className="flex items-center text-sm text-muted-foreground">
                                     <Clock className="mr-2 h-4 w-4 animate-spin" />
                                     Checking available slots for {format(date, "PPP")}...
@@ -539,3 +552,4 @@ export default function PublicBookingPage() {
     </div>
   );
 }
+
