@@ -10,7 +10,7 @@ import { auth } from '@/lib/firebaseConfig'; // auth can be undefined if firebas
 import { useToast } from '@/hooks/use-toast';
 
 // Log the imported auth object immediately
-console.log("--- AuthContext.tsx --- MODULE EXECUTING. Imported 'auth' from firebaseConfig:", auth ? "DEFINED" : "UNDEFINED");
+console.log("--- AuthContext.tsx --- MODULE EXECUTING. Imported 'auth' from firebaseConfig:", auth ? `DEFINED (App Name: ${auth.name})` : "UNDEFINED");
 
 interface AuthContextType {
   currentUser: FirebaseUser | null;
@@ -36,33 +36,33 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  console.log("--- AuthProvider MOUNTING (AuthContext.tsx) --- 'auth' object status from import:", auth ? "DEFINED" : "UNDEFINED");
+  console.log("--- AuthProvider MOUNTING (AuthContext.tsx) --- 'auth' object status from import:", auth ? `DEFINED (App Name: ${auth.name})` : "UNDEFINED");
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
-    console.log("--- AuthProvider useEffect (AuthContext.tsx) --- Setting up onAuthStateChanged. Current 'auth' service status:", auth ? "DEFINED" : "UNDEFINED");
+    console.log("--- AuthProvider useEffect (AuthContext.tsx) --- Setting up onAuthStateChanged. Current 'auth' service status:", auth ? `DEFINED (App Name: ${auth.name})` : "UNDEFINED");
     if (!auth) {
       console.error("--- AuthProvider useEffect (AuthContext.tsx) --- CRITICAL: Firebase 'auth' service is UNDEFINED. Cannot set up onAuthStateChanged. Firebase might not have initialized correctly in firebaseConfig.ts (e.g., API key missing/invalid or other init error). Authentication will not work.");
       setCurrentUser(null);
-      setLoading(false); 
+      setLoading(false);
       toast({
         title: "Authentication System Error",
         description: "Firebase auth service is not available. Please contact support or check console.",
         variant: "destructive",
       });
-      return; 
+      return;
     }
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log("--- AuthProvider onAuthStateChanged (AuthContext.tsx) --- User state changed. User ID:", user ? user.uid : "null");
+      console.log("--- AuthProvider onAuthStateChanged (AuthContext.tsx) --- User state changed. User ID:", user ? user.uid : "null", "App Name:", auth.name);
       setCurrentUser(user);
       setLoading(false);
       console.log("--- AuthProvider onAuthStateChanged (AuthContext.tsx) --- Loading set to false. Current user:", user ? user.uid : "null");
     }, (error) => {
-      console.error("--- AuthProvider onAuthStateChanged ERROR (AuthContext.tsx) ---", error);
+      console.error("--- AuthProvider onAuthStateChanged ERROR (AuthContext.tsx) ---", error, "App Name:", auth.name);
       setCurrentUser(null);
       setLoading(false);
       toast({
@@ -73,13 +73,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     });
     
     return () => {
-      console.log("--- AuthProvider useEffect CLEANUP (AuthContext.tsx) --- Unsubscribing from onAuthStateChanged.");
+      console.log("--- AuthProvider useEffect CLEANUP (AuthContext.tsx) --- Unsubscribing from onAuthStateChanged for app:", auth?.name || "N/A");
       unsubscribe();
     };
-  }, []);
+  }, []); // Added 'auth' to dependency array if it were to change, but it's module-scoped so it won't. Empty array is fine.
 
   const handleAuthError = (error: AuthError, defaultMessage: string, operation?: 'googleSignIn') => {
-    console.error(`Authentication error during ${operation || 'operation'} (AuthContext.tsx):`, error.code, error.message);
+    console.error(`Authentication error during ${operation || 'operation'} (AuthContext.tsx for app: ${auth?.name || 'N/A'}):`, error.code, error.message);
     let message = defaultMessage;
     if (error.code) {
         switch (error.code) {
@@ -91,7 +91,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 break;
             case 'auth/operation-not-allowed':
                 message = operation === 'googleSignIn' 
-                    ? 'Google Sign-In is not enabled or configured correctly for this project. Please check Firebase and Google Cloud Console OAuth settings.' 
+                    ? 'Google Sign-In is not enabled or configured correctly for this project. Please check Firebase and Google Cloud Console OAuth settings (Authorized JavaScript Origins, Redirect URIs, and OAuth Consent Screen).' 
                     : 'Email/password accounts are not enabled.';
                 break;
             case 'auth/weak-password':
@@ -105,20 +105,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                  message = 'Invalid email or password.';
                  break;
             case 'auth/popup-closed-by-user':
-                message = 'Google Sign-In popup closed by user. If it appeared blank or showed an error, check OAuth configuration.';
+                message = 'Google Sign-In popup closed by user. If it appeared blank or showed an error, check Google Cloud OAuth configuration (Authorized JavaScript Origins, Redirect URIs, Consent Screen).';
                 break;
             case 'auth/cancelled-popup-request':
             case 'auth/popup-blocked':
-                 message = 'Google Sign-In popup was blocked or cancelled. Please enable popups for this site and check OAuth configuration.';
+                 message = 'Google Sign-In popup was blocked or cancelled. Please enable popups for this site and check Google Cloud OAuth configuration.';
                  break;
             case 'auth/auth-domain-config-required':
-                 message = 'Google Sign-In failed. The authentication domain might not be configured correctly or authorized. Check Firebase and GCP settings.';
+                 message = 'Google Sign-In failed. The authentication domain might not be configured correctly or authorized. Check Firebase Auth settings and Google Cloud OAuth "Authorized JavaScript origins".';
                  break;
             case 'auth/unauthorized-domain':
-                 message = 'This domain is not authorized for OAuth operations. Check your Firebase and Google Cloud Console authorized domains.';
+                 message = 'This domain is not authorized for OAuth operations. Check your Google Cloud Console OAuth Client ID "Authorized JavaScript origins" and Firebase "Authorized domains".';
+                 break;
+            case 'auth/invalid-credential':
+                 message = 'Invalid credential provided. For Google Sign-In, this can indicate a problem with the OAuth configuration or the token received from Google.';
                  break;
             default:
-                message = error.message || defaultMessage;
+                message = `(${error.code}) ${error.message || defaultMessage}`;
         }
     }
     toast({
@@ -142,6 +145,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return userCredential.user;
     } catch (error) {
       return handleAuthError(error as AuthError, 'Failed to register.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -158,6 +163,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return userCredential.user;
     } catch (error) {
       return handleAuthError(error as AuthError, 'Failed to sign in.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -167,7 +174,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return null;
     }
     setLoading(true);
-    console.log("--- AuthContext.tsx --- Attempting Google Sign-In.");
+    console.log(`--- AuthContext.tsx --- Attempting Google Sign-In. Firebase App Name: '${auth.name}', Auth Domain: '${auth.config.authDomain}'. Ensure these match your GCP OAuth Client 'Authorized JavaScript origins' and Firebase 'Authorized domains'.`);
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
@@ -177,6 +184,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error) {
       console.error("--- AuthContext.tsx --- Google Sign-In failed:", error);
       return handleAuthError(error as AuthError, 'Failed to sign in with Google. Check console for details.', 'googleSignIn');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -191,9 +200,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
       router.push('/login'); 
     } catch (error) {
-      console.error("Logout error (AuthContext.tsx):", error);
+      console.error("Logout error (AuthContext.tsx for app: ${auth?.name || 'N/A'}):", error);
       toast({ title: 'Logout Error', description: (error as AuthError).message || 'Failed to log out.', variant: 'destructive' });
-       setLoading(false);
+    } finally {
+       setLoading(false); // Ensure loading is set to false even on logout error
     }
   };
 
@@ -206,6 +216,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
   };
   
-  console.log("--- AuthProvider (AuthContext.tsx) --- Rendering with value:", { currentUser: currentUser?.uid || null, loading });
+  console.log("--- AuthProvider (AuthContext.tsx) --- Rendering with value:", { currentUser: currentUser?.uid || null, loading, appName: auth?.name || "N/A" });
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
