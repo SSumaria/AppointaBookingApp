@@ -65,17 +65,11 @@ export default function PublicBookingPage() {
 
   useEffect(() => {
     const checkServiceProvider = async () => {
-      console.log(`PublicBookingPage: checkServiceProvider called. User ID from URL: '${serviceProviderUserId}'. This check verifies provider existence before allowing booking.`);
+      console.log(`PublicBookingPage: checkServiceProvider called for User ID from URL: '${serviceProviderUserId}'. This check verifies provider existence.`);
+
       if (!serviceProviderUserId) {
-        console.log("PublicBookingPage: No serviceProviderUserId available from URL params yet. Will skip check or set provider to not exist if it remains unavailable.");
-        // It might be an initial render where params are not yet populated.
-        // If serviceProviderExists is still null, we can wait for a re-render.
-        // If it's already decided (true/false), this means serviceProviderId became undefined after being defined.
-        if (serviceProviderExists === null) {
-            // Potentially set to false after a timeout if it never populates, or rely on re-render.
-        } else {
-             setServiceProviderExists(false); // If it was defined and now isn't.
-        }
+        console.log("PublicBookingPage: No serviceProviderUserId available from URL params. Setting provider to not exist.");
+        setServiceProviderExists(false);
         return;
       }
       if (!db) {
@@ -85,62 +79,80 @@ export default function PublicBookingPage() {
         return;
       }
 
+      let providerFound = false;
       try {
-        // Path 1: Appointments
-        const apptRef = ref(db, `Appointments/${serviceProviderUserId}`);
-        console.log(`PublicBookingPage: Checking Appointments path: 'Appointments/${serviceProviderUserId}'`);
+        // Path 1: Appointments (Prioritized for public read as per rules)
+        const apptRefPath = `Appointments/${serviceProviderUserId}`;
+        console.log(`PublicBookingPage: Attempting to read from Appointments path: '${apptRefPath}'`);
+        const apptRef = ref(db, apptRefPath);
         const apptSnapshot = await get(apptRef);
+
         if (apptSnapshot.exists()) {
           const apptData = apptSnapshot.val();
           if (apptData && Object.keys(apptData).length > 0) {
-            console.log(`PublicBookingPage: Data FOUND in Appointments for ID '${serviceProviderUserId}'. Provider exists. Data:`, apptData);
-            setServiceProviderExists(true);
-            return;
+            console.log(`PublicBookingPage: Data FOUND in Appointments for ID '${serviceProviderUserId}'. Provider exists. Data keys:`, Object.keys(apptData).length);
+            providerFound = true;
           } else {
-            console.log(`PublicBookingPage: Data node EXISTS in Appointments for ID '${serviceProviderUserId}', but it's EMPTY or not an object with keys. Considering provider not found based on this path.`);
+            console.log(`PublicBookingPage: Data node EXISTS in Appointments for ID '${serviceProviderUserId}', but it's EMPTY. Considering provider not yet confirmed by this path.`);
           }
         } else {
           console.log(`PublicBookingPage: NO data node found at Appointments path for ID '${serviceProviderUserId}'.`);
         }
 
-        // Path 2: Clients (Fallback)
-        const clientRef = ref(db, `Clients/${serviceProviderUserId}`);
-        console.log(`PublicBookingPage: Checking Clients path: 'Clients/${serviceProviderUserId}'`);
-        const clientSnapshot = await get(clientRef);
-        if (clientSnapshot.exists()) {
-          const clientData = clientSnapshot.val();
-          if (clientData && Object.keys(clientData).length > 0) {
-            console.log(`PublicBookingPage: Data FOUND in Clients for ID '${serviceProviderUserId}'. Provider exists. Data:`, clientData);
-            setServiceProviderExists(true);
-            return;
+        // Path 2: Clients (Fallback check, also requires public read in rules if used by unauthenticated context)
+        if (!providerFound) {
+          const clientRefPath = `Clients/${serviceProviderUserId}`;
+          console.log(`PublicBookingPage: Attempting to read from Clients path: '${clientRefPath}'`);
+          const clientRef = ref(db, clientRefPath);
+          const clientSnapshot = await get(clientRef);
+
+          if (clientSnapshot.exists()) {
+            const clientData = clientSnapshot.val();
+            if (clientData && Object.keys(clientData).length > 0) {
+              console.log(`PublicBookingPage: Data FOUND in Clients for ID '${serviceProviderUserId}'. Provider exists. Data keys:`, Object.keys(clientData).length);
+              providerFound = true;
+            } else {
+              console.log(`PublicBookingPage: Data node EXISTS in Clients for ID '${serviceProviderUserId}', but it's EMPTY.`);
+            }
           } else {
-            console.log(`PublicBookingPage: Data node EXISTS in Clients for ID '${serviceProviderUserId}', but it's EMPTY or not an object with keys. Considering provider not found based on this path.`);
+            console.log(`PublicBookingPage: NO data node found at Clients path for ID '${serviceProviderUserId}'.`);
           }
-        } else {
-          console.log(`PublicBookingPage: NO data node found at Clients path for ID '${serviceProviderUserId}'.`);
         }
         
-        console.log(`PublicBookingPage: Provider NOT FOUND for ID '${serviceProviderUserId}' after checking both Appointments and Clients paths.`);
-        setServiceProviderExists(false);
+        if (providerFound) {
+            console.log(`PublicBookingPage: Provider VERIFIED for ID '${serviceProviderUserId}'. Setting serviceProviderExists to true.`);
+            setServiceProviderExists(true);
+        } else {
+            console.log(`PublicBookingPage: Provider NOT VERIFIED for ID '${serviceProviderUserId}' after checking both Appointments and Clients paths. Setting serviceProviderExists to false.`);
+            setServiceProviderExists(false);
+        }
 
-      } catch (error) {
-        console.error(`PublicBookingPage: Error during database check for service provider ID '${serviceProviderUserId}':`, error);
+      } catch (error: any) {
+        let detailedErrorMessage = "An unexpected error occurred.";
+        if (error instanceof Error) {
+            detailedErrorMessage = error.message;
+        } else if (typeof error === 'string') {
+            detailedErrorMessage = error;
+        }
+        const errorCode = error.code ? ` (Code: ${error.code})` : '';
+        
+        console.error(`PublicBookingPage: Error during database check for service provider ID '${serviceProviderUserId}'${errorCode}: ${detailedErrorMessage}`, error);
         setServiceProviderExists(false);
-        toast({ title: "Error Verifying Provider", description: "Could not verify service provider information. Please ensure the link is correct or try again later.", variant: "destructive" });
+        toast({ title: "Error Verifying Provider", description: `Could not verify service provider information. Please ensure the link is correct or try again later. Details: ${detailedErrorMessage}${errorCode}`, variant: "destructive" });
       }
     };
-    // Only run checkServiceProvider if serviceProviderUserId is available.
-    // The useEffect dependency array will ensure it runs when serviceProviderUserId gets populated.
+
     if (serviceProviderUserId) {
         checkServiceProvider();
     } else {
         console.log("PublicBookingPage: useEffect for checkServiceProvider - serviceProviderUserId is currently not defined. Waiting for it to be populated by params.");
-        // If serviceProviderUserId is not available at all after initial renders,
-        // and serviceProviderExists is still null, we might need to explicitly set it to false.
-        // However, this check inside useEffect is primarily for when it *becomes* available.
-        // The initial `serviceProviderExists === null` will show loading.
+        if (serviceProviderExists === null) { // Only set to false if it was never decided
+          setServiceProviderExists(false);
+        }
     }
-  }, [serviceProviderUserId, toast]); // serviceProviderExists is removed from deps to avoid loops if it's set inside
+  // serviceProviderExists is intentionally removed from deps to avoid re-running if it's set within this effect.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serviceProviderUserId, toast]);
 
 
   const fetchBookedSlots = useCallback(async (selectedDate: Date) => {
@@ -194,7 +206,7 @@ export default function PublicBookingPage() {
   useEffect(() => {
     if (date && serviceProviderUserId && serviceProviderExists === true) {
       fetchBookedSlots(date);
-    } else {
+    } else if (serviceProviderExists === false) { // Explicitly clear if provider doesn't exist
       setBookedTimeSlotsForDate(new Set());
     }
   }, [date, serviceProviderUserId, fetchBookedSlots, serviceProviderExists]);
@@ -527,6 +539,3 @@ export default function PublicBookingPage() {
     </div>
   );
 }
-
-
-    
