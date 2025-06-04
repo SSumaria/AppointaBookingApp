@@ -1,6 +1,8 @@
 
 "use client";
 
+console.log("--- PublicBookingPage (/book/[userId]/page.tsx) --- MODULE SCRIPT EXECUTING (TOP LEVEL)");
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar";
@@ -43,6 +45,7 @@ const generateTimeSlots = () => {
 const timeSlots = generateTimeSlots();
 
 export default function PublicBookingPage() {
+  console.log("--- PublicBookingPage (/book/[userId]/page.tsx) --- COMPONENT RENDERING ---");
   const params = useParams();
   const serviceProviderUserId = params.userId as string;
   const router = useRouter();
@@ -70,33 +73,33 @@ export default function PublicBookingPage() {
       }
       if (!db) {
         console.error("PublicBookingPage: Firebase DB is not initialized. Cannot check service provider.");
-        setServiceProviderExists(false); // Cannot verify if DB is not available
+        setServiceProviderExists(false); 
         toast({ title: "Error", description: "Booking system is currently unavailable. Please try again later.", variant: "destructive" });
         return;
       }
 
       try {
-        // Try checking Appointments path first, as it has public read access
+        // Prioritize checking Appointments path as it has public read access defined
         const apptRef = ref(db, `Appointments/${serviceProviderUserId}`);
         console.log(`PublicBookingPage: Checking path: Appointments/${serviceProviderUserId}`);
         const apptSnapshot = await get(apptRef);
-        if (apptSnapshot.exists()) {
+        if (apptSnapshot.exists() && Object.keys(apptSnapshot.val()).length > 0) { // Check if there's any data
           console.log(`PublicBookingPage: Provider found based on Appointments data for ID: ${serviceProviderUserId}`);
           setServiceProviderExists(true);
           return;
         }
-        console.log(`PublicBookingPage: No data found in Appointments for ID: ${serviceProviderUserId}.`);
+        console.log(`PublicBookingPage: No data found or empty data in Appointments for ID: ${serviceProviderUserId}.`);
 
-        // As a fallback, try checking Clients path (though rules might restrict unauthenticated access)
+        // Fallback: Check Clients path (rules might be more restrictive)
         const clientRef = ref(db, `Clients/${serviceProviderUserId}`);
         console.log(`PublicBookingPage: Checking path: Clients/${serviceProviderUserId}`);
         const clientSnapshot = await get(clientRef);
-        if (clientSnapshot.exists()) {
+        if (clientSnapshot.exists() && Object.keys(clientSnapshot.val()).length > 0) {
           console.log(`PublicBookingPage: Provider found based on Clients data for ID: ${serviceProviderUserId}`);
           setServiceProviderExists(true);
           return;
         }
-        console.log(`PublicBookingPage: No data found in Clients for ID: ${serviceProviderUserId}. Provider assumed not to exist.`);
+        console.log(`PublicBookingPage: No data found or empty data in Clients for ID: ${serviceProviderUserId}. Provider assumed not to exist.`);
         setServiceProviderExists(false);
 
       } catch (error) {
@@ -158,7 +161,7 @@ export default function PublicBookingPage() {
   }, [serviceProviderUserId, toast, serviceProviderExists]);
 
   useEffect(() => {
-    if (date && serviceProviderUserId && serviceProviderExists === true) { // Only fetch if provider exists
+    if (date && serviceProviderUserId && serviceProviderExists === true) { 
       fetchBookedSlots(date);
     } else {
       setBookedTimeSlotsForDate(new Set());
@@ -175,7 +178,7 @@ export default function PublicBookingPage() {
         setIsSubmitting(false);
         return;
     }
-    if (!serviceProviderExists){ // Check the state here
+    if (!serviceProviderExists){ 
         toast({ title: "Error", description: "Service provider not found or booking system unavailable.", variant: "destructive" });
         setIsSubmitting(false);
         return;
@@ -235,7 +238,7 @@ export default function PublicBookingPage() {
             ClientContact: clientContact.trim(),
             CreateDate: format(now, "yyyy-MM-dd"),
             CreateTime: format(now, "HH:mm"),
-            CreatedByUserID: serviceProviderUserId
+            CreatedByUserID: serviceProviderUserId 
         });
 
         const providerAppointmentsRefPath = `Appointments/${serviceProviderUserId}`;
@@ -245,13 +248,13 @@ export default function PublicBookingPage() {
 
         await set(newAppointmentRef, {
             AppointmentID: appointmentId,
-            ClientID: newClientId,
+            ClientID: newClientId, 
             ServiceProcedure: serviceProcedure,
             AppointmentDate: selectedFormattedDate,
             AppointmentStartTime: startTime,
             AppointmentEndTime: endTime,
-            BookingStatus: "Booked", // Default status for new public bookings
-            BookedByUserID: serviceProviderUserId
+            BookingStatus: "Booked", 
+            BookedByUserID: serviceProviderUserId 
         });
 
         toast({ title: "Booking Confirmed!", description: `Your appointment for ${serviceProcedure} has been booked.` });
