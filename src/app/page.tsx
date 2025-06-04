@@ -23,7 +23,12 @@ export default function HomePage() {
     if (!loading && !currentUser) {
       router.push('/login');
     } else if (currentUser && typeof window !== 'undefined') {
-      setPublicBookingLink(`${window.location.origin}/book/${currentUser.uid}`);
+      let originToUse = window.location.origin;
+      // If running on a cloudworkstations.dev domain, explicitly use port 9000 for the public link
+      if (window.location.hostname.endsWith('cloudworkstations.dev')) {
+        originToUse = `${window.location.protocol}//${window.location.hostname}:9000`;
+      }
+      setPublicBookingLink(`${originToUse}/book/${currentUser.uid}`);
     }
   }, [currentUser, loading, router]);
 
@@ -137,6 +142,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-
-    
