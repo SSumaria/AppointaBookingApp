@@ -168,7 +168,12 @@ export default function NewBookingPage() {
     const handleClientNameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const query = e.target.value;
         setClientName(query);
-        setSelectedClientFirebaseKey(null);
+        setSelectedClientFirebaseKey(null); // Clear selected client if name is manually changed
+        // If name is cleared, also clear contact that might have been auto-filled
+        if (query.trim() === '') {
+          setClientContact('');
+        }
+
 
         if (debounceTimeoutRef.current) {
             clearTimeout(debounceTimeoutRef.current);
@@ -196,7 +201,7 @@ export default function NewBookingPage() {
                             });
                         });
                     }
-                    setSuggestions(fetchedSuggestions.slice(0, 5));
+                    setSuggestions(fetchedSuggestions.slice(0, 5)); // Limit suggestions
                     setShowSuggestions(true);
                 } catch (error) {
                     console.error("Error fetching client suggestions:", error);
@@ -241,8 +246,8 @@ export default function NewBookingPage() {
             return;
         }
 
-        if (!clientName || !serviceProcedure || !date || !startTime || !endTime) {
-            toast({ title: "Error", description: "Please fill in all required fields.", variant: "destructive" });
+        if (!clientName.trim() || !serviceProcedure || !date || !startTime || !endTime) {
+            toast({ title: "Error", description: "Client Name, Service, Date, Start Time, and End Time are required.", variant: "destructive" });
             setIsSubmitting(false);
             return;
         }
@@ -281,7 +286,9 @@ export default function NewBookingPage() {
         }
 
         let clientIdToUse: string | null = selectedClientFirebaseKey;
-        let clientNameToDisplay = clientName.trim();
+        let finalClientName = clientName.trim(); // Name from form input by default
+        let finalClientContact = clientContact.trim(); // Contact from form input by default
+
         const finalNotes: Note[] = [];
         if (notesInput.trim()) {
           finalNotes.push({
@@ -292,54 +299,67 @@ export default function NewBookingPage() {
         }
 
         try {
-            if (!clientIdToUse) {
+            if (!clientIdToUse) { // If no client was selected from autocomplete
                 const userClientsRefPath = `Clients/${currentUser.uid}`;
                 const clientsDbRef = ref(db, userClientsRefPath);
+                // Query more efficiently by name if possible, or fetch all and filter client-side for smaller datasets
                 const clientsSnapshot = await get(rtQuery(clientsDbRef, orderByChild('ClientName')));
 
-                const inputNameLower = clientName.trim().toLowerCase();
-                const inputContactLower = clientContact.trim().toLowerCase();
+                const inputNameLower = finalClientName.toLowerCase();
+                const inputContactLower = finalClientContact.toLowerCase();
                 let foundExisting = false;
 
                 if (clientsSnapshot.exists()) {
                     clientsSnapshot.forEach((childSnapshot) => {
                         const clientData = childSnapshot.val() as ClientData;
                         const dbNameLower = (clientData.ClientName || "").trim().toLowerCase();
-                        const dbContactLower = (clientData.ClientContact || "").trim().toLowerCase();
-
-                        if (inputContactLower) {
+                        
+                        if (inputContactLower) { // If contact info is provided in the form, match on name AND contact
+                            const dbContactLower = (clientData.ClientContact || "").trim().toLowerCase();
                             if (dbNameLower === inputNameLower && dbContactLower === inputContactLower) {
                                 clientIdToUse = childSnapshot.key;
-                                clientNameToDisplay = clientData.ClientName;
+                                finalClientName = clientData.ClientName; // Use existing name (preserves casing)
+                                finalClientContact = clientData.ClientContact || ''; // Use existing contact
+                                setClientContact(finalClientContact); // Update form state
                                 foundExisting = true;
-                                return true;
+                                return true; // Exit forEach
                             }
-                        } else {
-                            if (dbNameLower === inputNameLower && (!dbContactLower || dbContactLower === "")) {
+                        } else { // If no contact info is provided in the form, match by name ONLY
+                            if (dbNameLower === inputNameLower) {
                                 clientIdToUse = childSnapshot.key;
-                                clientNameToDisplay = clientData.ClientName;
+                                finalClientName = clientData.ClientName; // Use existing name
+                                finalClientContact = clientData.ClientContact || ''; // Use existing contact
+                                setClientContact(finalClientContact); // Update form state if found
                                 foundExisting = true;
-                                return true;
+                                return true; // Exit forEach
                             }
                         }
                     });
                 }
 
-                if (!foundExisting) {
+                if (!foundExisting) { // Create new client
                     const newClientRef = push(clientsDbRef);
                     clientIdToUse = newClientRef.key as string;
                     const now = new Date();
                     await set(newClientRef, {
-                        ClientID: clientIdToUse,
-                        ClientName: clientName.trim(),
-                        ClientContact: clientContact.trim(),
+                        ClientID: clientIdToUse, // Store the Firebase key as ClientID
+                        ClientName: finalClientName, // Name from form
+                        ClientContact: finalClientContact, // Contact from form
                         CreateDate: format(now, "yyyy-MM-dd"),
                         CreateTime: format(now, "HH:mm"),
                         CreatedByUserID: currentUser.uid
                     });
-                    clientNameToDisplay = clientName.trim();
+                }
+            } else { // Client was selected from autocomplete, ensure finalClientName and finalClientContact are from the selection
+                const selectedClientRef = ref(db, `Clients/${currentUser.uid}/${clientIdToUse}`);
+                const clientSnapshot = await get(selectedClientRef);
+                if(clientSnapshot.exists()){
+                    const clientData = clientSnapshot.val() as ClientData;
+                    finalClientName = clientData.ClientName;
+                    finalClientContact = clientData.ClientContact || '';
                 }
             }
+
 
             const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
             const appointmentsRefForUser = ref(db, userAppointmentsRefPath);
@@ -348,7 +368,7 @@ export default function NewBookingPage() {
 
             await set(newAppointmentRef, {
                 AppointmentID: appointmentId,
-                ClientID: clientIdToUse,
+                ClientID: clientIdToUse, // This will be either existing or new client's Firebase key
                 ServiceProcedure: serviceProcedure,
                 AppointmentDate: selectedFormattedDate,
                 AppointmentStartTime: startTime,
@@ -358,16 +378,17 @@ export default function NewBookingPage() {
                 BookedByUserID: currentUser.uid
             });
 
-            toast({ title: "Success", description: `Booking Confirmed for ${clientNameToDisplay}!` });
+            toast({ title: "Success", description: `Booking Confirmed for ${finalClientName}!` });
             if(date) fetchBookedSlots(date);
 
+            // Reset form fields
             setClientName('');
             setClientContact('');
             setServiceProcedure('');
             setNotesInput('');
             setStartTime('');
             setEndTime('');
-            // setDate(new Date()); // Keep date or reset as per preference
+            // setDate(new Date()); // Optional: reset date or keep it
             setSelectedClientFirebaseKey(null);
             setShowSuggestions(false);
 
@@ -442,6 +463,8 @@ export default function NewBookingPage() {
                                 onChange={(e) => setClientContact(e.target.value)}
                                 className="mt-1"
                                 placeholder="Client's phone or email"
+                                // If a client is selected via autocomplete, this might be disabled or readonly
+                                // For now, allow editing. It gets re-evaluated on submit.
                             />
                         </div>
                         <div>
@@ -563,10 +586,10 @@ export default function NewBookingPage() {
                                 </Select>
                             </div>
                         </div>
-                         {isLoadingBookedSlots && (
+                         {isLoadingBookedSlots && date && (
                             <div className="flex items-center text-sm text-muted-foreground">
                                 <Clock className="mr-2 h-4 w-4 animate-spin" />
-                                Checking available slots...
+                                Checking available slots for {date ? format(date, "PPP") : 'selected date'}...
                             </div>
                         )}
                         <div>
@@ -601,5 +624,3 @@ export default function NewBookingPage() {
         </div>
     );
 }
-
-    
