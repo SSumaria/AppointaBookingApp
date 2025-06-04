@@ -8,7 +8,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format, addMinutes, parse } from "date-fns";
-import { Calendar as CalendarIcon, Clock } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, AlertTriangle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,9 +17,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
 
 import { ref, set, get, query as rtQuery, orderByChild, equalTo, push } from "firebase/database";
-import { db } from '@/lib/firebaseConfig'; // Ensure db is exported from firebaseConfig
+import { db } from '@/lib/firebaseConfig'; 
 
 interface ExistingBooking {
   AppointmentStartTime: string;
@@ -31,10 +33,10 @@ interface ExistingBooking {
 const generateTimeSlots = () => {
   const slots = [];
   let currentTime = new Date();
-  currentTime.setHours(6, 0, 0, 0); // Start at 6:00 AM
+  currentTime.setHours(6, 0, 0, 0); 
 
   const endTimeLimit = new Date();
-  endTimeLimit.setHours(21, 0, 0, 0); // Slots up to 21:00 (9 PM)
+  endTimeLimit.setHours(21, 0, 0, 0); 
 
   while (currentTime <= endTimeLimit) {
     slots.push(format(currentTime, "HH:mm"));
@@ -49,8 +51,7 @@ export default function PublicBookingPage() {
   const params = useParams();
   const serviceProviderUserId = params.userId as string;
   console.log(`PublicBookingPage: Service Provider User ID from URL params: '${serviceProviderUserId}'`);
-  const router = useRouter();
-
+  
   const [clientName, setClientName] = useState('');
   const [clientContact, setClientContact] = useState('');
   const [serviceProcedure, setServiceProcedure] = useState('');
@@ -59,131 +60,130 @@ export default function PublicBookingPage() {
   const [endTimeInput, setEndTimeInput] = useState('');
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // serviceProviderExists will be null initially (loading), then true/false
   const [serviceProviderExists, setServiceProviderExists] = useState<boolean | null>(null);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
+
 
   const [bookedTimeSlotsForDate, setBookedTimeSlotsForDate] = useState<Set<string>>(new Set());
   const [isLoadingBookedSlots, setIsLoadingBookedSlots] = useState(false);
 
   useEffect(() => {
     const checkServiceProvider = async () => {
-      console.log(`PublicBookingPage: checkServiceProvider called for User ID from URL: '${serviceProviderUserId}'. This check verifies provider existence.`);
+      console.log(`PublicBookingPage: checkServiceProvider called for User ID: '${serviceProviderUserId}'. This check verifies provider existing data.`);
 
       if (!serviceProviderUserId) {
-        console.log("PublicBookingPage: No serviceProviderUserId available from URL params. Setting provider to not exist.");
+        console.log("PublicBookingPage: No serviceProviderUserId available from URL params. Setting provider check as done, exists = false.");
         setServiceProviderExists(false);
+        setInitialCheckDone(true);
         return;
       }
       if (!db) {
-        console.error("PublicBookingPage: Firebase DB is not initialized (db object is null/undefined). Cannot check service provider. This is a critical configuration issue in firebaseConfig.ts or its import.");
-        setServiceProviderExists(false);
+        console.error("PublicBookingPage: Firebase DB is not initialized. Cannot check service provider. Critical config issue.");
+        setServiceProviderExists(false); // Treat as non-existent if DB fails
+        setInitialCheckDone(true);
         toast({ title: "Error", description: "Booking system is currently unavailable. Please try again later.", variant: "destructive" });
         return;
       }
 
-      let providerFound = false;
+      let providerDataFound = false;
       let attemptedPathForError = ""; 
 
       try {
-        // Path 1: Appointments (Prioritized for public read as per rules)
         const apptRefPath = `Appointments/${serviceProviderUserId}`;
         attemptedPathForError = apptRefPath;
-        console.log(`PublicBookingPage: Attempting to read from Appointments path: '${apptRefPath}' (Rule should be ".read": true for Appointments/$uid)`);
+        console.log(`PublicBookingPage: Attempting to read from Appointments path: '${apptRefPath}'`);
         const apptRef = ref(db, apptRefPath);
         const apptSnapshot = await get(apptRef);
 
         if (apptSnapshot.exists()) {
           const apptData = apptSnapshot.val();
           if (apptData && Object.keys(apptData).length > 0) {
-            console.log(`PublicBookingPage: Data FOUND in Appointments for ID '${serviceProviderUserId}'. Provider exists. Data keys:`, Object.keys(apptData).length);
-            providerFound = true;
+            console.log(`PublicBookingPage: Data FOUND in Appointments for ID '${serviceProviderUserId}'. Provider has existing data. Keys:`, Object.keys(apptData).length);
+            providerDataFound = true;
           } else {
-            console.log(`PublicBookingPage: Data node EXISTS in Appointments for ID '${serviceProviderUserId}', but it's EMPTY. Considering provider not yet confirmed by this path.`);
+            console.log(`PublicBookingPage: Data node EXISTS in Appointments for ID '${serviceProviderUserId}', but it's EMPTY.`);
           }
         } else {
-          console.log(`PublicBookingPage: NO data node found at Appointments path for ID '${serviceProviderUserId}'. This means snapshot.exists() was false.`);
+          console.log(`PublicBookingPage: NO data node found at Appointments path for ID '${serviceProviderUserId}'.`);
         }
 
-        // Path 2: Clients (Fallback check, also requires public read in rules if used by unauthenticated context)
-        if (!providerFound) {
+        if (!providerDataFound) {
           const clientRefPath = `Clients/${serviceProviderUserId}`;
           attemptedPathForError = clientRefPath;
-          console.log(`PublicBookingPage: Attempting to read from Clients path: '${clientRefPath}' (Rule should be ".read": true for Clients/$uid)`);
+          console.log(`PublicBookingPage: Attempting to read from Clients path: '${clientRefPath}'`);
           const clientRef = ref(db, clientRefPath);
           const clientSnapshot = await get(clientRef);
 
           if (clientSnapshot.exists()) {
             const clientData = clientSnapshot.val();
             if (clientData && Object.keys(clientData).length > 0) {
-              console.log(`PublicBookingPage: Data FOUND in Clients for ID '${serviceProviderUserId}'. Provider exists. Data keys:`, Object.keys(clientData).length);
-              providerFound = true;
+              console.log(`PublicBookingPage: Data FOUND in Clients for ID '${serviceProviderUserId}'. Provider has existing data. Keys:`, Object.keys(clientData).length);
+              providerDataFound = true;
             } else {
               console.log(`PublicBookingPage: Data node EXISTS in Clients for ID '${serviceProviderUserId}', but it's EMPTY.`);
             }
           } else {
-            console.log(`PublicBookingPage: NO data node found at Clients path for ID '${serviceProviderUserId}'. This means snapshot.exists() was false.`);
+            console.log(`PublicBookingPage: NO data node found at Clients path for ID '${serviceProviderUserId}'.`);
           }
         }
         
-        if (providerFound) {
-            console.log(`PublicBookingPage: Provider VERIFIED for ID '${serviceProviderUserId}'. Setting serviceProviderExists to true.`);
+        if (providerDataFound) {
+            console.log(`PublicBookingPage: Provider data VERIFIED for ID '${serviceProviderUserId}'. Setting serviceProviderExists to true.`);
             setServiceProviderExists(true);
         } else {
-            console.log(`PublicBookingPage: Provider NOT VERIFIED for ID '${serviceProviderUserId}' after checking both Appointments and Clients paths (both returned no data or empty data). Setting serviceProviderExists to false.`);
+            console.log(`PublicBookingPage: Provider data NOT VERIFIED for ID '${serviceProviderUserId}' (no data or empty data in Appointments/Clients). Setting serviceProviderExists to false.`);
             setServiceProviderExists(false);
         }
 
       } catch (error: any) {
         let detailedErrorMessage = "An unexpected error occurred.";
-        if (error instanceof Error) {
-            detailedErrorMessage = error.message;
-        } else if (typeof error === 'string') {
-            detailedErrorMessage = error;
-        }
+        if (error instanceof Error) detailedErrorMessage = error.message;
+        else if (typeof error === 'string') detailedErrorMessage = error;
         const errorCode = error.code ? ` (Code: ${error.code})` : '';
         
         if (error.code === 'PERMISSION_DENIED') {
-             console.error(`PublicBookingPage: CRITICAL - PERMISSION DENIED while checking service provider ID '${serviceProviderUserId}'. Attempted path: '${attemptedPathForError}'. Ensure Realtime Database rules allow public read to this specific path (e.g., '/${attemptedPathForError}'). Error: ${detailedErrorMessage}${errorCode}`, error);
+             console.error(`PublicBookingPage: CRITICAL - PERMISSION DENIED while checking service provider ID '${serviceProviderUserId}'. Path: '${attemptedPathForError}'. Error: ${detailedErrorMessage}${errorCode}`, error);
              toast({ 
                 title: "Error Verifying Provider", 
-                description: `Database access was denied. Please check your Firebase Realtime Database rules for path '${attemptedPathForError}'. Details: ${detailedErrorMessage}${errorCode}`, 
-                variant: "destructive",
-                duration: 10000 
+                description: `Database access denied for path '${attemptedPathForError}'. Please check Firebase rules. Details: ${detailedErrorMessage}${errorCode}`, 
+                variant: "destructive", duration: 10000 
             });
         } else {
-            console.error(`PublicBookingPage: Error during database check for service provider ID '${serviceProviderUserId}'${errorCode}: ${detailedErrorMessage}`, error);
+            console.error(`PublicBookingPage: Error during database check for ID '${serviceProviderUserId}'${errorCode}: ${detailedErrorMessage}`, error);
              toast({ 
                 title: "Error Verifying Provider", 
                 description: `Could not verify service provider. Details: ${detailedErrorMessage}${errorCode}`, 
-                variant: "destructive",
-                duration: 10000
+                variant: "destructive", duration: 10000
             });
         }
-        
-        setServiceProviderExists(false);
+        setServiceProviderExists(false); // Assume non-existent on error
+      } finally {
+        setInitialCheckDone(true);
       }
     };
 
     if (serviceProviderUserId) {
         checkServiceProvider();
     } else {
-        console.log("PublicBookingPage: useEffect for checkServiceProvider - serviceProviderUserId is currently not defined. Waiting for it to be populated by params.");
-        if (serviceProviderExists === null) { 
-          setServiceProviderExists(false);
-        }
+        console.log("PublicBookingPage: useEffect for checkServiceProvider - serviceProviderUserId is missing from URL. Setting check as done.");
+        setServiceProviderExists(false);
+        setInitialCheckDone(true);
     }
-  // serviceProviderExists is intentionally removed from deps to avoid re-running if it's set within this effect.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serviceProviderUserId, toast]);
+  }, [serviceProviderUserId, toast]); // Only run when serviceProviderUserId from URL changes
 
 
   const fetchBookedSlots = useCallback(async (selectedDate: Date) => {
-    if (!serviceProviderUserId || !selectedDate || !serviceProviderExists) {
+    if (!serviceProviderUserId || !selectedDate) {
       setBookedTimeSlotsForDate(new Set());
       return;
     }
     setIsLoadingBookedSlots(true);
     const formattedDate = format(selectedDate, "yyyy-MM-dd");
     const appointmentsRefPath = `Appointments/${serviceProviderUserId}`;
+    console.log(`PublicBookingPage: Fetching booked slots for provider '${serviceProviderUserId}' on date '${formattedDate}' from path '${appointmentsRefPath}'`);
     const appointmentsRef = ref(db, appointmentsRefPath);
     const appointmentsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'), equalTo(formattedDate));
 
@@ -191,6 +191,7 @@ export default function PublicBookingPage() {
       const snapshot = await get(appointmentsQuery);
       const newBookedSlots = new Set<string>();
       if (snapshot.exists()) {
+        console.log(`PublicBookingPage: Found ${snapshot.size} bookings for provider '${serviceProviderUserId}' on '${formattedDate}'.`);
         snapshot.forEach((childSnapshot) => {
           const booking = childSnapshot.val() as ExistingBooking;
           if (booking.BookingStatus === "Booked") {
@@ -205,32 +206,32 @@ export default function PublicBookingPage() {
                   currentSlotTime = addMinutes(currentSlotTime, 30);
                 }
               } catch (parseError) {
-                console.error("Error parsing booking times from DB:", booking, parseError);
+                console.error("PublicBookingPage: Error parsing booking times from DB:", booking, parseError);
               }
           }
         });
+      } else {
+        console.log(`PublicBookingPage: No bookings found for provider '${serviceProviderUserId}' on '${formattedDate}'.`);
       }
       setBookedTimeSlotsForDate(newBookedSlots);
-    } catch (error) {
-      console.error("Error fetching booked slots:", error);
+    } catch (error: any) {
+      console.error("PublicBookingPage: Error fetching booked slots:", error);
       toast({
         title: "Error loading schedule",
-        description: "Could not fetch existing bookings for this provider and date.",
+        description: `Could not fetch existing bookings. Error: ${error.message}`,
         variant: "destructive",
       });
       setBookedTimeSlotsForDate(new Set());
     } finally {
       setIsLoadingBookedSlots(false);
     }
-  }, [serviceProviderUserId, toast, serviceProviderExists]);
+  }, [serviceProviderUserId, toast]);
 
   useEffect(() => {
-    if (date && serviceProviderUserId && serviceProviderExists === true) {
+    if (date && serviceProviderUserId && initialCheckDone) { // Run after initial check for provider is done
       fetchBookedSlots(date);
-    } else if (serviceProviderExists === false) { 
-      setBookedTimeSlotsForDate(new Set());
     }
-  }, [date, serviceProviderUserId, fetchBookedSlots, serviceProviderExists]);
+  }, [date, serviceProviderUserId, initialCheckDone, fetchBookedSlots]);
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -238,16 +239,11 @@ export default function PublicBookingPage() {
     setIsSubmitting(true);
 
     if (!serviceProviderUserId) {
-        toast({ title: "Error", description: "Service provider ID is missing. Cannot process booking.", variant: "destructive" });
+        toast({ title: "Error", description: "Service provider ID is missing from the link. Cannot process booking.", variant: "destructive" });
         setIsSubmitting(false);
         return;
     }
-    if (!serviceProviderExists){
-        toast({ title: "Error", description: "Service provider not found or booking system unavailable. Cannot process booking.", variant: "destructive" });
-        setIsSubmitting(false);
-        return;
-    }
-
+    
     if (!clientName || !serviceProcedure || !date || !startTime || !endTimeInput) {
         toast({ title: "Error", description: "Please fill in all required fields.", variant: "destructive" });
         setIsSubmitting(false);
@@ -278,7 +274,7 @@ export default function PublicBookingPage() {
     if(hasOverlap) {
         toast({ title: "Booking Conflict", description: "The selected time range is no longer available or overlaps with an existing booking.", variant: "destructive" });
         setIsSubmitting(false);
-        if (date) fetchBookedSlots(date); // Re-fetch slots to show latest availability
+        if (date) fetchBookedSlots(date); 
         return;
     }
 
@@ -290,6 +286,8 @@ export default function PublicBookingPage() {
     }
 
     try {
+        // Note: serviceProviderUserId from URL is used directly.
+        // The application assumes this ID is the target for client and appointment records.
         const providerClientsRefPath = `Clients/${serviceProviderUserId}`;
         const clientsDbRef = ref(db, providerClientsRefPath);
         const newClientRef = push(clientsDbRef);
@@ -302,7 +300,7 @@ export default function PublicBookingPage() {
             ClientContact: clientContact.trim(),
             CreateDate: format(now, "yyyy-MM-dd"),
             CreateTime: format(now, "HH:mm"),
-            CreatedByUserID: serviceProviderUserId // Important for security rules
+            CreatedByUserID: serviceProviderUserId 
         });
 
         const providerAppointmentsRefPath = `Appointments/${serviceProviderUserId}`;
@@ -330,7 +328,6 @@ export default function PublicBookingPage() {
         setStartTime('');
         setEndTimeInput('');
         
-
     } catch (error: any) {
         console.error("Error during public booking submission:", error);
         toast({ title: "Booking Error", description: error.message || "An unexpected error occurred. Please try again.", variant: "destructive" });
@@ -339,30 +336,13 @@ export default function PublicBookingPage() {
     }
   };
 
-  if (serviceProviderExists === null) { 
-    return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-muted/40 p-4">
-            <svg className="animate-spin mx-auto h-12 w-12 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p className="mt-4 text-muted-foreground">Verifying service provider, please wait...</p>
-             <footer className="bg-transparent py-4 text-center text-sm text-muted-foreground mt-auto fixed bottom-0">
-                © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
-            </footer>
-        </div>
-    );
-  }
-
-  if (!serviceProviderExists) { 
+  if (!serviceProviderUserId) {
      return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-muted/40 p-4">
             <Card className="w-full max-w-md shadow-xl p-6 text-center">
-                <CardTitle className="text-2xl font-bold text-destructive mb-4">Service Provider Not Found</CardTitle>
+                <CardTitle className="text-2xl font-bold text-destructive mb-4">Invalid Booking Link</CardTitle>
                 <CardDescription>
-                    The booking link is invalid, the service provider could not
-                    be found, or access to their information was denied. Please check the link and try again.
-                    If this issue persists, the service provider may need to adjust their settings.
+                    The booking link is incomplete or invalid. Please ensure you have the correct link.
                 </CardDescription>
             </Card>
             <footer className="bg-transparent py-4 text-center text-sm text-muted-foreground mt-auto fixed bottom-0">
@@ -371,6 +351,22 @@ export default function PublicBookingPage() {
         </div>
     );
   }
+
+  if (!initialCheckDone) { 
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-muted/40 p-4">
+            <svg className="animate-spin mx-auto h-12 w-12 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p className="mt-4 text-muted-foreground">Verifying booking link, please wait...</p>
+             <footer className="bg-transparent py-4 text-center text-sm text-muted-foreground mt-auto fixed bottom-0">
+                © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
+            </footer>
+        </div>
+    );
+  }
+
 
   return (
     <div className="min-h-screen flex flex-col bg-muted/40">
@@ -381,6 +377,16 @@ export default function PublicBookingPage() {
         </header>
         <main className="flex-grow py-10">
             <div className="container max-w-2xl mx-auto">
+                 {serviceProviderExists === false && initialCheckDone && (
+                    <Alert variant="default" className="mb-6 bg-yellow-50 border-yellow-300 text-yellow-700 dark:bg-yellow-900/30 dark:border-yellow-700 dark:text-yellow-300">
+                        <AlertTriangle className="h-4 w-4 !text-yellow-600 dark:!text-yellow-400" />
+                        <AlertTitle>Notice</AlertTitle>
+                        <AlertDescription>
+                            This booking link appears to be for a new or unrecognized service provider. 
+                            Your booking will proceed and create a record for them.
+                        </AlertDescription>
+                    </Alert>
+                )}
                 <Card className="shadow-xl">
                     <CardHeader>
                         <CardTitle className="text-xl font-bold text-center text-primary">New Appointment Booking</CardTitle>
