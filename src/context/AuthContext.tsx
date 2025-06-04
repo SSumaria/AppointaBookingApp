@@ -45,10 +45,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     console.log("--- AuthProvider useEffect (AuthContext.tsx) --- Setting up onAuthStateChanged. 'auth' is:", auth ? "DEFINED" : "UNDEFINED");
     if (!auth) {
-      console.error("--- AuthProvider useEffect (AuthContext.tsx) --- Firebase 'auth' service is UNDEFINED. Cannot set up onAuthStateChanged. This indicates a Firebase initialization problem in firebaseConfig.ts. The public booking page may redirect if it relies on auth state, even if it shouldn't.");
-      setLoading(false); // Stop loading if auth is not available
-      // Potentially, if on a public page, we should not redirect here.
-      // The redirect might be happening due to router.push in other functions if they are called.
+      console.error("--- AuthProvider useEffect (AuthContext.tsx) --- Firebase 'auth' service is UNDEFINED. Cannot set up onAuthStateChanged. This indicates a Firebase initialization problem in firebaseConfig.ts (e.g. API key missing/invalid).");
+      setCurrentUser(null); // Ensure currentUser is null if auth is not available
+      setLoading(false);    // Stop loading as auth state cannot be determined
       return; 
     }
 
@@ -202,9 +201,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signInWithGoogle,
     logout,
   };
-
-  // Conditionally render children only if Firebase auth is somehow available (even if user is null)
-  // or if we are not in loading state due to auth init failure
-  // Children are always rendered, but their behavior might depend on currentUser and loading.
+  
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
