@@ -24,10 +24,25 @@ export default function HomePage() {
       router.push('/login');
     } else if (currentUser && typeof window !== 'undefined') {
       let originToUse = window.location.origin;
-      // If running on a cloudworkstations.dev domain, explicitly use port 9000 for the public link
+      
       if (window.location.hostname.endsWith('cloudworkstations.dev')) {
-        originToUse = `${window.location.protocol}//${window.location.hostname}:9000`;
+        const currentHostname = window.location.hostname;
+        const protocol = window.location.protocol; // e.g., "https:"
+        
+        // Regex to find if the hostname starts with a port prefix like "xxxx-"
+        const portPrefixRegex = /^(\d+)-/;
+        const portPrefixMatch = currentHostname.match(portPrefixRegex);
+        
+        let baseHostname = currentHostname;
+        if (portPrefixMatch) {
+          // If "6000-idx-studio...", baseHostname becomes "idx-studio..."
+          baseHostname = currentHostname.substring(portPrefixMatch[0].length);
+        }
+        
+        // Construct the new origin with the "9000-" prefix
+        originToUse = `${protocol}//9000-${baseHostname}`;
       }
+      
       setPublicBookingLink(`${originToUse}/book/${currentUser.uid}`);
     }
   }, [currentUser, loading, router]);
