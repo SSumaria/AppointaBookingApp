@@ -301,21 +301,21 @@ export default function AllBookingsPage() {
           {props.date.getDate()}
         </span>
         {dayBookings.length > 0 && (
-          <div className="mt-1 text-[10px] leading-tight flex-grow w-full overflow-y-auto space-y-1 pr-0.5"> {/* Increased space-y-1 */}
-            {dayBookings.slice(0, 4).map(booking => (
+          <div className="mt-1 text-xs leading-tight flex-grow w-full overflow-y-auto space-y-1 pr-0.5">
+            {dayBookings.slice(0, 3).map(booking => ( // Display up to 3 bookings
               <div 
                 key={booking.id} 
-                className="p-1 bg-primary/10 dark:bg-primary/20 rounded-sm" // Increased p-1
+                className="p-1 bg-primary/10 dark:bg-primary/20 rounded-sm"
                 title={`${booking.AppointmentStartTime} - ${booking.ClientName}: ${booking.ServiceProcedure}`}
               >
-                <div className="flex items-center truncate"> {/* Inner div for flex layout and truncation */}
+                <div className="flex items-center truncate">
                   <span className="font-semibold text-primary mr-1">{booking.AppointmentStartTime}</span>
                   <span className="truncate">{booking.ClientName || "Loading..."}</span>
                 </div>
               </div>
             ))}
-            {dayBookings.length > 4 && (
-              <div className="text-muted-foreground text-center text-[9px] mt-0.5">+ {dayBookings.length - 4} more</div>
+            {dayBookings.length > 3 && ( // Adjust if more than 3
+              <div className="text-muted-foreground text-center text-[9px] mt-0.5">+ {dayBookings.length - 3} more</div>
             )}
           </div>
         )}
@@ -605,3 +605,4 @@ export default function AllBookingsPage() {
     </div>
   );
 }
+
