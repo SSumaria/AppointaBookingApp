@@ -297,19 +297,25 @@ export default function AllBookingsPage() {
 
     return (
       <div className="flex flex-col h-full p-1 items-start w-full text-left">
-        <span className={cn("font-medium", props.displayMonth.getMonth() !== props.date.getMonth() && "text-muted-foreground/50")}>
+        <span className={cn("font-medium text-sm", props.displayMonth.getMonth() !== props.date.getMonth() && "text-muted-foreground/50")}>
           {props.date.getDate()}
         </span>
         {dayBookings.length > 0 && (
-          <div className="mt-0.5 text-[10px] leading-tight flex-grow w-full overflow-y-auto space-y-px pr-0.5">
-            {dayBookings.slice(0, 4).map(booking => ( // Show up to 4 bookings
-              <div key={booking.id} className="p-0.5 bg-primary/10 dark:bg-primary/20 rounded-sm truncate" title={`${booking.AppointmentStartTime} - ${booking.ClientName}: ${booking.ServiceProcedure}`}>
-                <span className="font-semibold text-primary">{booking.AppointmentStartTime}</span>
-                <span className="ml-1 truncate">{booking.ClientName || "Loading..."}</span>
+          <div className="mt-1 text-[10px] leading-tight flex-grow w-full overflow-y-auto space-y-1 pr-0.5"> {/* Increased space-y-1 */}
+            {dayBookings.slice(0, 4).map(booking => (
+              <div 
+                key={booking.id} 
+                className="p-1 bg-primary/10 dark:bg-primary/20 rounded-sm" // Increased p-1
+                title={`${booking.AppointmentStartTime} - ${booking.ClientName}: ${booking.ServiceProcedure}`}
+              >
+                <div className="flex items-center truncate"> {/* Inner div for flex layout and truncation */}
+                  <span className="font-semibold text-primary mr-1">{booking.AppointmentStartTime}</span>
+                  <span className="truncate">{booking.ClientName || "Loading..."}</span>
+                </div>
               </div>
             ))}
             {dayBookings.length > 4 && (
-              <div className="text-muted-foreground text-center text-[9px]">+ {dayBookings.length - 4} more</div>
+              <div className="text-muted-foreground text-center text-[9px] mt-0.5">+ {dayBookings.length - 4} more</div>
             )}
           </div>
         )}
@@ -360,11 +366,11 @@ export default function AllBookingsPage() {
                   onSelect={handleCalendarDayClick}
                   month={calendarOverviewMonth}
                   onMonthChange={setCalendarOverviewMonth}
-                  className="rounded-md border w-full [&_td]:align-top [&_td]:p-0" // Ensure table cells align top and have no padding for custom content
+                  className="rounded-md border w-full [&_td]:align-top [&_td]:p-0" 
                   classNames={{
-                    day: "h-28 w-full p-0", // Adjust height of the day button, remove padding
-                    cell: "h-28 w-full p-0", // Adjust height of the cell, remove padding
-                     head_cell: "text-muted-foreground rounded-md w-full font-normal text-[0.8rem] pb-1", // Ensure head cells take full width for alignment
+                    day: "h-28 w-full p-0", 
+                    cell: "h-28 w-full p-0", 
+                    head_cell: "text-muted-foreground rounded-md w-full font-normal text-[0.8rem] pb-1",
                   }}
                   components={{ DayContent: CustomDayContent }}
                 />
