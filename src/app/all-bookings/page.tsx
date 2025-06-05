@@ -7,7 +7,7 @@ import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, 
 import { cn } from "@/lib/utils";
 import { format, parseISO, isSameDay } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { Calendar, type DayContentProps } from "@/components/ui/calendar"; // Added DayContentProps
+import { Calendar, type DayContentProps } from "@/components/ui/calendar";
 import Link from 'next/link';
 import {
   Popover,
@@ -141,10 +141,10 @@ export default function AllBookingsPage() {
             } else if (typeof data.Notes === 'object' && !Array.isArray(data.Notes)) {
               processedNotes = Object.values(data.Notes as Record<string, Note>).filter((n: any) => n && typeof n.text === 'string' && typeof n.timestamp === 'number' && typeof n.id === 'string');
             } else if (typeof data.Notes === 'string' && data.Notes.trim() !== '') {
-              processedNotes = [{ 
-                id: generateNoteId(), 
-                text: data.Notes, 
-                timestamp: data.timestamp || Date.now() 
+              processedNotes = [{
+                id: generateNoteId(),
+                text: data.Notes,
+                timestamp: data.timestamp || Date.now()
               }];
             }
           }
@@ -162,7 +162,7 @@ export default function AllBookingsPage() {
           return { ...booking, ClientName: clientName };
         })
       );
-      
+
       bookingsWithClientNames.sort((a, b) => {
         const dateComparison = b.AppointmentDate.localeCompare(a.AppointmentDate);
         if (dateComparison !== 0) return dateComparison;
@@ -190,10 +190,10 @@ export default function AllBookingsPage() {
   }, [currentUser, fetchAndSetAllBookings]);
 
   useEffect(() => {
-    setIsLoading(true); 
+    setIsLoading(true);
     if (!filterDateRange?.from) {
       setBookingsForDisplay(allFetchedBookings);
-      if (allFetchedBookings.length === 0 && currentUser && !authLoading) { 
+      if (allFetchedBookings.length === 0 && currentUser && !authLoading) {
          toast({
           title: "No Bookings",
           description: "You have no bookings yet.",
@@ -204,13 +204,13 @@ export default function AllBookingsPage() {
     }
 
     const fromDate = filterDateRange.from;
-    const toDate = filterDateRange.to || filterDateRange.from; 
+    const toDate = filterDateRange.to || filterDateRange.from;
 
     const filtered = allFetchedBookings.filter(booking => {
-      const bookingDate = parseISO(booking.AppointmentDate); 
+      const bookingDate = parseISO(booking.AppointmentDate);
       return bookingDate >= fromDate && bookingDate <= toDate;
     });
-    
+
     setBookingsForDisplay(filtered);
     if (filtered.length === 0) {
        toast({
@@ -251,7 +251,7 @@ export default function AllBookingsPage() {
         title: "Booking Cancelled",
         description: "The booking has been successfully cancelled.",
       });
-      fetchAndSetAllBookings(); 
+      fetchAndSetAllBookings();
     } catch (error: any) {
       console.error("Error cancelling booking:", error);
       toast({
@@ -278,9 +278,9 @@ export default function AllBookingsPage() {
       await update(ref(db, bookingRefPath), { Notes: updatedNotes });
       toast({ title: "Note Added", description: "The new note has been added." });
       setNewNoteInputValue('');
-      
+
       setEditingBooking(prev => prev ? {...prev, Notes: updatedNotes} : null);
-      setAllFetchedBookings(prevBookings => prevBookings.map(b => 
+      setAllFetchedBookings(prevBookings => prevBookings.map(b =>
           b.id === bookingId ? { ...b, Notes: updatedNotes } : b
       ));
     } catch (error: any) {
@@ -289,64 +289,32 @@ export default function AllBookingsPage() {
     }
   };
 
-  const bookedDaysModifier = useMemo(() => {
-    const datesWithBookings = allFetchedBookings
-        .filter(b => b.BookingStatus !== "Cancelled") 
-        .map(booking => parseISO(booking.AppointmentDate));
-    return { booked: datesWithBookings };
-  }, [allFetchedBookings]);
 
   const CustomDayContent = (props: DayContentProps) => {
-    const dayBookings = allFetchedBookings.filter(booking =>
-      isSameDay(parseISO(booking.AppointmentDate), props.date) && booking.BookingStatus !== "Cancelled"
-    );
+    const dayBookings = allFetchedBookings
+      .filter(booking => isSameDay(parseISO(booking.AppointmentDate), props.date) && booking.BookingStatus !== "Cancelled")
+      .sort((a, b) => a.AppointmentStartTime.localeCompare(b.AppointmentStartTime));
 
-    if (dayBookings.length > 0) {
-      return (
-        <Popover>
-          <PopoverTrigger asChild>
-            <div 
-              className="relative w-full h-full flex items-center justify-center focus:outline-none rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1" 
-              tabIndex={0} // Make it focusable for PopoverTrigger
-              role="button"
-              aria-label={`View bookings for ${format(props.date, "PPP")}`}
-            >
-              {props.date.getDate()}
-            </div>
-          </PopoverTrigger>
-          <PopoverContent className="w-80 z-[60] shadow-xl" align="center" side="bottom"> {/* Increased z-index */}
-            <div className="grid gap-4">
-              <div className="space-y-1">
-                <h4 className="font-medium leading-none text-primary">
-                  Bookings for {format(props.date, "PPP")}
-                </h4>
-                <p className="text-xs text-muted-foreground">
-                  {dayBookings.length} booking(s)
-                </p>
+    return (
+      <div className="flex flex-col h-full p-1 items-start w-full text-left">
+        <span className={cn("font-medium", props.displayMonth.getMonth() !== props.date.getMonth() && "text-muted-foreground/50")}>
+          {props.date.getDate()}
+        </span>
+        {dayBookings.length > 0 && (
+          <div className="mt-0.5 text-[10px] leading-tight flex-grow w-full overflow-y-auto space-y-px pr-0.5">
+            {dayBookings.slice(0, 4).map(booking => ( // Show up to 4 bookings
+              <div key={booking.id} className="p-0.5 bg-primary/10 dark:bg-primary/20 rounded-sm truncate" title={`${booking.AppointmentStartTime} - ${booking.ClientName}: ${booking.ServiceProcedure}`}>
+                <span className="font-semibold text-primary">{booking.AppointmentStartTime}</span>
+                <span className="ml-1 truncate">{booking.ClientName || "Loading..."}</span>
               </div>
-              <ScrollArea className="h-[180px] pr-3">
-                <div className="grid gap-3">
-                  {dayBookings.map(booking => (
-                    <div key={booking.id} className="text-sm p-2.5 border rounded-md bg-card hover:bg-muted/50 transition-colors">
-                      <p className="font-semibold text-sm truncate">
-                        {booking.ClientName || "Loading Client..."}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">{booking.ServiceProcedure}</p>
-                      <p className="text-xs font-medium text-primary/90">
-                        {booking.AppointmentStartTime} - {booking.AppointmentEndTime}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
-          </PopoverContent>
-        </Popover>
-      );
-    }
-    // Default rendering for DayPicker.DayContent (just the day number)
-    // The DayPicker's button will still handle the number styling and the dot from modifiers.
-    return <>{props.date.getDate()}</>;
+            ))}
+            {dayBookings.length > 4 && (
+              <div className="text-muted-foreground text-center text-[9px]">+ {dayBookings.length - 4} more</div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
 
@@ -382,7 +350,7 @@ export default function AllBookingsPage() {
                   <CalendarDays className="mr-2 h-6 w-6" /> Calendar Overview
                 </CardTitle>
                 <CardDescription>
-                  Days with bookings are marked with a dot. Click a day number to view booking details in a popover, or click anywhere on the day cell to filter the table below.
+                  View bookings directly in the calendar. Click any day cell to filter the table below.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex justify-center">
@@ -392,9 +360,12 @@ export default function AllBookingsPage() {
                   onSelect={handleCalendarDayClick}
                   month={calendarOverviewMonth}
                   onMonthChange={setCalendarOverviewMonth}
-                  modifiers={bookedDaysModifier}
-                  modifiersClassNames={{ booked: 'booked-day-overview' }}
-                  className="rounded-md border"
+                  className="rounded-md border w-full [&_td]:align-top [&_td]:p-0" // Ensure table cells align top and have no padding for custom content
+                  classNames={{
+                    day: "h-28 w-full p-0", // Adjust height of the day button, remove padding
+                    cell: "h-28 w-full p-0", // Adjust height of the cell, remove padding
+                     head_cell: "text-muted-foreground rounded-md w-full font-normal text-[0.8rem] pb-1", // Ensure head cells take full width for alignment
+                  }}
                   components={{ DayContent: CustomDayContent }}
                 />
               </CardContent>
@@ -505,7 +476,7 @@ export default function AllBookingsPage() {
                                   className="h-6 w-6 p-0"
                                   onClick={() => {
                                     setEditingBooking(booking);
-                                    setNewNoteInputValue(''); 
+                                    setNewNoteInputValue('');
                                   }}
                                 >
                                   <Edit className="h-4 w-4" />

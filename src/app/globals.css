@@ -87,30 +87,4 @@
   }
 }
 
-/* Style for days with bookings in the overview calendar */
-.booked-day-overview .rdp-button { /* Target the button inside the day cell */
-  position: relative;
-}
-.booked-day-overview .rdp-button::after {
-  content: "";
-  position: absolute;
-  bottom: 4px; /* Adjust as needed */
-  left: 50%;
-  transform: translateX(-50%);
-  width: 6px; /* Size of the dot */
-  height: 6px; /* Size of the dot */
-  border-radius: 50%;
-  background-color: hsl(var(--primary)); /* Primary color dot */
-}
-
-/* Change dot color on selection/hover for better visibility if the day itself is styled */
-.booked-day-overview.rdp-day_selected .rdp-button::after,
-.booked-day-overview:hover .rdp-button::after {
-  background-color: hsl(var(--primary-foreground));
-}
-/* Ensure selected booked days still show their dot clearly */
-.booked-day-overview.rdp-day_selected {
-    /* If primary color is dark, primary-foreground might be light, suitable for dot */
-}
-
-    
+/* Removed .booked-day-overview styles as they are no longer needed */
