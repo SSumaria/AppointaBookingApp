@@ -7,7 +7,7 @@ import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, 
 import { cn } from "@/lib/utils";
 import { format, parseISO, isSameDay } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
+import { Calendar, type DayContentProps } from "@/components/ui/calendar"; // Added DayContentProps
 import Link from 'next/link';
 import {
   Popover,
@@ -39,7 +39,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger, // Added AlertDialogTrigger
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Dialog,
@@ -127,7 +127,6 @@ export default function AllBookingsPage() {
     try {
       const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
       const appointmentsRef = ref(db, userAppointmentsRefPath);
-      // Fetch all bookings, ordered by date
       const bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'));
 
       const snapshot = await get(bookingsQuery);
@@ -164,7 +163,6 @@ export default function AllBookingsPage() {
         })
       );
       
-      // Sort by date (desc) then time (desc) for allFetchedBookings
       bookingsWithClientNames.sort((a, b) => {
         const dateComparison = b.AppointmentDate.localeCompare(a.AppointmentDate);
         if (dateComparison !== 0) return dateComparison;
@@ -192,10 +190,10 @@ export default function AllBookingsPage() {
   }, [currentUser, fetchAndSetAllBookings]);
 
   useEffect(() => {
-    setIsLoading(true); // Show loading when filter changes, as filtering can take a moment
+    setIsLoading(true); 
     if (!filterDateRange?.from) {
       setBookingsForDisplay(allFetchedBookings);
-      if (allFetchedBookings.length === 0 && currentUser && !authLoading) { // Check if initial fetch is done
+      if (allFetchedBookings.length === 0 && currentUser && !authLoading) { 
          toast({
           title: "No Bookings",
           description: "You have no bookings yet.",
@@ -206,11 +204,9 @@ export default function AllBookingsPage() {
     }
 
     const fromDate = filterDateRange.from;
-    const toDate = filterDateRange.to || filterDateRange.from; // If no 'to', use 'from' for single day
+    const toDate = filterDateRange.to || filterDateRange.from; 
 
     const filtered = allFetchedBookings.filter(booking => {
-      // Ensure booking.AppointmentDate is parsed correctly. It's yyyy-MM-dd.
-      // Adding time component to make it midnight UTC for robust comparison
       const bookingDate = parseISO(booking.AppointmentDate); 
       return bookingDate >= fromDate && bookingDate <= toDate;
     });
@@ -232,11 +228,9 @@ export default function AllBookingsPage() {
 
   const handleCalendarDayClick = (day: Date | undefined) => {
     if (day) {
-      // Normalize day to ensure time part doesn't affect range
       const normalizedDay = new Date(day.getFullYear(), day.getMonth(), day.getDate());
       setFilterDateRange({ from: normalizedDay, to: normalizedDay });
     } else {
-      // If day is undefined (e.g., selection cleared), clear the filter.
       setFilterDateRange(undefined);
     }
   };
@@ -257,7 +251,7 @@ export default function AllBookingsPage() {
         title: "Booking Cancelled",
         description: "The booking has been successfully cancelled.",
       });
-      fetchAndSetAllBookings(); // Re-fetch all bookings to update UI
+      fetchAndSetAllBookings(); 
     } catch (error: any) {
       console.error("Error cancelling booking:", error);
       toast({
@@ -285,13 +279,10 @@ export default function AllBookingsPage() {
       toast({ title: "Note Added", description: "The new note has been added." });
       setNewNoteInputValue('');
       
-      // Update local state for immediate UI refresh
       setEditingBooking(prev => prev ? {...prev, Notes: updatedNotes} : null);
       setAllFetchedBookings(prevBookings => prevBookings.map(b => 
           b.id === bookingId ? { ...b, Notes: updatedNotes } : b
       ));
-      // bookingsForDisplay will update via its useEffect dependency on allFetchedBookings
-
     } catch (error: any) {
       console.error("Error adding note:", error);
       toast({ title: "Error Adding Note", description: error.message, variant: "destructive" });
@@ -300,10 +291,64 @@ export default function AllBookingsPage() {
 
   const bookedDaysModifier = useMemo(() => {
     const datesWithBookings = allFetchedBookings
-        .filter(b => b.BookingStatus !== "Cancelled") // Optional: don't mark cancelled
+        .filter(b => b.BookingStatus !== "Cancelled") 
         .map(booking => parseISO(booking.AppointmentDate));
     return { booked: datesWithBookings };
   }, [allFetchedBookings]);
+
+  const CustomDayContent = (props: DayContentProps) => {
+    const dayBookings = allFetchedBookings.filter(booking =>
+      isSameDay(parseISO(booking.AppointmentDate), props.date) && booking.BookingStatus !== "Cancelled"
+    );
+
+    if (dayBookings.length > 0) {
+      return (
+        <Popover>
+          <PopoverTrigger asChild>
+            <div 
+              className="relative w-full h-full flex items-center justify-center focus:outline-none rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1" 
+              tabIndex={0} // Make it focusable for PopoverTrigger
+              role="button"
+              aria-label={`View bookings for ${format(props.date, "PPP")}`}
+            >
+              {props.date.getDate()}
+            </div>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 z-[60] shadow-xl" align="center" side="bottom"> {/* Increased z-index */}
+            <div className="grid gap-4">
+              <div className="space-y-1">
+                <h4 className="font-medium leading-none text-primary">
+                  Bookings for {format(props.date, "PPP")}
+                </h4>
+                <p className="text-xs text-muted-foreground">
+                  {dayBookings.length} booking(s)
+                </p>
+              </div>
+              <ScrollArea className="h-[180px] pr-3">
+                <div className="grid gap-3">
+                  {dayBookings.map(booking => (
+                    <div key={booking.id} className="text-sm p-2.5 border rounded-md bg-card hover:bg-muted/50 transition-colors">
+                      <p className="font-semibold text-sm truncate">
+                        {booking.ClientName || "Loading Client..."}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">{booking.ServiceProcedure}</p>
+                      <p className="text-xs font-medium text-primary/90">
+                        {booking.AppointmentStartTime} - {booking.AppointmentEndTime}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          </PopoverContent>
+        </Popover>
+      );
+    }
+    // Default rendering for DayPicker.DayContent (just the day number)
+    // The DayPicker's button will still handle the number styling and the dot from modifiers.
+    return <>{props.date.getDate()}</>;
+  };
+
 
   if (authLoading || !currentUser) {
     return (
@@ -337,7 +382,7 @@ export default function AllBookingsPage() {
                   <CalendarDays className="mr-2 h-6 w-6" /> Calendar Overview
                 </CardTitle>
                 <CardDescription>
-                  Days with bookings are marked with a dot. Click a day to filter the table below.
+                  Days with bookings are marked with a dot. Click a day number to view booking details in a popover, or click anywhere on the day cell to filter the table below.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex justify-center">
@@ -350,6 +395,7 @@ export default function AllBookingsPage() {
                   modifiers={bookedDaysModifier}
                   modifiersClassNames={{ booked: 'booked-day-overview' }}
                   className="rounded-md border"
+                  components={{ DayContent: CustomDayContent }}
                 />
               </CardContent>
             </Card>
@@ -582,5 +628,3 @@ export default function AllBookingsPage() {
     </div>
   );
 }
-
-    
