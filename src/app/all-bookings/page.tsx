@@ -1,11 +1,11 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { DateRange } from "react-day-picker";
-import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle } from "lucide-react";
+import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, parseISO, isSameDay } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import Link from 'next/link';
@@ -28,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { ref, get, query as rtQuery, orderByChild, startAt, endAt, update, push as firebasePush } from "firebase/database";
+import { ref, get, query as rtQuery, orderByChild, update } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
 import {
   AlertDialog,
@@ -39,7 +39,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Dialog,
@@ -67,7 +66,7 @@ interface Booking {
   ClientID: string;
   ClientName?: string;
   ServiceProcedure: string;
-  AppointmentDate: string;
+  AppointmentDate: string; // yyyy-MM-dd
   AppointmentStartTime: string;
   AppointmentEndTime: string;
   BookingStatus?: string;
@@ -75,14 +74,14 @@ interface Booking {
   BookedByUserID?: string;
 }
 
-// Helper to generate a simple unique ID for notes
 const generateNoteId = () => {
   return Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9);
 };
 
 
 export default function AllBookingsPage() {
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [allFetchedBookings, setAllFetchedBookings] = useState<Booking[]>([]);
+  const [bookingsForDisplay, setBookingsForDisplay] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [filterDateRange, setFilterDateRange] = useState<DateRange | undefined>(undefined);
   const [clientsCache, setClientsCache] = useState<Record<string, string>>({});
@@ -92,6 +91,7 @@ export default function AllBookingsPage() {
 
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [newNoteInputValue, setNewNoteInputValue] = useState('');
+  const [calendarOverviewMonth, setCalendarOverviewMonth] = useState<Date>(new Date());
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
@@ -119,26 +119,15 @@ export default function AllBookingsPage() {
     }
   }, [currentUser?.uid, clientsCache]);
 
-  const fetchBookings = useCallback(async () => {
+  const fetchAndSetAllBookings = useCallback(async () => {
     if (!currentUser?.uid) return;
 
     setIsLoading(true);
     try {
       const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
       const appointmentsRef = ref(db, userAppointmentsRefPath);
-      let bookingsQuery;
-
-      if (filterDateRange?.from && filterDateRange?.to) {
-        const formattedFromDate = format(filterDateRange.from, "yyyy-MM-dd");
-        const formattedToDate = format(filterDateRange.to, "yyyy-MM-dd");
-        bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'), startAt(formattedFromDate), endAt(formattedToDate));
-      } else if (filterDateRange?.from) {
-        const formattedDate = format(filterDateRange.from, "yyyy-MM-dd");
-        bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'), startAt(formattedDate), endAt(formattedDate));
-      }
-      else {
-        bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'));
-      }
+      // Fetch all bookings, ordered by date
+      const bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'));
 
       const snapshot = await get(bookingsQuery);
       const fetchedBookings: Booking[] = [];
@@ -146,25 +135,23 @@ export default function AllBookingsPage() {
         snapshot.forEach((childSnapshot) => {
           const data = childSnapshot.val();
           let processedNotes: Note[] = [];
-          if (data.Notes) {
+            if (data.Notes) {
             if (Array.isArray(data.Notes)) {
               processedNotes = data.Notes.filter((n: any) => n && typeof n.text === 'string' && typeof n.timestamp === 'number' && typeof n.id === 'string');
             } else if (typeof data.Notes === 'object' && !Array.isArray(data.Notes)) {
-              // Handle cases where Firebase might return an object for an array (e.g. sparse array or non-0-indexed keys)
               processedNotes = Object.values(data.Notes as Record<string, Note>).filter((n: any) => n && typeof n.text === 'string' && typeof n.timestamp === 'number' && typeof n.id === 'string');
             } else if (typeof data.Notes === 'string' && data.Notes.trim() !== '') {
-              // Handle legacy string notes: convert to a single Note object in an array
               processedNotes = [{ 
                 id: generateNoteId(), 
                 text: data.Notes, 
-                timestamp: data.timestamp || Date.now() // Use booking's own timestamp if available, else current time
+                timestamp: data.timestamp || Date.now() 
               }];
             }
           }
           fetchedBookings.push({
             id: childSnapshot.key as string,
             ...data,
-            Notes: processedNotes, // Ensure Notes is always Note[]
+            Notes: processedNotes,
           });
         });
       }
@@ -175,25 +162,15 @@ export default function AllBookingsPage() {
           return { ...booking, ClientName: clientName };
         })
       );
-
+      
+      // Sort by date (desc) then time (desc) for allFetchedBookings
       bookingsWithClientNames.sort((a, b) => {
         const dateComparison = b.AppointmentDate.localeCompare(a.AppointmentDate);
         if (dateComparison !== 0) return dateComparison;
         return b.AppointmentStartTime.localeCompare(a.AppointmentStartTime);
       });
 
-      setBookings(bookingsWithClientNames);
-      if (bookingsWithClientNames.length === 0 && filterDateRange?.from) {
-         toast({
-          title: "No Bookings",
-          description: `No bookings found for the selected date range.`,
-        });
-      } else if (bookingsWithClientNames.length === 0 && !filterDateRange?.from){
-         toast({
-          title: "No Bookings",
-          description: "You have no bookings yet.",
-        });
-      }
+      setAllFetchedBookings(bookingsWithClientNames);
 
     } catch (error: any) {
       console.error("Error fetching bookings:", error);
@@ -205,16 +182,62 @@ export default function AllBookingsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentUser?.uid, filterDateRange, fetchClientName, toast]);
+  }, [currentUser?.uid, fetchClientName, toast]);
 
   useEffect(() => {
     if (currentUser) {
-      fetchBookings();
+      fetchAndSetAllBookings();
     }
-  }, [currentUser, fetchBookings]);
+  }, [currentUser, fetchAndSetAllBookings]);
+
+  useEffect(() => {
+    setIsLoading(true); // Show loading when filter changes, as filtering can take a moment
+    if (!filterDateRange?.from) {
+      setBookingsForDisplay(allFetchedBookings);
+      if (allFetchedBookings.length === 0 && currentUser && !authLoading) { // Check if initial fetch is done
+         toast({
+          title: "No Bookings",
+          description: "You have no bookings yet.",
+        });
+      }
+      setIsLoading(false);
+      return;
+    }
+
+    const fromDate = filterDateRange.from;
+    const toDate = filterDateRange.to || filterDateRange.from; // If no 'to', use 'from' for single day
+
+    const filtered = allFetchedBookings.filter(booking => {
+      // Ensure booking.AppointmentDate is parsed correctly. It's yyyy-MM-dd.
+      // Adding time component to make it midnight UTC for robust comparison
+      const bookingDate = parseISO(booking.AppointmentDate); 
+      return bookingDate >= fromDate && bookingDate <= toDate;
+    });
+    
+    setBookingsForDisplay(filtered);
+    if (filtered.length === 0) {
+       toast({
+        title: "No Bookings Found",
+        description: `No bookings found for the selected date range.`,
+      });
+    }
+    setIsLoading(false);
+  }, [allFetchedBookings, filterDateRange, toast, currentUser, authLoading]);
+
 
   const handleFilterDateChange = (selectedRange: DateRange | undefined) => {
     setFilterDateRange(selectedRange);
+  };
+
+  const handleCalendarDayClick = (day: Date | undefined) => {
+    if (day) {
+      // Normalize day to ensure time part doesn't affect range
+      const normalizedDay = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+      setFilterDateRange({ from: normalizedDay, to: normalizedDay });
+    } else {
+      // If day is undefined (e.g., selection cleared), clear the filter.
+      setFilterDateRange(undefined);
+    }
   };
 
   const clearFilter = () => {
@@ -233,7 +256,7 @@ export default function AllBookingsPage() {
         title: "Booking Cancelled",
         description: "The booking has been successfully cancelled.",
       });
-      fetchBookings();
+      fetchAndSetAllBookings(); // Re-fetch all bookings to update UI
     } catch (error: any) {
       console.error("Error cancelling booking:", error);
       toast({
@@ -246,57 +269,40 @@ export default function AllBookingsPage() {
 
   const handleAddNote = async () => {
     if (!currentUser?.uid || !editingBooking || !newNoteInputValue.trim()) {
-      toast({ title: "Error", description: "Cannot add note. No booking selected, user not logged in, or note is empty.", variant: "destructive" });
+      toast({ title: "Error", description: "Cannot add note.", variant: "destructive" });
       return;
     }
     const bookingId = editingBooking.id;
-    const newNoteText = newNoteInputValue.trim();
-
-    const newNote: Note = {
-      id: generateNoteId(), 
-      text: newNoteText,
-      timestamp: Date.now(),
-    };
+    const newNote: Note = { id: generateNoteId(), text: newNoteInputValue.trim(), timestamp: Date.now() };
 
     try {
       const bookingRefPath = `Appointments/${currentUser.uid}/${bookingId}`;
-      // Ensure currentNotes is an array before spreading
-      let currentNotes: Note[] = [];
-      if (editingBooking.Notes) {
-        if (Array.isArray(editingBooking.Notes)) {
-          currentNotes = editingBooking.Notes;
-        } else if (typeof editingBooking.Notes === 'object') { // Should not happen if fetchBookings is correct
-          currentNotes = Object.values(editingBooking.Notes as Record<string, Note>);
-        }
-        // If it was a string, fetchBookings should have converted it.
-      }
-      
+      let currentNotes: Note[] = Array.isArray(editingBooking.Notes) ? editingBooking.Notes : [];
       const updatedNotes = [...currentNotes, newNote];
 
       await update(ref(db, bookingRefPath), { Notes: updatedNotes });
-      toast({
-        title: "Note Added",
-        description: "The new note has been added to the booking.",
-      });
-      setNewNoteInputValue(''); 
-
-      setEditingBooking(prev => prev ? {...prev, Notes: updatedNotes} : null);
+      toast({ title: "Note Added", description: "The new note has been added." });
+      setNewNoteInputValue('');
       
-      // Update the main bookings list as well for consistency
-      setBookings(prevBookings => prevBookings.map(b => 
+      // Update local state for immediate UI refresh
+      setEditingBooking(prev => prev ? {...prev, Notes: updatedNotes} : null);
+      setAllFetchedBookings(prevBookings => prevBookings.map(b => 
           b.id === bookingId ? { ...b, Notes: updatedNotes } : b
       ));
+      // bookingsForDisplay will update via its useEffect dependency on allFetchedBookings
 
     } catch (error: any) {
       console.error("Error adding note:", error);
-      toast({
-        title: "Error Adding Note",
-        description: error.message || "Could not add the note.",
-        variant: "destructive",
-      });
+      toast({ title: "Error Adding Note", description: error.message, variant: "destructive" });
     }
   };
 
+  const bookedDaysModifier = useMemo(() => {
+    const datesWithBookings = allFetchedBookings
+        .filter(b => b.BookingStatus !== "Cancelled") // Optional: don't mark cancelled
+        .map(booking => parseISO(booking.AppointmentDate));
+    return { booked: datesWithBookings };
+  }, [allFetchedBookings]);
 
   if (authLoading || !currentUser) {
     return (
@@ -323,7 +329,30 @@ export default function AllBookingsPage() {
       <Header />
       <Dialog open={!!editingBooking} onOpenChange={(isOpen) => { if (!isOpen) { setEditingBooking(null); setNewNoteInputValue('');} }}>
         <main className="flex-grow py-10">
-          <div className="container max-w-6xl mx-auto">
+          <div className="container max-w-7xl mx-auto space-y-8">
+            <Card className="shadow-xl">
+              <CardHeader>
+                <CardTitle className="text-2xl font-bold flex items-center text-primary">
+                  <CalendarDays className="mr-2 h-6 w-6" /> Calendar Overview
+                </CardTitle>
+                <CardDescription>
+                  Days with bookings are marked with a dot. Click a day to filter the table below.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex justify-center">
+                <Calendar
+                  mode="single"
+                  selected={filterDateRange?.from && isSameDay(filterDateRange.from, filterDateRange.to || filterDateRange.from) ? filterDateRange.from : undefined}
+                  onSelect={handleCalendarDayClick}
+                  month={calendarOverviewMonth}
+                  onMonthChange={setCalendarOverviewMonth}
+                  modifiers={bookedDaysModifier}
+                  modifiersClassNames={{ booked: 'booked-day-overview' }}
+                  className="rounded-md border"
+                />
+              </CardContent>
+            </Card>
+
             <Card className="shadow-xl">
               <CardHeader>
                 <CardTitle className="text-2xl font-bold flex items-center text-primary">
@@ -382,11 +411,11 @@ export default function AllBookingsPage() {
                     </svg>
                     <p className="mt-2 text-muted-foreground">Loading bookings...</p>
                   </div>
-                ) : bookings.length > 0 ? (
+                ) : bookingsForDisplay.length > 0 ? (
                   <Table>
                     <TableCaption>
                       {filterDateRange?.from
-                        ? `A list of your bookings from ${format(filterDateRange.from, "PPP")}${filterDateRange.to ? ` to ${format(filterDateRange.to, "PPP")}` : ''}.`
+                        ? `A list of your bookings from ${format(filterDateRange.from, "PPP")}${filterDateRange.to && !isSameDay(filterDateRange.from, filterDateRange.to) ? ` to ${format(filterDateRange.to, "PPP")}` : ''}.`
                         : "A list of all your bookings."}
                     </TableCaption>
                     <TableHeader>
@@ -402,7 +431,7 @@ export default function AllBookingsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {bookings.map((booking) => (
+                      {bookingsForDisplay.map((booking) => (
                         <TableRow key={booking.id}>
                           <TableCell className="font-medium">
                             {booking.ClientName && booking.ClientID ? (
@@ -414,7 +443,7 @@ export default function AllBookingsPage() {
                             )}
                           </TableCell>
                           <TableCell>{booking.ServiceProcedure}</TableCell>
-                          <TableCell>{format(new Date(booking.AppointmentDate), "PPP")}</TableCell>
+                          <TableCell>{format(parseISO(booking.AppointmentDate), "PPP")}</TableCell>
                           <TableCell>{booking.AppointmentStartTime}</TableCell>
                           <TableCell>{booking.AppointmentEndTime}</TableCell>
                           <TableCell className="text-sm text-muted-foreground ">
@@ -459,7 +488,7 @@ export default function AllBookingsPage() {
                                   <AlertDialogHeader>
                                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      This action will cancel the booking for {booking.ClientName} on {format(new Date(booking.AppointmentDate), "PPP")} at {booking.AppointmentStartTime}. This cannot be undone.
+                                      This action will cancel the booking for {booking.ClientName} on {format(parseISO(booking.AppointmentDate), "PPP")} at {booking.AppointmentStartTime}. This cannot be undone.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
@@ -481,7 +510,7 @@ export default function AllBookingsPage() {
                     <p className="text-muted-foreground">
                       {filterDateRange?.from
                         ? `No bookings found for the selected date range.`
-                        : "You have no bookings yet."}
+                        : isLoading ? "Loading bookings..." : "You have no bookings yet."}
                     </p>
                   </div>
                 )}
@@ -497,7 +526,7 @@ export default function AllBookingsPage() {
                 Manage Notes for {editingBooking.ClientName}
               </DialogTitle>
               <DialogDescription>
-                Appointment on {format(new Date(editingBooking.AppointmentDate), "PPP")} at {editingBooking.AppointmentStartTime} - {editingBooking.AppointmentEndTime}
+                Appointment on {format(parseISO(editingBooking.AppointmentDate), "PPP")} at {editingBooking.AppointmentStartTime} - {editingBooking.AppointmentEndTime}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -552,3 +581,5 @@ export default function AllBookingsPage() {
     </div>
   );
 }
+
+    
