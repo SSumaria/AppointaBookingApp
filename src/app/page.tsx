@@ -1,6 +1,9 @@
 
 "use client";
 
+// Server-side log to check if the module is being processed
+console.log("--- HomePage (/src/app/page.tsx) --- MODULE SCRIPT EXECUTING (SERVER-SIDE LOG)");
+
 import Link from 'next/link';
 import { Calendar, Clock, Users, ExternalLink } from "lucide-react"; 
 import { Button } from "@/components/ui/button";
@@ -157,3 +160,4 @@ export default function HomePage() {
     </div>
   );
 }
+
