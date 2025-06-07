@@ -302,9 +302,9 @@ export default function AllBookingsPage() {
         </span>
         {dayBookings.length > 0 && (
           <div className="mt-1 text-xs leading-tight flex-grow w-full overflow-y-auto space-y-1 pr-0.5">
-            {dayBookings.slice(0, 3).map(booking => ( // Display up to 3 bookings
-              <div 
-                key={booking.id} 
+            {dayBookings.slice(0, 3).map(booking => (
+              <div
+                key={booking.id}
                 className="p-1 bg-primary/10 dark:bg-primary/20 rounded-sm"
                 title={`${booking.AppointmentStartTime} - ${booking.ClientName}: ${booking.ServiceProcedure}`}
               >
@@ -314,7 +314,7 @@ export default function AllBookingsPage() {
                 </div>
               </div>
             ))}
-            {dayBookings.length > 3 && ( // Adjust if more than 3
+            {dayBookings.length > 3 && (
               <div className="text-muted-foreground text-center text-[9px] mt-0.5">+ {dayBookings.length - 3} more</div>
             )}
           </div>
@@ -359,17 +359,17 @@ export default function AllBookingsPage() {
                   View bookings directly in the calendar. Click any day cell to filter the table below.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex justify-center">
+              <CardContent>
                 <Calendar
                   mode="single"
                   selected={filterDateRange?.from && isSameDay(filterDateRange.from, filterDateRange.to || filterDateRange.from) ? filterDateRange.from : undefined}
                   onSelect={handleCalendarDayClick}
                   month={calendarOverviewMonth}
                   onMonthChange={setCalendarOverviewMonth}
-                  className="rounded-md border w-full [&_td]:align-top [&_td]:p-0" 
+                  className="rounded-md border w-full [&_td]:align-top [&_td]:p-0"
                   classNames={{
-                    day: "h-28 w-full p-0", 
-                    cell: "h-28 w-full p-0", 
+                    day: "h-28 w-full p-0",
+                    cell: "h-28 w-full p-0",
                     head_cell: "text-muted-foreground rounded-md w-full font-normal text-[0.8rem] pb-1",
                   }}
                   components={{ DayContent: CustomDayContent }}
@@ -605,4 +605,3 @@ export default function AllBookingsPage() {
     </div>
   );
 }
-
