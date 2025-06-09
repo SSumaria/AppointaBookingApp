@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import Header from '@/components/layout/Header';
@@ -9,9 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import { User, Calendar as CalendarIconLucide, Briefcase, Mail, Phone, Clock } from "lucide-react";
-import { format } from "date-fns";
+import { User, Calendar as CalendarIconLucide, Briefcase, Mail, Phone, Clock, FileText } from "lucide-react";
+import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 import { ref, get, query as rtQuery, orderByChild, equalTo } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
@@ -44,6 +46,15 @@ interface Booking {
   BookedByUserID?: string;
 }
 
+interface ProcessedNote {
+  id: string; // Note ID
+  noteText: string;
+  noteTimestamp: number;
+  serviceProcedure: string;
+  appointmentDate: string; // Booking's appointment date
+  bookingId: string;
+}
+
 export default function ClientDetailsPage() {
   const params = useParams();
   const clientId = params.clientId as string;
@@ -55,6 +66,7 @@ export default function ClientDetailsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoadingClient, setIsLoadingClient] = useState(true);
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
+  const [allClientNotes, setAllClientNotes] = useState<ProcessedNote[]>([]);
 
   const fetchClientDetails = useCallback(async () => {
     if (!currentUser?.uid || !clientId) return;
@@ -90,17 +102,25 @@ export default function ClientDetailsPage() {
     try {
       const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
       const appointmentsRef = ref(db, userAppointmentsRefPath);
-      // The ClientID stored in appointments should be the Firebase key of the client document
       const bookingsQuery = rtQuery(appointmentsRef, orderByChild('ClientID'), equalTo(clientId));
-
 
       const snapshot = await get(bookingsQuery);
       const fetchedBookings: Booking[] = [];
       if (snapshot.exists()) {
         snapshot.forEach((childSnapshot) => {
+          const bookingData = childSnapshot.val();
+          let processedNotes: Note[] = [];
+           if (bookingData.Notes) {
+            if (Array.isArray(bookingData.Notes)) {
+              processedNotes = bookingData.Notes.filter((n: any) => n && typeof n.text === 'string' && typeof n.timestamp === 'number' && typeof n.id === 'string');
+            } else if (typeof bookingData.Notes === 'object' && !Array.isArray(bookingData.Notes)) {
+              processedNotes = Object.values(bookingData.Notes as Record<string, Note>).filter((n: any) => n && typeof n.text === 'string' && typeof n.timestamp === 'number' && typeof n.id === 'string');
+            }
+          }
           fetchedBookings.push({
             id: childSnapshot.key as string,
-            ...childSnapshot.val(),
+            ...bookingData,
+            Notes: processedNotes,
           });
         });
       }
@@ -130,6 +150,30 @@ export default function ClientDetailsPage() {
       fetchClientBookings();
     }
   }, [currentUser, authLoading, clientId, router, fetchClientDetails, fetchClientBookings]);
+
+  useEffect(() => {
+    if (bookings.length > 0) {
+      const notes: ProcessedNote[] = [];
+      bookings.forEach(booking => {
+        if (booking.Notes && Array.isArray(booking.Notes)) {
+          booking.Notes.forEach(note => {
+            notes.push({
+              id: note.id,
+              noteText: note.text,
+              noteTimestamp: note.timestamp,
+              serviceProcedure: booking.ServiceProcedure,
+              appointmentDate: booking.AppointmentDate,
+              bookingId: booking.id,
+            });
+          });
+        }
+      });
+      notes.sort((a, b) => b.noteTimestamp - a.noteTimestamp); // Sort by most recent note
+      setAllClientNotes(notes);
+    } else {
+      setAllClientNotes([]);
+    }
+  }, [bookings]);
 
 
   if (authLoading || (!client && isLoadingClient)) {
@@ -185,7 +229,7 @@ export default function ClientDetailsPage() {
                 <User className="mr-3 h-8 w-8" /> {client.ClientName}
               </CardTitle>
               <CardDescription>
-                Detailed information and booking history for {client.ClientName}.
+                Detailed information and history for {client.ClientName}.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -197,71 +241,135 @@ export default function ClientDetailsPage() {
                     <span className="font-medium">Contact:</span> {client.ClientContact}
                   </p>
                 )}
-                <p className="flex items-center"><CalendarIconLucide className="mr-2 h-5 w-5 text-primary/80" /> <span className="font-medium">Date Created:</span> {format(new Date(client.CreateDate), "PPP")}</p>
+                <p className="flex items-center"><CalendarIconLucide className="mr-2 h-5 w-5 text-primary/80" /> <span className="font-medium">Date Created:</span> {format(parseISO(client.CreateDate), "PPP")}</p>
                 <p className="flex items-center"><Clock className="mr-2 h-5 w-5 text-primary/80" /> <span className="font-medium">Time Created:</span> {client.CreateTime}</p>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="shadow-xl">
-            <CardHeader>
-              <CardTitle className="text-2xl font-bold flex items-center text-primary">
-                <Briefcase className="mr-2 h-6 w-6" /> Booking History
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoadingBookings ? (
-                 <div className="text-center py-10">
-                    <svg className="animate-spin mx-auto h-10 w-10 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <p className="mt-2 text-muted-foreground">Loading bookings...</p>
-                </div>
-              ) : bookings.length > 0 ? (
-                <Table>
-                  <TableCaption>A list of all bookings for {client.ClientName}.</TableCaption>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[200px]">Service/Procedure</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Start</TableHead>
-                      <TableHead>End</TableHead>
-                      <TableHead className="w-[200px]">Latest Note</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {bookings.map((booking) => (
-                      <TableRow key={booking.id}>
-                        <TableCell className="font-medium">{booking.ServiceProcedure}</TableCell>
-                        <TableCell>{format(new Date(booking.AppointmentDate), "PPP")}</TableCell>
-                        <TableCell>{booking.AppointmentStartTime}</TableCell>
-                        <TableCell>{booking.AppointmentEndTime}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground max-w-xs truncate" title={booking.Notes && booking.Notes.length > 0 ? booking.Notes[booking.Notes.length -1].text : 'N/A'}>
-                            {booking.Notes && booking.Notes.length > 0 ? booking.Notes[booking.Notes.length -1].text : 'N/A'}
-                        </TableCell>
-                        <TableCell>
-                          <span className={cn(
-                            "px-2 py-1 rounded-full text-xs font-medium",
-                            booking.BookingStatus === "Booked" && "bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-200",
-                            booking.BookingStatus === "Cancelled" && "bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-200",
-                            (!booking.BookingStatus || (booking.BookingStatus !== "Booked" && booking.BookingStatus !== "Cancelled")) && "bg-muted text-muted-foreground"
-                          )}>
-                            {booking.BookingStatus ? booking.BookingStatus : "Unknown"}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-10">
-                  <p className="text-muted-foreground">{client.ClientName} has no bookings yet.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <Tabs defaultValue="bookingHistory" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="bookingHistory" className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5" /> Booking History
+              </TabsTrigger>
+              <TabsTrigger value="allNotes" className="flex items-center gap-2">
+                <FileText className="h-5 w-5" /> All Notes
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="bookingHistory">
+              <Card className="shadow-xl mt-2">
+                <CardHeader>
+                  <CardTitle className="text-2xl font-bold">
+                    Booking History
+                  </CardTitle>
+                   <CardDescription>A list of all bookings for {client.ClientName}.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingBookings ? (
+                    <div className="text-center py-10">
+                        <svg className="animate-spin mx-auto h-10 w-10 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p className="mt-2 text-muted-foreground">Loading bookings...</p>
+                    </div>
+                  ) : bookings.length > 0 ? (
+                    <ScrollArea className="h-[400px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[200px]">Service/Procedure</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Start</TableHead>
+                            <TableHead>End</TableHead>
+                            <TableHead className="w-[200px]">Latest Note</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {bookings.map((booking) => (
+                            <TableRow key={booking.id}>
+                              <TableCell className="font-medium">{booking.ServiceProcedure}</TableCell>
+                              <TableCell>{format(parseISO(booking.AppointmentDate), "PPP")}</TableCell>
+                              <TableCell>{booking.AppointmentStartTime}</TableCell>
+                              <TableCell>{booking.AppointmentEndTime}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate" title={booking.Notes && booking.Notes.length > 0 ? booking.Notes.slice().sort((a,b) => b.timestamp - a.timestamp)[0].text : 'N/A'}>
+                                  {booking.Notes && booking.Notes.length > 0 ? booking.Notes.slice().sort((a,b) => b.timestamp - a.timestamp)[0].text : 'N/A'}
+                              </TableCell>
+                              <TableCell>
+                                <span className={cn(
+                                  "px-2 py-1 rounded-full text-xs font-medium",
+                                  booking.BookingStatus === "Booked" && "bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-200",
+                                  booking.BookingStatus === "Cancelled" && "bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-200",
+                                  (!booking.BookingStatus || (booking.BookingStatus !== "Booked" && booking.BookingStatus !== "Cancelled")) && "bg-muted text-muted-foreground"
+                                )}>
+                                  {booking.BookingStatus ? booking.BookingStatus : "Unknown"}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  ) : (
+                    <div className="text-center py-10">
+                      <p className="text-muted-foreground">{client.ClientName} has no bookings yet.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="allNotes">
+              <Card className="shadow-xl mt-2">
+                <CardHeader>
+                  <CardTitle className="text-2xl font-bold">
+                    All Notes
+                  </CardTitle>
+                  <CardDescription>A comprehensive list of all notes for {client.ClientName}'s bookings.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingBookings ? (
+                     <div className="text-center py-10">
+                        <svg className="animate-spin mx-auto h-10 w-10 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p className="mt-2 text-muted-foreground">Loading notes...</p>
+                    </div>
+                  ) : allClientNotes.length > 0 ? (
+                    <ScrollArea className="h-[400px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[180px]">Note Created</TableHead>
+                            <TableHead>Note</TableHead>
+                            <TableHead className="w-[200px]">Associated Service</TableHead>
+                            <TableHead className="w-[150px]">Appointment Date</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {allClientNotes.map((note) => (
+                            <TableRow key={note.id}>
+                              <TableCell className="text-sm">
+                                {format(new Date(note.noteTimestamp), "PPPp")}
+                              </TableCell>
+                              <TableCell className="text-sm whitespace-pre-wrap">{note.noteText}</TableCell>
+                              <TableCell className="text-sm">{note.serviceProcedure}</TableCell>
+                              <TableCell className="text-sm">{format(parseISO(note.appointmentDate), "PPP")}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  ) : (
+                    <div className="text-center py-10">
+                      <p className="text-muted-foreground">No notes found for {client.ClientName}.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
       <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
@@ -270,5 +378,6 @@ export default function ClientDetailsPage() {
     </div>
   );
 }
+    
 
     
