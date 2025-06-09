@@ -212,12 +212,7 @@ export default function AllBookingsPage() {
     });
 
     setBookingsForDisplay(filtered);
-    if (filtered.length === 0) {
-       toast({
-        title: "No Bookings Found",
-        description: `No bookings found for the selected date range.`,
-      });
-    }
+    // Removed "No Bookings Found" toast for filtered results
     setIsLoading(false);
   }, [allFetchedBookings, filterDateRange, toast, currentUser, authLoading]);
 
@@ -302,18 +297,18 @@ export default function AllBookingsPage() {
         <span className={cn(
           "font-medium text-sm block",
           props.displayMonth.getMonth() !== props.date.getMonth() && "text-muted-foreground/50",
-          isToday && !props.selected && "text-primary font-bold", // Highlight today's date number if not selected
-          props.selected && isToday && "text-primary font-bold" // Ensure today selected has special text
+          isToday && !props.selected && "text-primary font-bold", 
+          props.selected && isToday && "text-primary font-bold" 
         )}>
           {props.date.getDate()}
         </span>
         {dayBookings.length > 0 && (
-          <ScrollArea className="mt-1 text-xs leading-tight flex-grow w-full pr-0.5 max-h-[calc(theme(spacing.28)_-_theme(spacing.8))]"> {/* Max height adjusted for padding and date num */}
+          <ScrollArea className="mt-1 text-xs leading-tight flex-grow w-full pr-0.5 max-h-[calc(theme(spacing.28)_-_theme(spacing.8))]">
             <div className="space-y-1">
               {dayBookings.slice(0, 3).map(booking => (
                 <div
                   key={booking.id}
-                  className="p-1 bg-primary/10 dark:bg-primary/20 rounded-sm text-[10px]" // Adjusted font size
+                  className="p-1 bg-primary/10 dark:bg-primary/20 rounded-sm text-xs"
                   title={`${booking.AppointmentStartTime} - ${booking.ClientName}: ${booking.ServiceProcedure}`}
                 >
                   <div className="flex items-center truncate">
@@ -400,7 +395,7 @@ export default function AllBookingsPage() {
                       "after:content-[''] after:absolute after:inset-0 after:border-2 after:border-muted-foreground after:rounded-sm",
                       "hover:!bg-muted/20 focus:!bg-muted/20"
                     ),
-                    day_today: "font-semibold", // Style for today's date text handled in CustomDayContent
+                    day_today: "font-semibold", 
                     day_outside: "text-muted-foreground/40",
                     day_disabled: "text-muted-foreground/40 opacity-50 cursor-not-allowed",
                     day_hidden: "invisible",
@@ -638,3 +633,4 @@ export default function AllBookingsPage() {
     </div>
   );
 }
+
