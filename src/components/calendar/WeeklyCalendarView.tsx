@@ -127,9 +127,9 @@ const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({ bookings, curre
                       key={booking.id}
                       className={cn(
                         "absolute left-[2px] right-[2px] bg-primary/80 text-primary-foreground p-1.5 rounded shadow-sm overflow-hidden cursor-pointer hover:bg-primary focus-visible:ring-2 focus-visible:ring-ring",
-                        "dark:bg-primary/70 dark:hover:bg-primary/90"
+                        "dark:bg-primary/70 dark:hover:bg-primary/90 flex flex-col justify-start" // Added flex for content alignment
                       )}
-                      style={{ top: `${top}px`, height: `${Math.max(height, 15)}px` }} // min height for visibility
+                      style={{ top: `${top}px`, height: `${Math.max(height, 20)}px` }} // min height for visibility, ensure enough for padding
                       title={`${booking.AppointmentStartTime}-${booking.AppointmentEndTime}: ${booking.ClientName} - ${booking.ServiceProcedure}`}
                       onClick={(e) => { 
                         e.stopPropagation(); // Prevent day click if booking is clicked
@@ -137,9 +137,9 @@ const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({ bookings, curre
                        }}
                       tabIndex={0} // Make it focusable
                     >
-                      <p className="text-xs font-semibold truncate">{booking.ClientName || "N/A"}</p>
-                      <p className="text-[10px] truncate">{booking.ServiceProcedure}</p>
-                       <p className="text-[9px] opacity-80 truncate">{booking.AppointmentStartTime} - {booking.AppointmentEndTime}</p>
+                      <p className="text-xs font-semibold whitespace-normal leading-tight">{booking.ClientName || "N/A"}</p>
+                      <p className="text-[10px] whitespace-normal leading-tight">{booking.ServiceProcedure}</p>
+                       <p className="text-[9px] opacity-80 whitespace-normal leading-tight">{booking.AppointmentStartTime} - {booking.AppointmentEndTime}</p>
                     </div>
                   );
                 })}
@@ -152,4 +152,3 @@ const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({ bookings, curre
 };
 
 export default WeeklyCalendarView;
-
