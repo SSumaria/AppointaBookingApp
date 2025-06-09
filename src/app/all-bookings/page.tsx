@@ -3,9 +3,9 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { DateRange, DayContentProps } from "react-day-picker";
-import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, CalendarDays } from "lucide-react";
+import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, parseISO, isSameDay } from "date-fns";
+import { format, parseISO, isSameDay, addDays, subDays, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import Link from 'next/link';
@@ -53,6 +53,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import WeeklyCalendarView from '@/components/calendar/WeeklyCalendarView';
 
 
 interface Note {
@@ -93,6 +95,9 @@ export default function AllBookingsPage() {
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [newNoteInputValue, setNewNoteInputValue] = useState('');
   const [calendarOverviewMonth, setCalendarOverviewMonth] = useState<Date>(new Date());
+  const [activeTab, setActiveTab] = useState<"month" | "week">("month");
+  const [weekViewDate, setWeekViewDate] = useState<Date>(new Date());
+
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
@@ -193,7 +198,6 @@ export default function AllBookingsPage() {
     setIsLoading(true);
     if (!filterDateRange?.from) {
       setBookingsForDisplay(allFetchedBookings);
-      // Removed the "No Bookings" toast for initial load
       setIsLoading(false);
       return;
     }
@@ -213,12 +217,17 @@ export default function AllBookingsPage() {
 
   const handleFilterDateChange = (selectedRange: DateRange | undefined) => {
     setFilterDateRange(selectedRange);
+     // When month view calendar is used to filter, sync week view
+    if (selectedRange?.from) {
+        setWeekViewDate(selectedRange.from);
+    }
   };
 
   const handleCalendarDayClick = (day: Date | undefined) => {
     if (day) {
       const normalizedDay = new Date(day.getFullYear(), day.getMonth(), day.getDate());
       setFilterDateRange({ from: normalizedDay, to: normalizedDay });
+      setWeekViewDate(normalizedDay); // Sync week view
     } else {
       setFilterDateRange(undefined);
     }
@@ -342,6 +351,11 @@ export default function AllBookingsPage() {
     );
   }
 
+  const currentWeekDays = eachDayOfInterval({
+    start: startOfWeek(weekViewDate, { weekStartsOn: 1 }), // Monday
+    end: endOfWeek(weekViewDate, { weekStartsOn: 1 }),     // Sunday
+  });
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -350,59 +364,98 @@ export default function AllBookingsPage() {
           <div className="container max-w-7xl mx-auto space-y-8">
             <Card className="shadow-xl">
               <CardHeader>
-                <CardTitle className="text-2xl font-bold flex items-center text-primary">
-                  <CalendarDays className="mr-2 h-6 w-6" /> Calendar Overview
-                </CardTitle>
-                <CardDescription>
-                  View bookings directly in the calendar. Click any day cell to filter the table below.
-                </CardDescription>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                  <div>
+                    <CardTitle className="text-2xl font-bold flex items-center text-primary">
+                      <CalendarDays className="mr-2 h-6 w-6" /> Calendar Overview
+                    </CardTitle>
+                    <CardDescription>
+                      {activeTab === "month" ? "View monthly bookings. Click a day to filter the table." : "View weekly bookings. Navigate weeks below."}
+                    </CardDescription>
+                  </div>
+                  <Tabs defaultValue="month" onValueChange={(value) => setActiveTab(value as "month" | "week")} className="mt-4 sm:mt-0">
+                    <TabsList>
+                      <TabsTrigger value="month">Month View</TabsTrigger>
+                      <TabsTrigger value="week">Week View</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+                 {activeTab === "week" && (
+                    <div className="flex items-center justify-between mt-4">
+                      <Button variant="outline" size="sm" onClick={() => setWeekViewDate(subDays(weekViewDate, 7))}>
+                        <ChevronLeft className="h-4 w-4 mr-1" /> Prev Week
+                      </Button>
+                       <span className="text-lg font-semibold text-muted-foreground">
+                        {format(currentWeekDays[0], 'MMM d')} - {format(currentWeekDays[6], 'MMM d, yyyy')}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setWeekViewDate(new Date())}>Today</Button>
+                        <Button variant="outline" size="sm" onClick={() => setWeekViewDate(addDays(weekViewDate, 7))}>
+                          Next Week <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
               </CardHeader>
               <CardContent>
-                <Calendar
-                  mode="single"
-                  selected={filterDateRange?.from && isSameDay(filterDateRange.from, filterDateRange.to || filterDateRange.from) ? filterDateRange.from : undefined}
-                  onSelect={handleCalendarDayClick}
-                  month={calendarOverviewMonth}
-                  onMonthChange={setCalendarOverviewMonth}
-                  className="rounded-md border w-full"
-                  classNames={{
-                    table: "w-full border-collapse",
-                    months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-                    month: "space-y-4 flex-1",
-                    caption: "flex justify-center pt-1 relative items-center mb-2",
-                    caption_label: "text-lg font-medium",
-                    nav: "space-x-1 flex items-center",
-                    nav_button: cn(buttonVariants({ variant: "outline" }), "h-8 w-8 bg-transparent p-0"),
-                    nav_button_previous: "absolute left-2",
-                    nav_button_next: "absolute right-2",
-                    head_row: "flex border-b",
-                    head_cell: "flex-1 text-muted-foreground font-normal text-[0.8rem] py-2 text-center align-middle border-x first:border-l-0 last:border-r-0",
-                    row: "flex w-full border-b last:border-b-0",
-                    cell: cn(
-                      "h-28 flex-1 p-0 align-top relative border-x first:border-l-0 last:border-r-0",
-                      "[&:has([aria-selected=true]:not([disabled]))]:!bg-transparent",
-                      "focus-within:relative focus-within:z-10"
-                    ),
-                    day: "h-full w-full p-0 align-top text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-none",
-                    day_selected: cn(
-                      "relative !bg-transparent text-foreground",
-                      "after:content-[''] after:absolute after:inset-0 after:border-2 after:border-muted-foreground after:rounded-sm",
-                      "hover:!bg-muted/20 focus:!bg-muted/20"
-                    ),
-                    day_today: "font-semibold", 
-                    day_outside: "text-muted-foreground/40",
-                    day_disabled: "text-muted-foreground/40 opacity-50 cursor-not-allowed",
-                    day_hidden: "invisible",
-                  }}
-                  components={{ DayContent: CustomDayContent }}
-                />
+                <TabsContent value="month">
+                  <Calendar
+                    mode="single"
+                    selected={filterDateRange?.from && isSameDay(filterDateRange.from, filterDateRange.to || filterDateRange.from) ? filterDateRange.from : undefined}
+                    onSelect={handleCalendarDayClick}
+                    month={calendarOverviewMonth}
+                    onMonthChange={setCalendarOverviewMonth}
+                    className="rounded-md border w-full"
+                    classNames={{
+                      table: "w-full border-collapse",
+                      months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
+                      month: "space-y-4 flex-1",
+                      caption: "flex justify-center pt-1 relative items-center mb-2",
+                      caption_label: "text-lg font-medium",
+                      nav: "space-x-1 flex items-center",
+                      nav_button: cn(buttonVariants({ variant: "outline" }), "h-8 w-8 bg-transparent p-0"),
+                      nav_button_previous: "absolute left-2",
+                      nav_button_next: "absolute right-2",
+                      head_row: "flex border-b",
+                      head_cell: "flex-1 text-muted-foreground font-normal text-[0.8rem] py-2 text-center align-middle border-x first:border-l-0 last:border-r-0",
+                      row: "flex w-full border-b last:border-b-0",
+                      cell: cn(
+                        "h-28 flex-1 p-0 align-top relative border-x first:border-l-0 last:border-r-0",
+                        "[&:has([aria-selected=true]:not([disabled]))]:!bg-transparent",
+                        "focus-within:relative focus-within:z-10"
+                      ),
+                      day: "h-full w-full p-0 align-top text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-none",
+                      day_selected: cn(
+                        "relative !bg-transparent text-foreground",
+                        "after:content-[''] after:absolute after:inset-0 after:border-2 after:border-muted-foreground after:rounded-sm",
+                        "hover:!bg-muted/20 focus:!bg-muted/20"
+                      ),
+                      day_today: "font-semibold", 
+                      day_outside: "text-muted-foreground/40",
+                      day_disabled: "text-muted-foreground/40 opacity-50 cursor-not-allowed",
+                      day_hidden: "invisible",
+                    }}
+                    components={{ DayContent: CustomDayContent }}
+                  />
+                </TabsContent>
+                <TabsContent value="week">
+                  <WeeklyCalendarView 
+                    bookings={allFetchedBookings} 
+                    currentDate={weekViewDate} 
+                    onDayClick={(date) => {
+                        handleCalendarDayClick(date);
+                        // setActiveTab("month"); // Optional: switch back to month view to see day detail filter
+                        // setCalendarOverviewMonth(date);
+                    }}
+                   />
+                </TabsContent>
               </CardContent>
             </Card>
 
             <Card className="shadow-xl">
               <CardHeader>
                 <CardTitle className="text-2xl font-bold flex items-center text-primary">
-                  <ListFilter className="mr-2 h-6 w-6" /> All Bookings
+                  <ListFilter className="mr-2 h-6 w-6" /> Bookings List
                 </CardTitle>
                 <CardDescription>
                   View and filter all your bookings by date range. Click the <Edit className="inline h-4 w-4" /> icon to manage notes.
