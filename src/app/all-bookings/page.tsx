@@ -2,12 +2,12 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import type { DateRange } from "react-day-picker";
+import type { DateRange, DayContentProps } from "react-day-picker";
 import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO, isSameDay } from "date-fns";
-import { Button } from "@/components/ui/button";
-import { Calendar, type DayContentProps } from "@/components/ui/calendar";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import Link from 'next/link';
 import {
   Popover,
@@ -294,30 +294,39 @@ export default function AllBookingsPage() {
     const dayBookings = allFetchedBookings
       .filter(booking => isSameDay(parseISO(booking.AppointmentDate), props.date) && booking.BookingStatus !== "Cancelled")
       .sort((a, b) => a.AppointmentStartTime.localeCompare(b.AppointmentStartTime));
+    
+    const isToday = isSameDay(props.date, new Date());
 
     return (
-      <div className="flex flex-col h-full p-1 items-start w-full text-left">
-        <span className={cn("font-medium text-sm", props.displayMonth.getMonth() !== props.date.getMonth() && "text-muted-foreground/50")}>
+      <div className="flex flex-col h-full items-start w-full text-left relative z-10 p-1">
+        <span className={cn(
+          "font-medium text-sm block",
+          props.displayMonth.getMonth() !== props.date.getMonth() && "text-muted-foreground/50",
+          isToday && !props.selected && "text-primary font-bold", // Highlight today's date number if not selected
+          props.selected && isToday && "text-primary font-bold" // Ensure today selected has special text
+        )}>
           {props.date.getDate()}
         </span>
         {dayBookings.length > 0 && (
-          <div className="mt-1 text-xs leading-tight flex-grow w-full overflow-y-auto space-y-1 pr-0.5">
-            {dayBookings.slice(0, 3).map(booking => (
-              <div
-                key={booking.id}
-                className="p-1 bg-primary/10 dark:bg-primary/20 rounded-sm"
-                title={`${booking.AppointmentStartTime} - ${booking.ClientName}: ${booking.ServiceProcedure}`}
-              >
-                <div className="flex items-center truncate">
-                  <span className="font-semibold text-primary mr-1">{booking.AppointmentStartTime}</span>
-                  <span className="truncate">{booking.ClientName || "Loading..."}</span>
+          <ScrollArea className="mt-1 text-xs leading-tight flex-grow w-full pr-0.5 max-h-[calc(theme(spacing.28)_-_theme(spacing.8))]"> {/* Max height adjusted for padding and date num */}
+            <div className="space-y-1">
+              {dayBookings.slice(0, 3).map(booking => (
+                <div
+                  key={booking.id}
+                  className="p-1 bg-primary/10 dark:bg-primary/20 rounded-sm text-[10px]" // Adjusted font size
+                  title={`${booking.AppointmentStartTime} - ${booking.ClientName}: ${booking.ServiceProcedure}`}
+                >
+                  <div className="flex items-center truncate">
+                    <span className="font-semibold text-primary mr-1">{booking.AppointmentStartTime}</span>
+                    <span className="truncate">{booking.ClientName || "Loading..."}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-            {dayBookings.length > 3 && (
-              <div className="text-muted-foreground text-center text-[9px] mt-0.5">+ {dayBookings.length - 3} more</div>
-            )}
-          </div>
+              ))}
+              {dayBookings.length > 3 && (
+                <div className="text-muted-foreground text-center text-[9px] mt-0.5">+ {dayBookings.length - 3} more</div>
+              )}
+            </div>
+          </ScrollArea>
         )}
       </div>
     );
@@ -366,11 +375,35 @@ export default function AllBookingsPage() {
                   onSelect={handleCalendarDayClick}
                   month={calendarOverviewMonth}
                   onMonthChange={setCalendarOverviewMonth}
-                  className="rounded-md border w-full [&_td]:align-top [&_td]:p-0"
+                  className="rounded-md border w-full"
                   classNames={{
-                    day: "h-28 w-full p-0",
-                    cell: "h-28 w-full p-0",
-                    head_cell: "text-muted-foreground rounded-md w-full font-normal text-[0.8rem] pb-1",
+                    table: "w-full border-collapse",
+                    months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
+                    month: "space-y-4 flex-1",
+                    caption: "flex justify-center pt-1 relative items-center mb-2",
+                    caption_label: "text-lg font-medium",
+                    nav: "space-x-1 flex items-center",
+                    nav_button: cn(buttonVariants({ variant: "outline" }), "h-8 w-8 bg-transparent p-0"),
+                    nav_button_previous: "absolute left-2",
+                    nav_button_next: "absolute right-2",
+                    head_row: "flex border-b",
+                    head_cell: "flex-1 text-muted-foreground font-normal text-[0.8rem] py-2 text-center align-middle border-x first:border-l-0 last:border-r-0",
+                    row: "flex w-full border-b last:border-b-0",
+                    cell: cn(
+                      "h-28 flex-1 p-0 align-top relative border-x first:border-l-0 last:border-r-0",
+                      "[&:has([aria-selected=true]:not([disabled]))]:!bg-transparent",
+                      "focus-within:relative focus-within:z-10"
+                    ),
+                    day: "h-full w-full p-0 align-top text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-none",
+                    day_selected: cn(
+                      "relative !bg-transparent text-foreground",
+                      "after:content-[''] after:absolute after:inset-0 after:border-2 after:border-muted-foreground after:rounded-sm",
+                      "hover:!bg-muted/20 focus:!bg-muted/20"
+                    ),
+                    day_today: "font-semibold", // Style for today's date text handled in CustomDayContent
+                    day_outside: "text-muted-foreground/40",
+                    day_disabled: "text-muted-foreground/40 opacity-50 cursor-not-allowed",
+                    day_hidden: "invisible",
                   }}
                   components={{ DayContent: CustomDayContent }}
                 />
