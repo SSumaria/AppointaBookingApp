@@ -2,7 +2,7 @@
 "use client";
 
 import React from 'react';
-import { format, parse, addMinutes, differenceInMinutes, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, getHours, getMinutes } from 'date-fns';
+import { format, parse, addMinutes, differenceInMinutes, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, getHours, getMinutes, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 const TIME_SLOT_HEIGHT_PX_VALUE = 60; // Corresponds to --time-slot-height in globals.css
