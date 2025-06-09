@@ -193,12 +193,7 @@ export default function AllBookingsPage() {
     setIsLoading(true);
     if (!filterDateRange?.from) {
       setBookingsForDisplay(allFetchedBookings);
-      if (allFetchedBookings.length === 0 && currentUser && !authLoading) {
-         toast({
-          title: "No Bookings",
-          description: "You have no bookings yet.",
-        });
-      }
+      // Removed the "No Bookings" toast for initial load
       setIsLoading(false);
       return;
     }
@@ -212,9 +207,8 @@ export default function AllBookingsPage() {
     });
 
     setBookingsForDisplay(filtered);
-    // Removed "No Bookings Found" toast for filtered results
     setIsLoading(false);
-  }, [allFetchedBookings, filterDateRange, toast, currentUser, authLoading]);
+  }, [allFetchedBookings, filterDateRange, currentUser, authLoading]);
 
 
   const handleFilterDateChange = (selectedRange: DateRange | undefined) => {
