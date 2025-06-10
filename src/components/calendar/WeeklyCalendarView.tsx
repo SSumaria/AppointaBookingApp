@@ -5,7 +5,7 @@ import React from 'react';
 import { format, parse, addMinutes, differenceInMinutes, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, getHours, getMinutes, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 
-const TIME_SLOT_HEIGHT_PX_VALUE = 100; // Corresponds to --time-slot-height in globals.css (1 hour = 100px)
+const TIME_SLOT_HEIGHT_PX_VALUE = 60; // Corresponds to --time-slot-height in globals.css (1 hour = 60px)
 const CALENDAR_START_HOUR = 6; // 6 AM
 const CALENDAR_END_HOUR = 21; // 9 PM (slots up to 20:30)
 
@@ -25,7 +25,7 @@ interface WeeklyCalendarViewProps {
   bookings: Booking[];
   currentDate: Date; // Any date within the week to display
   onDayClick?: (date: Date) => void;
-  onBookingClick?: (booking: Booking) => void; 
+  onBookingClick?: (booking: Booking) => void;
 }
 
 const timeToPosition = (time: string): number => {
@@ -113,33 +113,45 @@ const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({ bookings, curre
                 .map(booking => {
                   const top = timeToPosition(booking.AppointmentStartTime);
                   const height = durationToHeight(booking.AppointmentStartTime, booking.AppointmentEndTime);
+                  const displayHeight = Math.max(height, 30); // Min height for a 30-min slot
+                  const isSmallBlock = displayHeight < 40; // Threshold for small block styling
 
-                  // Ensure booking is within displayable hours
                   const bookingStartHour = getHours(parse(booking.AppointmentStartTime, 'HH:mm', new Date()));
                   const bookingEndHour = getHours(parse(booking.AppointmentEndTime, 'HH:mm', new Date())) + (getMinutes(parse(booking.AppointmentEndTime, 'HH:mm', new Date())) > 0 ? 1 : 0);
-                  
+
                   if (bookingEndHour < CALENDAR_START_HOUR || bookingStartHour > CALENDAR_END_HOUR) {
-                    return null; // Booking is completely outside visible hours
+                    return null;
                   }
 
                   return (
                     <div
                       key={booking.id}
                       className={cn(
-                        "absolute left-[2px] right-[2px] bg-primary/80 text-primary-foreground p-1.5 rounded shadow-sm overflow-hidden cursor-pointer hover:bg-primary focus-visible:ring-2 focus-visible:ring-ring",
-                        "dark:bg-primary/70 dark:hover:bg-primary/90 flex flex-col justify-start" 
+                        "absolute left-[2px] right-[2px] bg-primary/80 text-primary-foreground p-1 rounded shadow-sm overflow-hidden cursor-pointer hover:bg-primary focus-visible:ring-2 focus-visible:ring-ring",
+                        "dark:bg-primary/70 dark:hover:bg-primary/90 flex flex-col justify-start"
                       )}
-                      style={{ top: `${top}px`, height: `${Math.max(height, 50)}px` }} // Use Math.max with 50px as minimum height
+                      style={{ top: `${top}px`, height: `${displayHeight}px` }}
                       title={`${booking.AppointmentStartTime}-${booking.AppointmentEndTime}: ${booking.ClientName} - ${booking.ServiceProcedure}`}
-                      onClick={(e) => { 
-                        e.stopPropagation(); // Prevent day click if booking is clicked
+                      onClick={(e) => {
+                        e.stopPropagation();
                         onBookingClick?.(booking);
                        }}
-                      tabIndex={0} // Make it focusable
+                      tabIndex={0}
                     >
-                      <p className="text-xs font-semibold whitespace-normal leading-tight">{booking.ClientName || "N/A"}</p>
-                      <p className="text-[10px] whitespace-normal leading-tight">{booking.ServiceProcedure}</p>
-                       <p className="text-[9px] opacity-80 whitespace-normal leading-tight">{booking.AppointmentStartTime} - {booking.AppointmentEndTime}</p>
+                      {isSmallBlock ? (
+                        <div className="flex flex-col justify-center h-full">
+                          <div className="flex items-baseline gap-x-1">
+                            <p className="text-xs font-semibold whitespace-normal leading-tight overflow-hidden text-ellipsis flex-grow min-w-0">{booking.ClientName || "N/A"}</p>
+                            <p className="text-[9px] opacity-80 whitespace-nowrap leading-tight shrink-0">{booking.AppointmentStartTime}-{booking.AppointmentEndTime}</p>
+                          </div>
+                        </div>
+                       ) : (
+                         <>
+                           <p className="text-xs font-semibold whitespace-normal leading-tight">{booking.ClientName || "N/A"}</p>
+                           <p className="text-[10px] whitespace-normal leading-tight">{booking.ServiceProcedure}</p>
+                           <p className="text-[9px] opacity-80 whitespace-normal leading-tight">{booking.AppointmentStartTime} - {booking.AppointmentEndTime}</p>
+                         </>
+                       )}
                     </div>
                   );
                 })}
@@ -152,4 +164,3 @@ const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({ bookings, curre
 };
 
 export default WeeklyCalendarView;
-
