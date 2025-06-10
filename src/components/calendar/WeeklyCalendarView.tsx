@@ -103,7 +103,7 @@ const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({ bookings, curre
               {timeSlots.map((_, slotIndex) => (
                 <div
                   key={`hline-${dayIndex}-${slotIndex}`}
-                  className="h-[var(--time-slot-height)] border-b border-border/50"
+                  className="h-[var(--time-slot-height)] border-b-2 border-border/60"
                 ></div>
               ))}
 
@@ -113,8 +113,8 @@ const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({ bookings, curre
                 .map(booking => {
                   const top = timeToPosition(booking.AppointmentStartTime);
                   const height = durationToHeight(booking.AppointmentStartTime, booking.AppointmentEndTime);
-                  const displayHeight = Math.max(height, 30); // Min height for a 30-min slot
-                  const isSmallBlock = displayHeight < 40; // Threshold for small block styling
+                  const displayHeight = Math.max(height, 30); // Min height for a 30-min slot (assuming 1hr = 60px)
+                  const isSmallBlock = displayHeight < 40; 
 
                   const bookingStartHour = getHours(parse(booking.AppointmentStartTime, 'HH:mm', new Date()));
                   const bookingEndHour = getHours(parse(booking.AppointmentEndTime, 'HH:mm', new Date())) + (getMinutes(parse(booking.AppointmentEndTime, 'HH:mm', new Date())) > 0 ? 1 : 0);
@@ -164,3 +164,4 @@ const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({ bookings, curre
 };
 
 export default WeeklyCalendarView;
+
