@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 const TIME_SLOT_HEIGHT_PX_VALUE = 60; // Corresponds to --time-slot-height in globals.css (1 hour = 60px)
 const CALENDAR_START_HOUR = 6; // 6 AM
 const CALENDAR_END_HOUR = 21; // 9 PM (slots up to 20:30)
+const EFFECTIVE_BOOKING_PADDING = 2; // px, creates visual gap around booking blocks within their slot
 
 interface Booking {
   id: string;
@@ -111,10 +112,15 @@ const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({ bookings, curre
               {bookings
                 .filter(booking => isSameDay(parseISO(booking.AppointmentDate), day) && booking.BookingStatus === "Booked")
                 .map(booking => {
-                  const top = timeToPosition(booking.AppointmentStartTime);
-                  const height = durationToHeight(booking.AppointmentStartTime, booking.AppointmentEndTime);
-                  const displayHeight = Math.max(height, 30); // Min height for a 30-min slot (assuming 1hr = 60px)
-                  const isSmallBlock = displayHeight < 40; 
+                  const rawBookingHeight = durationToHeight(booking.AppointmentStartTime, booking.AppointmentEndTime);
+                  const heightAfterPadding = rawBookingHeight - (2 * EFFECTIVE_BOOKING_PADDING);
+                  
+                  // Ensure minimum display height for the block, e.g. 20px, even after padding reduction.
+                  const displayHeight = Math.max(heightAfterPadding, 20); 
+                  
+                  const top = timeToPosition(booking.AppointmentStartTime) + EFFECTIVE_BOOKING_PADDING;
+                  
+                  const isSmallBlock = displayHeight < 40; // Threshold for simplified content
 
                   const bookingStartHour = getHours(parse(booking.AppointmentStartTime, 'HH:mm', new Date()));
                   const bookingEndHour = getHours(parse(booking.AppointmentEndTime, 'HH:mm', new Date())) + (getMinutes(parse(booking.AppointmentEndTime, 'HH:mm', new Date())) > 0 ? 1 : 0);
@@ -164,4 +170,3 @@ const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({ bookings, curre
 };
 
 export default WeeklyCalendarView;
-
