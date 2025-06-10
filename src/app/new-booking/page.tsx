@@ -74,14 +74,13 @@ const generateTimeSlots = () => {
 };
 const timeSlots = generateTimeSlots();
 
-// Helper to generate a simple unique ID for notes
 const generateNoteId = () => {
   return Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9);
 };
 
 export default function NewBookingPage() {
     const [clientName, setClientName] = useState('');
-    const [clientContact, setClientContact] = useState('');
+    // const [clientContact, setClientContact] = useState(''); // Removed
     const [serviceProcedure, setServiceProcedure] = useState('');
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [startTime, setStartTime] = useState('');
@@ -96,7 +95,6 @@ export default function NewBookingPage() {
     const { currentUser, loading: authLoading } = useAuth();
     const router = useRouter();
 
-    // Autocomplete state
     const [suggestions, setSuggestions] = useState<ClientSuggestion[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [selectedClientFirebaseKey, setSelectedClientFirebaseKey] = useState<string | null>(null);
@@ -168,10 +166,10 @@ export default function NewBookingPage() {
     const handleClientNameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const query = e.target.value;
         setClientName(query);
-        setSelectedClientFirebaseKey(null); // Clear selected client if name is manually changed
-        // If name is cleared, also clear contact that might have been auto-filled
+        setSelectedClientFirebaseKey(null); 
+        
         if (query.trim() === '') {
-          setClientContact('');
+          // setClientContact(''); // No longer needed as clientContact state is removed
         }
 
 
@@ -201,7 +199,7 @@ export default function NewBookingPage() {
                             });
                         });
                     }
-                    setSuggestions(fetchedSuggestions.slice(0, 5)); // Limit suggestions
+                    setSuggestions(fetchedSuggestions.slice(0, 5)); 
                     setShowSuggestions(true);
                 } catch (error) {
                     console.error("Error fetching client suggestions:", error);
@@ -216,7 +214,7 @@ export default function NewBookingPage() {
 
     const handleSuggestionClick = (suggestion: ClientSuggestion) => {
         setClientName(suggestion.ClientName);
-        setClientContact(suggestion.ClientContact || '');
+        // setClientContact(suggestion.ClientContact || ''); // Removed
         setSelectedClientFirebaseKey(suggestion.id);
         setShowSuggestions(false);
         setSuggestions([]);
@@ -286,8 +284,8 @@ export default function NewBookingPage() {
         }
 
         let clientIdToUse: string | null = selectedClientFirebaseKey;
-        let finalClientName = clientName.trim(); // Name from form input by default
-        let finalClientContact = clientContact.trim(); // Contact from form input by default
+        let finalClientName = clientName.trim();
+        let finalClientContact = ''; // Contact is now always empty for new/form-edited clients
 
         const finalNotes: Note[] = [];
         if (notesInput.trim()) {
@@ -299,14 +297,12 @@ export default function NewBookingPage() {
         }
 
         try {
-            if (!clientIdToUse) { // If no client was selected from autocomplete
+            if (!clientIdToUse) { 
                 const userClientsRefPath = `Clients/${currentUser.uid}`;
                 const clientsDbRef = ref(db, userClientsRefPath);
-                // Query more efficiently by name if possible, or fetch all and filter client-side for smaller datasets
                 const clientsSnapshot = await get(rtQuery(clientsDbRef, orderByChild('ClientName')));
 
                 const inputNameLower = finalClientName.toLowerCase();
-                const inputContactLower = finalClientContact.toLowerCase();
                 let foundExisting = false;
 
                 if (clientsSnapshot.exists()) {
@@ -314,49 +310,36 @@ export default function NewBookingPage() {
                         const clientData = childSnapshot.val() as ClientData;
                         const dbNameLower = (clientData.ClientName || "").trim().toLowerCase();
                         
-                        if (inputContactLower) { // If contact info is provided in the form, match on name AND contact
-                            const dbContactLower = (clientData.ClientContact || "").trim().toLowerCase();
-                            if (dbNameLower === inputNameLower && dbContactLower === inputContactLower) {
-                                clientIdToUse = childSnapshot.key;
-                                finalClientName = clientData.ClientName; // Use existing name (preserves casing)
-                                finalClientContact = clientData.ClientContact || ''; // Use existing contact
-                                setClientContact(finalClientContact); // Update form state
-                                foundExisting = true;
-                                return true; // Exit forEach
-                            }
-                        } else { // If no contact info is provided in the form, match by name ONLY
-                            if (dbNameLower === inputNameLower) {
-                                clientIdToUse = childSnapshot.key;
-                                finalClientName = clientData.ClientName; // Use existing name
-                                finalClientContact = clientData.ClientContact || ''; // Use existing contact
-                                setClientContact(finalClientContact); // Update form state if found
-                                foundExisting = true;
-                                return true; // Exit forEach
-                            }
+                        if (dbNameLower === inputNameLower) { // Match by name ONLY
+                            clientIdToUse = childSnapshot.key;
+                            finalClientName = clientData.ClientName; 
+                            finalClientContact = clientData.ClientContact || ''; // Preserve existing contact from DB
+                            foundExisting = true;
+                            return true; 
                         }
                     });
                 }
 
-                if (!foundExisting) { // Create new client
+                if (!foundExisting) { 
                     const newClientRef = push(clientsDbRef);
                     clientIdToUse = newClientRef.key as string;
                     const now = new Date();
                     await set(newClientRef, {
-                        ClientID: clientIdToUse, // Store the Firebase key as ClientID
-                        ClientName: finalClientName, // Name from form
-                        ClientContact: finalClientContact, // Contact from form
+                        ClientID: clientIdToUse, 
+                        ClientName: finalClientName, 
+                        ClientContact: '', // New client contact is empty
                         CreateDate: format(now, "yyyy-MM-dd"),
                         CreateTime: format(now, "HH:mm"),
                         CreatedByUserID: currentUser.uid
                     });
                 }
-            } else { // Client was selected from autocomplete, ensure finalClientName and finalClientContact are from the selection
+            } else { 
                 const selectedClientRef = ref(db, `Clients/${currentUser.uid}/${clientIdToUse}`);
                 const clientSnapshot = await get(selectedClientRef);
                 if(clientSnapshot.exists()){
                     const clientData = clientSnapshot.val() as ClientData;
                     finalClientName = clientData.ClientName;
-                    finalClientContact = clientData.ClientContact || '';
+                    finalClientContact = clientData.ClientContact || ''; // Use existing contact from DB if client was selected
                 }
             }
 
@@ -368,7 +351,7 @@ export default function NewBookingPage() {
 
             await set(newAppointmentRef, {
                 AppointmentID: appointmentId,
-                ClientID: clientIdToUse, // This will be either existing or new client's Firebase key
+                ClientID: clientIdToUse, 
                 ServiceProcedure: serviceProcedure,
                 AppointmentDate: selectedFormattedDate,
                 AppointmentStartTime: startTime,
@@ -381,14 +364,12 @@ export default function NewBookingPage() {
             toast({ title: "Success", description: `Booking Confirmed for ${finalClientName}!` });
             if(date) fetchBookedSlots(date);
 
-            // Reset form fields
             setClientName('');
-            setClientContact('');
+            // setClientContact(''); // Removed
             setServiceProcedure('');
             setNotesInput('');
             setStartTime('');
             setEndTime('');
-            // setDate(new Date()); // Optional: reset date or keep it
             setSelectedClientFirebaseKey(null);
             setShowSuggestions(false);
 
@@ -448,25 +429,13 @@ export default function NewBookingPage() {
                                             className="px-3 py-2 hover:bg-accent hover:text-accent-foreground cursor-pointer"
                                             onClick={() => handleSuggestionClick(suggestion)}
                                         >
-                                            {suggestion.ClientName} {suggestion.ClientContact && `(${suggestion.ClientContact})`}
+                                            {suggestion.ClientName} {/* Contact info removed from suggestion display */}
                                         </div>
                                     ))}
                                 </div>
                             )}
                         </div>
-                        <div>
-                            <Label htmlFor="clientContact" className="font-medium">Client Contact (Phone or Email)</Label>
-                            <Input
-                                type="text"
-                                id="clientContact"
-                                value={clientContact}
-                                onChange={(e) => setClientContact(e.target.value)}
-                                className="mt-1"
-                                placeholder="Client's phone or email"
-                                // If a client is selected via autocomplete, this might be disabled or readonly
-                                // For now, allow editing. It gets re-evaluated on submit.
-                            />
-                        </div>
+                        {/* Client Contact Field Removed */}
                         <div>
                             <Label htmlFor="serviceProcedure" className="font-medium">Service/Procedure *</Label>
                             <Textarea
@@ -624,3 +593,4 @@ export default function NewBookingPage() {
         </div>
     );
 }
+

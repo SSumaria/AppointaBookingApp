@@ -54,11 +54,10 @@ export default function PublicBookingPage() {
   console.log(`PublicBookingPage: Service Provider User ID from URL params: '${serviceProviderUserId}'`);
   
   const [clientName, setClientName] = useState('');
-  const [clientContact, setClientContact] = useState('');
+  // const [clientContact, setClientContact] = useState(''); // Removed
   const [serviceProcedure, setServiceProcedure] = useState('');
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [startTime, setStartTime] = useState('');
-  // const [endTimeInput, setEndTimeInput] = useState(''); // Removed
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -241,7 +240,7 @@ export default function PublicBookingPage() {
         return;
     }
     
-    if (!clientName || !serviceProcedure || !date || !startTime) { // endTimeInput removed
+    if (!clientName || !serviceProcedure || !date || !startTime) {
         toast({ title: "Error", description: "Please fill in all required fields.", variant: "destructive" });
         setIsSubmitting(false);
         return;
@@ -251,11 +250,9 @@ export default function PublicBookingPage() {
     const baseDateForSubmitParse = new Date(selectedFormattedDate + "T00:00:00");
     const startDateTime = parse(startTime, 'HH:mm', baseDateForSubmitParse);
     
-    // Calculate end time (1 hour duration)
     const endDateTime = addMinutes(startDateTime, 60);
     const calculatedEndTime = format(endDateTime, "HH:mm");
 
-    // Validate if 1-hour booking exceeds MAX_BOOKING_HOUR
     const endHour = getHours(endDateTime);
     const endMinutes = getMinutes(endDateTime);
 
@@ -269,10 +266,9 @@ export default function PublicBookingPage() {
         return;
     }
 
-    // Conflict checking for the 1-hour slot
     let tempSlot = startDateTime;
     let hasOverlap = false;
-    while(tempSlot < endDateTime) { // Loop up to the calculated end time
+    while(tempSlot < endDateTime) { 
         if(bookedTimeSlotsForDate.has(format(tempSlot, "HH:mm"))) {
             hasOverlap = true;
             break;
@@ -298,7 +294,7 @@ export default function PublicBookingPage() {
     const clientDataToSave = {
         ClientID: "", 
         ClientName: clientName.trim(),
-        ClientContact: clientContact.trim(),
+        ClientContact: "", // Removed contact field
         CreateDate: format(now, "yyyy-MM-dd"),
         CreateTime: format(now, "HH:mm"),
         CreatedByUserID: serviceProviderUserId 
@@ -310,7 +306,7 @@ export default function PublicBookingPage() {
         ServiceProcedure: serviceProcedure,
         AppointmentDate: selectedFormattedDate,
         AppointmentStartTime: startTime,
-        AppointmentEndTime: calculatedEndTime, // Use calculated end time
+        AppointmentEndTime: calculatedEndTime, 
         BookingStatus: "Booked",
         BookedByUserID: serviceProviderUserId 
     };
@@ -348,10 +344,9 @@ export default function PublicBookingPage() {
         if(date) fetchBookedSlots(date); 
 
         setClientName('');
-        setClientContact('');
+        // setClientContact(''); // Removed
         setServiceProcedure('');
         setStartTime('');
-        // setEndTimeInput(''); // Removed
         
     } catch (error: any) {
         console.error("Error during public booking submission:", error);
@@ -443,17 +438,7 @@ export default function PublicBookingPage() {
                                     placeholder="Enter your full name"
                                 />
                             </div>
-                            <div>
-                                <Label htmlFor="clientContact" className="font-medium">Your Contact (Phone or Email)</Label>
-                                <Input
-                                    type="text"
-                                    id="clientContact"
-                                    value={clientContact}
-                                    onChange={(e) => setClientContact(e.target.value)}
-                                    className="mt-1"
-                                    placeholder="Enter your phone number or email"
-                                />
-                            </div>
+                            {/* Client Contact Field Removed */}
                             <div>
                                 <Label htmlFor="serviceProcedure" className="font-medium">Service/Procedure Requested *</Label>
                                 <Textarea
@@ -488,7 +473,6 @@ export default function PublicBookingPage() {
                                                 onSelect={(selectedDay) => {
                                                     setDate(selectedDay);
                                                     setStartTime(''); 
-                                                    // setEndTimeInput(''); // Removed
                                                 }}
                                                 disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))} 
                                                 initialFocus
@@ -513,7 +497,6 @@ export default function PublicBookingPage() {
                                                 let itemLabelSuffix = itemIsDisabled ? "(Unavailable)" : "";
                                                 
                                                 if (!itemIsDisabled && date) {
-                                                    // Check if 1-hour booking from this slot exceeds MAX_BOOKING_HOUR
                                                     const slotDateTime = parse(slot, "HH:mm", date);
                                                     const slotEndDateTime = addMinutes(slotDateTime, 60);
                                                     const slotEndHour = getHours(slotEndDateTime);
@@ -523,7 +506,6 @@ export default function PublicBookingPage() {
                                                         itemIsDisabled = true;
                                                         itemLabelSuffix = "(Too late)";
                                                     } else {
-                                                        // Check for conflicts within the 1-hour slot
                                                         let tempCheckTime = slotDateTime;
                                                         while(tempCheckTime < slotEndDateTime){
                                                             if(bookedTimeSlotsForDate.has(format(tempCheckTime, "HH:mm"))){
@@ -549,7 +531,6 @@ export default function PublicBookingPage() {
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                {/* End Time Select Removed */}
                             </div>
                             {isLoadingBookedSlots && date && ( 
                                 <div className="flex items-center text-sm text-muted-foreground">
