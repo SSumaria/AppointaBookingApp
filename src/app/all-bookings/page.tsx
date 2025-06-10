@@ -434,13 +434,15 @@ export default function AllBookingsPage() {
                     />
                   </TabsContent>
                   <TabsContent value="week">
-                    <WeeklyCalendarView 
-                      bookings={allFetchedBookings} 
-                      currentDate={weekViewDate} 
-                      onDayClick={(date) => {
-                          handleCalendarDayClick(date);
-                      }}
-                    />
+                    <div className="overflow-x-auto">
+                      <WeeklyCalendarView 
+                        bookings={allFetchedBookings} 
+                        currentDate={weekViewDate} 
+                        onDayClick={(date) => {
+                            handleCalendarDayClick(date);
+                        }}
+                      />
+                    </div>
                   </TabsContent>
                 </Tabs>
               </CardContent>
