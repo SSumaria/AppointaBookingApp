@@ -5,7 +5,7 @@ import React from 'react';
 import { format, parse, addMinutes, differenceInMinutes, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, getHours, getMinutes, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 
-const TIME_SLOT_HEIGHT_PX_VALUE = 60; // Corresponds to --time-slot-height in globals.css
+const TIME_SLOT_HEIGHT_PX_VALUE = 100; // Corresponds to --time-slot-height in globals.css (1 hour = 100px)
 const CALENDAR_START_HOUR = 6; // 6 AM
 const CALENDAR_END_HOUR = 21; // 9 PM (slots up to 20:30)
 
@@ -127,9 +127,9 @@ const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({ bookings, curre
                       key={booking.id}
                       className={cn(
                         "absolute left-[2px] right-[2px] bg-primary/80 text-primary-foreground p-1.5 rounded shadow-sm overflow-hidden cursor-pointer hover:bg-primary focus-visible:ring-2 focus-visible:ring-ring",
-                        "dark:bg-primary/70 dark:hover:bg-primary/90 flex flex-col justify-start" // Added flex for content alignment
+                        "dark:bg-primary/70 dark:hover:bg-primary/90 flex flex-col justify-start" 
                       )}
-                      style={{ top: `${top}px`, height: `${Math.max(height, 20)}px` }} // min height for visibility, ensure enough for padding
+                      style={{ top: `${top}px`, height: `${Math.max(height, 50)}px` }} // Use Math.max with 50px as minimum height
                       title={`${booking.AppointmentStartTime}-${booking.AppointmentEndTime}: ${booking.ClientName} - ${booking.ServiceProcedure}`}
                       onClick={(e) => { 
                         e.stopPropagation(); // Prevent day click if booking is clicked
@@ -152,3 +152,4 @@ const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({ bookings, curre
 };
 
 export default WeeklyCalendarView;
+
