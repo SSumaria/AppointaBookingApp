@@ -7,7 +7,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { format, addMinutes, parse } from "date-fns";
+import { format, addMinutes, parse, getHours, getMinutes } from "date-fns";
 import { Calendar as CalendarIcon, Clock, AlertTriangle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,7 @@ const generateTimeSlots = () => {
   return slots;
 };
 const timeSlots = generateTimeSlots();
+const MAX_BOOKING_HOUR = 21; // Bookings cannot end after 9 PM
 
 export default function PublicBookingPage() {
   console.log("--- PublicBookingPage (/book/[userId]/page.tsx) --- COMPONENT RENDERING ---");
@@ -57,11 +58,10 @@ export default function PublicBookingPage() {
   const [serviceProcedure, setServiceProcedure] = useState('');
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [startTime, setStartTime] = useState('');
-  const [endTimeInput, setEndTimeInput] = useState('');
+  // const [endTimeInput, setEndTimeInput] = useState(''); // Removed
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // serviceProviderExists will be null initially (loading), then true/false
   const [serviceProviderExists, setServiceProviderExists] = useState<boolean | null>(null);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
 
@@ -241,7 +241,7 @@ export default function PublicBookingPage() {
         return;
     }
     
-    if (!clientName || !serviceProcedure || !date || !startTime || !endTimeInput) {
+    if (!clientName || !serviceProcedure || !date || !startTime) { // endTimeInput removed
         toast({ title: "Error", description: "Please fill in all required fields.", variant: "destructive" });
         setIsSubmitting(false);
         return;
@@ -250,17 +250,29 @@ export default function PublicBookingPage() {
     const selectedFormattedDate = format(date, "yyyy-MM-dd");
     const baseDateForSubmitParse = new Date(selectedFormattedDate + "T00:00:00");
     const startDateTime = parse(startTime, 'HH:mm', baseDateForSubmitParse);
-    const endDateTime = parse(endTimeInput, 'HH:mm', baseDateForSubmitParse);
+    
+    // Calculate end time (1 hour duration)
+    const endDateTime = addMinutes(startDateTime, 60);
+    const calculatedEndTime = format(endDateTime, "HH:mm");
 
-    if (endDateTime <= startDateTime) {
-      toast({ title: "Validation Error", description: "End time must be after start time.", variant: "destructive" });
-      setIsSubmitting(false);
-      return;
+    // Validate if 1-hour booking exceeds MAX_BOOKING_HOUR
+    const endHour = getHours(endDateTime);
+    const endMinutes = getMinutes(endDateTime);
+
+    if (endHour > MAX_BOOKING_HOUR || (endHour === MAX_BOOKING_HOUR && endMinutes > 0)) {
+        toast({ 
+            title: "Booking Time Invalid", 
+            description: `A 1-hour booking from ${startTime} would end after ${MAX_BOOKING_HOUR}:00. Please select an earlier start time.`, 
+            variant: "destructive" 
+        });
+        setIsSubmitting(false);
+        return;
     }
 
+    // Conflict checking for the 1-hour slot
     let tempSlot = startDateTime;
     let hasOverlap = false;
-    while(tempSlot < endDateTime) {
+    while(tempSlot < endDateTime) { // Loop up to the calculated end time
         if(bookedTimeSlotsForDate.has(format(tempSlot, "HH:mm"))) {
             hasOverlap = true;
             break;
@@ -269,7 +281,7 @@ export default function PublicBookingPage() {
     }
 
     if(hasOverlap) {
-        toast({ title: "Booking Conflict", description: "The selected time range is no longer available or overlaps with an existing booking.", variant: "destructive" });
+        toast({ title: "Booking Conflict", description: "The selected 1-hour time slot is no longer available or overlaps with an existing booking.", variant: "destructive" });
         setIsSubmitting(false);
         if (date) fetchBookedSlots(date); 
         return;
@@ -284,7 +296,7 @@ export default function PublicBookingPage() {
 
     const now = new Date();
     const clientDataToSave = {
-        ClientID: "", // Will be set by push key
+        ClientID: "", 
         ClientName: clientName.trim(),
         ClientContact: clientContact.trim(),
         CreateDate: format(now, "yyyy-MM-dd"),
@@ -293,12 +305,12 @@ export default function PublicBookingPage() {
     };
     
     const appointmentDataToSave = {
-        AppointmentID: "", // Will be set by push key
-        ClientID: "", // Will be linked to new client's ID
+        AppointmentID: "", 
+        ClientID: "", 
         ServiceProcedure: serviceProcedure,
         AppointmentDate: selectedFormattedDate,
         AppointmentStartTime: startTime,
-        AppointmentEndTime: endTimeInput,
+        AppointmentEndTime: calculatedEndTime, // Use calculated end time
         BookingStatus: "Booked",
         BookedByUserID: serviceProviderUserId 
     };
@@ -313,7 +325,7 @@ export default function PublicBookingPage() {
         const newClientRef = push(clientsDbRef);
         const newClientId = newClientRef.key as string;
 
-        clientDataToSave.ClientID = newClientId; // Set the generated ClientID
+        clientDataToSave.ClientID = newClientId; 
 
         console.log("PublicBookingPage: Attempting to save new client data to path:", newClientRef.toString());
         await set(newClientRef, clientDataToSave);
@@ -325,21 +337,21 @@ export default function PublicBookingPage() {
         const appointmentId = newAppointmentRef.key as string;
 
         appointmentDataToSave.AppointmentID = appointmentId;
-        appointmentDataToSave.ClientID = newClientId; // Link appointment to the new client
+        appointmentDataToSave.ClientID = newClientId; 
 
         console.log("PublicBookingPage: Attempting to save new appointment data to path:", newAppointmentRef.toString());
         await set(newAppointmentRef, appointmentDataToSave);
         console.log("PublicBookingPage: New appointment data saved successfully. Appointment ID:", appointmentId);
 
 
-        toast({ title: "Booking Confirmed!", description: `Your appointment for ${serviceProcedure} has been booked.` });
+        toast({ title: "Booking Confirmed!", description: `Your 1-hour appointment for ${serviceProcedure} has been booked.` });
         if(date) fetchBookedSlots(date); 
 
         setClientName('');
         setClientContact('');
         setServiceProcedure('');
         setStartTime('');
-        setEndTimeInput('');
+        // setEndTimeInput(''); // Removed
         
     } catch (error: any) {
         console.error("Error during public booking submission:", error);
@@ -414,7 +426,7 @@ export default function PublicBookingPage() {
                     <CardHeader>
                         <CardTitle className="text-xl font-bold text-center text-primary">New Appointment Booking</CardTitle>
                         <CardDescription className="text-center">
-                            Fill in your details below to schedule your appointment.
+                            Fill in your details below to schedule your 1-hour appointment.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -476,7 +488,7 @@ export default function PublicBookingPage() {
                                                 onSelect={(selectedDay) => {
                                                     setDate(selectedDay);
                                                     setStartTime(''); 
-                                                    setEndTimeInput('');
+                                                    // setEndTimeInput(''); // Removed
                                                 }}
                                                 disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))} 
                                                 initialFocus
@@ -496,62 +508,37 @@ export default function PublicBookingPage() {
                                         </SelectTrigger>
                                         <SelectContent>
                                              {isLoadingBookedSlots && <SelectItem value="loading" disabled>Loading slots...</SelectItem>}
-                                             {!isLoadingBookedSlots && timeSlots.map(slot => (
-                                                <SelectItem
-                                                    key={`start-${slot}`}
-                                                    value={slot}
-                                                    disabled={bookedTimeSlotsForDate.has(slot)} 
-                                                >
-                                                    {slot} {bookedTimeSlotsForDate.has(slot) ? "(Unavailable)" : ""}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="flex-1">
-                                    <Label htmlFor="endTime" className="font-medium">End Time *</Label>
-                                    <Select
-                                        value={endTimeInput}
-                                        onValueChange={setEndTimeInput}
-                                        disabled={isLoadingBookedSlots || !date || !startTime} 
-                                    >
-                                        <SelectTrigger className="w-full mt-1">
-                                            <SelectValue placeholder={isLoadingBookedSlots ? "Loading..." : "Select end time"} />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {isLoadingBookedSlots && <SelectItem value="loading" disabled>Loading slots...</SelectItem>}
-                                            {!isLoadingBookedSlots && timeSlots.filter(slot => {
-                                                if (!startTime) return true; 
-                                                const baseDateForFilter = date ? new Date(date) : new Date(); 
-                                                baseDateForFilter.setHours(0,0,0,0);
-                                                const currentSlotTime = parse(slot, "HH:mm", baseDateForFilter);
-                                                const selectedStartTime = parse(startTime, "HH:mm", baseDateForFilter);
-                                                return currentSlotTime > selectedStartTime; 
-                                            }).map(slot => {
-                                                let itemIsDisabled = false;
-                                                let itemLabelSuffix = "";
+                                             {!isLoadingBookedSlots && timeSlots.map(slot => {
+                                                let itemIsDisabled = bookedTimeSlotsForDate.has(slot);
+                                                let itemLabelSuffix = itemIsDisabled ? "(Unavailable)" : "";
                                                 
-                                                if (startTime && date) {
-                                                    const baseDateForCheck = new Date(date); 
-                                                    baseDateForCheck.setHours(0,0,0,0);
-                                                    const newBookingStartForCheck = parse(startTime, "HH:mm", baseDateForCheck);
-                                                    const potentialEndTime = parse(slot, "HH:mm", baseDateForCheck);
-                                                    let tempSlotCheck = newBookingStartForCheck;
-                                                    while (tempSlotCheck < potentialEndTime) { 
-                                                        if (bookedTimeSlotsForDate.has(format(tempSlotCheck, "HH:mm"))) {
-                                                            itemIsDisabled = true;
-                                                            itemLabelSuffix = "(Conflicts)";
-                                                            break;
+                                                if (!itemIsDisabled && date) {
+                                                    // Check if 1-hour booking from this slot exceeds MAX_BOOKING_HOUR
+                                                    const slotDateTime = parse(slot, "HH:mm", date);
+                                                    const slotEndDateTime = addMinutes(slotDateTime, 60);
+                                                    const slotEndHour = getHours(slotEndDateTime);
+                                                    const slotEndMinutes = getMinutes(slotEndDateTime);
+
+                                                    if (slotEndHour > MAX_BOOKING_HOUR || (slotEndHour === MAX_BOOKING_HOUR && slotEndMinutes > 0)) {
+                                                        itemIsDisabled = true;
+                                                        itemLabelSuffix = "(Too late)";
+                                                    } else {
+                                                        // Check for conflicts within the 1-hour slot
+                                                        let tempCheckTime = slotDateTime;
+                                                        while(tempCheckTime < slotEndDateTime){
+                                                            if(bookedTimeSlotsForDate.has(format(tempCheckTime, "HH:mm"))){
+                                                                itemIsDisabled = true;
+                                                                itemLabelSuffix = "(Conflicts)";
+                                                                break;
+                                                            }
+                                                            tempCheckTime = addMinutes(tempCheckTime, 30);
                                                         }
-                                                        tempSlotCheck = addMinutes(tempSlotCheck, 30);
                                                     }
-                                                } else if (!startTime){ 
-                                                    itemIsDisabled = true;
                                                 }
 
                                                 return (
                                                     <SelectItem
-                                                        key={`end-${slot}`}
+                                                        key={`start-${slot}`}
                                                         value={slot}
                                                         disabled={itemIsDisabled}
                                                     >
@@ -562,6 +549,7 @@ export default function PublicBookingPage() {
                                         </SelectContent>
                                     </Select>
                                 </div>
+                                {/* End Time Select Removed */}
                             </div>
                             {isLoadingBookedSlots && date && ( 
                                 <div className="flex items-center text-sm text-muted-foreground">
@@ -575,7 +563,7 @@ export default function PublicBookingPage() {
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
-                                ) : "Request Booking"}
+                                ) : "Request 1-Hour Booking"}
                             </Button>
                         </form>
                     </CardContent>
