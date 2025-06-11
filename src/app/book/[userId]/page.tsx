@@ -54,6 +54,7 @@ export default function PublicBookingPage() {
   console.log(`PublicBookingPage: Service Provider User ID from URL params: '${serviceProviderUserId}'`);
   
   const [clientName, setClientName] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
   // const [clientContact, setClientContact] = useState(''); // Removed
   const [serviceProcedure, setServiceProcedure] = useState('');
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -294,6 +295,7 @@ export default function PublicBookingPage() {
     const clientDataToSave = {
         ClientID: "", 
         ClientName: clientName.trim(),
+        ClientEmail: clientEmail.trim(),
         ClientContact: "", // Removed contact field
         CreateDate: format(now, "yyyy-MM-dd"),
         CreateTime: format(now, "HH:mm"),
@@ -344,6 +346,7 @@ export default function PublicBookingPage() {
         if(date) fetchBookedSlots(date); 
 
         setClientName('');
+        setClientEmail('');
         // setClientContact(''); // Removed
         setServiceProcedure('');
         setStartTime('');
@@ -439,6 +442,18 @@ export default function PublicBookingPage() {
                                 />
                             </div>
                             {/* Client Contact Field Removed */}
+                             <div>
+                                <Label htmlFor="clientEmail" className="font-medium">Your Email (Optional)</Label>
+                                <Input
+                                    type="email"
+                                    id="clientEmail"
+                                    value={clientEmail}
+                                    onChange={(e) => setClientEmail(e.target.value)}
+                                    className="mt-1"
+                                    placeholder="Enter your email"
+                                />
+                            </div>
+
                             <div>
                                 <Label htmlFor="serviceProcedure" className="font-medium">Service/Procedure Requested *</Label>
                                 <Textarea

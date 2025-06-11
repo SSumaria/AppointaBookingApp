@@ -50,6 +50,7 @@ interface ExistingBooking {
 interface ClientData {
     ClientID: string;
     ClientName: string;
+ ClientEmail?: string; // Added client email field
     ClientContact?: string;
 }
 
@@ -81,6 +82,7 @@ const generateNoteId = () => {
 export default function NewBookingPage() {
     const [clientName, setClientName] = useState('');
     // const [clientContact, setClientContact] = useState(''); // Removed
+ const [clientEmail, setClientEmail] = useState(''); // Added state for client email
     const [serviceProcedure, setServiceProcedure] = useState('');
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [startTime, setStartTime] = useState('');
@@ -170,6 +172,7 @@ export default function NewBookingPage() {
         
         if (query.trim() === '') {
           // setClientContact(''); // No longer needed as clientContact state is removed
+ setClientEmail(''); // Clear email if name is cleared
         }
 
 
@@ -214,6 +217,7 @@ export default function NewBookingPage() {
 
     const handleSuggestionClick = (suggestion: ClientSuggestion) => {
         setClientName(suggestion.ClientName);
+ setClientEmail(suggestion.ClientEmail || ''); // Set email from suggestion
         // setClientContact(suggestion.ClientContact || ''); // Removed
         setSelectedClientFirebaseKey(suggestion.id);
         setShowSuggestions(false);
@@ -285,7 +289,7 @@ export default function NewBookingPage() {
 
         let clientIdToUse: string | null = selectedClientFirebaseKey;
         let finalClientName = clientName.trim();
-        let finalClientContact = ''; // Contact is now always empty for new/form-edited clients
+ let finalClientEmail = clientEmail.trim(); // Use the email from the form
 
         const finalNotes: Note[] = [];
         if (notesInput.trim()) {
@@ -313,7 +317,7 @@ export default function NewBookingPage() {
                         if (dbNameLower === inputNameLower) { // Match by name ONLY
                             clientIdToUse = childSnapshot.key;
                             finalClientName = clientData.ClientName; 
-                            finalClientContact = clientData.ClientContact || ''; // Preserve existing contact from DB
+ finalClientEmail = clientData.ClientEmail || ''; // Preserve existing email from DB if client was selected
                             foundExisting = true;
                             return true; 
                         }
@@ -328,6 +332,7 @@ export default function NewBookingPage() {
                         ClientID: clientIdToUse, 
                         ClientName: finalClientName, 
                         ClientContact: '', // New client contact is empty
+ ClientEmail: finalClientEmail, // Use form email for new client
                         CreateDate: format(now, "yyyy-MM-dd"),
                         CreateTime: format(now, "HH:mm"),
                         CreatedByUserID: currentUser.uid
@@ -339,7 +344,7 @@ export default function NewBookingPage() {
                 if(clientSnapshot.exists()){
                     const clientData = clientSnapshot.val() as ClientData;
                     finalClientName = clientData.ClientName;
-                    finalClientContact = clientData.ClientContact || ''; // Use existing contact from DB if client was selected
+ finalClientEmail = clientData.ClientEmail || ''; // Use existing email from DB if client was selected
                 }
             }
 
@@ -353,6 +358,7 @@ export default function NewBookingPage() {
                 AppointmentID: appointmentId,
                 ClientID: clientIdToUse, 
                 ServiceProcedure: serviceProcedure,
+ ClientEmail: finalClientEmail, // Save the email with the booking
                 AppointmentDate: selectedFormattedDate,
                 AppointmentStartTime: startTime,
                 AppointmentEndTime: endTime,
@@ -366,6 +372,7 @@ export default function NewBookingPage() {
 
             setClientName('');
             // setClientContact(''); // Removed
+ setClientEmail(''); // Clear email field after successful booking
             setServiceProcedure('');
             setNotesInput('');
             setStartTime('');
@@ -435,7 +442,20 @@ export default function NewBookingPage() {
                                 </div>
                             )}
                         </div>
-                        {/* Client Contact Field Removed */}
+
+                        {/* Client Email Field Added */}
+                        <div>
+                            <Label htmlFor="clientEmail" className="font-medium">Client Email (Optional)</Label>
+                            <Input
+                                type="email" // Use type="email" for email validation hint
+                                id="clientEmail"
+                                value={clientEmail}
+                                onChange={(e) => setClientEmail(e.target.value)}
+                                className="mt-1"
+                                placeholder="Enter client's email address"
+                            />
+                        </div>
+
                         <div>
                             <Label htmlFor="serviceProcedure" className="font-medium">Service/Procedure *</Label>
                             <Textarea
