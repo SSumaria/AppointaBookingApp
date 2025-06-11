@@ -55,7 +55,7 @@ export default function PublicBookingPage() {
   
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
-  // const [clientContact, setClientContact] = useState(''); // Removed
+  const [clientPhone, setClientPhone] = useState(''); 
   const [serviceProcedure, setServiceProcedure] = useState('');
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [startTime, setStartTime] = useState('');
@@ -240,8 +240,8 @@ export default function PublicBookingPage() {
         setIsSubmitting(false);
         return;
     }
-    
-    if (!clientName || !serviceProcedure || !date || !startTime) {
+
+    if (!clientName || !serviceProcedure || !date || !startTime || !clientEmail || !clientPhone) {
         toast({ title: "Error", description: "Please fill in all required fields.", variant: "destructive" });
         setIsSubmitting(false);
         return;
@@ -296,7 +296,7 @@ export default function PublicBookingPage() {
         ClientID: "", 
         ClientName: clientName.trim(),
         ClientEmail: clientEmail.trim(),
-        ClientContact: "", // Removed contact field
+        ClientContact: clientPhone.trim(), 
         CreateDate: format(now, "yyyy-MM-dd"),
         CreateTime: format(now, "HH:mm"),
         CreatedByUserID: serviceProviderUserId 
@@ -347,7 +347,7 @@ export default function PublicBookingPage() {
 
         setClientName('');
         setClientEmail('');
-        // setClientContact(''); // Removed
+        setClientPhone(''); 
         setServiceProcedure('');
         setStartTime('');
         

@@ -50,7 +50,7 @@ interface ExistingBooking {
 interface ClientData {
     ClientID: string;
     ClientName: string;
- ClientEmail?: string; // Added client email field
+    ClientEmail?: string;
     ClientContact?: string;
 }
 
@@ -82,7 +82,7 @@ const generateNoteId = () => {
 export default function NewBookingPage() {
     const [clientName, setClientName] = useState('');
     // const [clientContact, setClientContact] = useState(''); // Removed
- const [clientEmail, setClientEmail] = useState(''); // Added state for client email
+    const [clientEmail, setClientEmail] = useState('');
     const [serviceProcedure, setServiceProcedure] = useState('');
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [startTime, setStartTime] = useState('');
@@ -91,6 +91,7 @@ export default function NewBookingPage() {
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const [clientPhone, setClientPhone] = useState('');
     const [bookedTimeSlotsForDate, setBookedTimeSlotsForDate] = useState<Set<string>>(new Set());
     const [isLoadingBookedSlots, setIsLoadingBookedSlots] = useState(false);
 
@@ -173,6 +174,7 @@ export default function NewBookingPage() {
         if (query.trim() === '') {
           // setClientContact(''); // No longer needed as clientContact state is removed
  setClientEmail(''); // Clear email if name is cleared
+ setClientPhone(''); // Clear phone if name is cleared
         }
 
 
@@ -217,7 +219,8 @@ export default function NewBookingPage() {
 
     const handleSuggestionClick = (suggestion: ClientSuggestion) => {
         setClientName(suggestion.ClientName);
- setClientEmail(suggestion.ClientEmail || ''); // Set email from suggestion
+        setClientEmail(suggestion.ClientEmail || ''); // Set email from suggestion
+        setClientPhone(suggestion.ClientContact || ''); // Set phone from suggestion
         // setClientContact(suggestion.ClientContact || ''); // Removed
         setSelectedClientFirebaseKey(suggestion.id);
         setShowSuggestions(false);
@@ -248,8 +251,8 @@ export default function NewBookingPage() {
             return;
         }
 
-        if (!clientName.trim() || !serviceProcedure || !date || !startTime || !endTime) {
-            toast({ title: "Error", description: "Client Name, Service, Date, Start Time, and End Time are required.", variant: "destructive" });
+        if (!clientName.trim() || !clientEmail.trim() || !clientPhone.trim() || !serviceProcedure || !date || !startTime || !endTime) {
+            toast({ title: "Error", description: "Client Name, Email, Phone, Service, Date, Start Time, and End Time are required.", variant: "destructive" });
             setIsSubmitting(false);
             return;
         }
@@ -289,7 +292,8 @@ export default function NewBookingPage() {
 
         let clientIdToUse: string | null = selectedClientFirebaseKey;
         let finalClientName = clientName.trim();
- let finalClientEmail = clientEmail.trim(); // Use the email from the form
+        let finalClientEmail = clientEmail.trim(); // Use the email from the form
+        let finalClientPhone = clientPhone.trim(); // Use the phone from the form
 
         const finalNotes: Note[] = [];
         if (notesInput.trim()) {
@@ -316,7 +320,7 @@ export default function NewBookingPage() {
                         
                         if (dbNameLower === inputNameLower) { // Match by name ONLY
                             clientIdToUse = childSnapshot.key;
-                            finalClientName = clientData.ClientName; 
+                            finalClientName = clientData.ClientName;
  finalClientEmail = clientData.ClientEmail || ''; // Preserve existing email from DB if client was selected
                             foundExisting = true;
                             return true; 
@@ -332,7 +336,7 @@ export default function NewBookingPage() {
                         ClientID: clientIdToUse, 
                         ClientName: finalClientName, 
                         ClientContact: '', // New client contact is empty
- ClientEmail: finalClientEmail, // Use form email for new client
+                        ClientEmail: finalClientEmail, // Use form email for new client
                         CreateDate: format(now, "yyyy-MM-dd"),
                         CreateTime: format(now, "HH:mm"),
                         CreatedByUserID: currentUser.uid
@@ -344,7 +348,7 @@ export default function NewBookingPage() {
                 if(clientSnapshot.exists()){
                     const clientData = clientSnapshot.val() as ClientData;
                     finalClientName = clientData.ClientName;
- finalClientEmail = clientData.ClientEmail || ''; // Use existing email from DB if client was selected
+                    finalClientEmail = clientData.ClientEmail || ''; // Use existing email from DB if client was selected
                 }
             }
 
@@ -358,7 +362,8 @@ export default function NewBookingPage() {
                 AppointmentID: appointmentId,
                 ClientID: clientIdToUse, 
                 ServiceProcedure: serviceProcedure,
- ClientEmail: finalClientEmail, // Save the email with the booking
+                ClientEmail: finalClientEmail, // Save the email with the booking
+                ClientContact: finalClientPhone, // Save the phone with the booking
                 AppointmentDate: selectedFormattedDate,
                 AppointmentStartTime: startTime,
                 AppointmentEndTime: endTime,
@@ -372,7 +377,8 @@ export default function NewBookingPage() {
 
             setClientName('');
             // setClientContact(''); // Removed
- setClientEmail(''); // Clear email field after successful booking
+            setClientEmail(''); // Clear email field after successful booking
+            setClientPhone(''); // Clear phone field after successful booking
             setServiceProcedure('');
             setNotesInput('');
             setStartTime('');
@@ -443,14 +449,27 @@ export default function NewBookingPage() {
                             )}
                         </div>
 
-                        {/* Client Email Field Added */}
+                        {/* Client Email Field */}
                         <div>
-                            <Label htmlFor="clientEmail" className="font-medium">Client Email (Optional)</Label>
+                            <Label htmlFor="clientEmail" className="font-medium">Client Email *</Label>
                             <Input
                                 type="email" // Use type="email" for email validation hint
                                 id="clientEmail"
                                 value={clientEmail}
                                 onChange={(e) => setClientEmail(e.target.value)}
+                                required
+                                className="mt-1"
+                                placeholder="Enter client's email address"
+                            />
+                        </div>
+
+                        {/* Client Phone Number Field */}
+                        <div>
+                            <Label htmlFor="clientPhone" className="font-medium">Client Phone Number *</Label>
+                            <Input
+                                type="tel" // Use type="tel" for phone number
+                                id="clientPhone"
+                                value={clientPhone}
                                 className="mt-1"
                                 placeholder="Enter client's email address"
                             />
