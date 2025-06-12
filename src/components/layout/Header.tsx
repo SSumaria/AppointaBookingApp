@@ -2,12 +2,19 @@
 "use client";
 
 import Link from 'next/link';
-import { Home, Calendar as CalendarIcon, Search as SearchIcon, ListChecks, LogIn, LogOut, UserPlus, UserCircle, Menu } from "lucide-react";
+import { Home, Calendar as CalendarIcon, Search as SearchIcon, ListChecks, LogIn, LogOut, UserPlus, UserCircle, Menu, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'; // SheetClose removed as it's not explicitly used for programmatic close here
 import { useState } from 'react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function Header() {
   const { currentUser, logout, loading } = useAuth();
@@ -16,7 +23,7 @@ export default function Header() {
 
   const handleLogout = async () => {
     await logout();
-    setIsSheetOpen(false);
+    setIsSheetOpen(false); // Close sheet if open
   };
 
   const handleNavigation = (path: string) => {
@@ -26,19 +33,19 @@ export default function Header() {
 
   const commonNavLinks = (
     <>
-      <Button variant="ghost" className="justify-start w-full" onClick={() => handleNavigation('/')}>
+      <Button variant="ghost" className="justify-start w-full md:w-auto md:justify-center" onClick={() => handleNavigation('/')}>
         <Home className="mr-2 h-4 w-4" />
         Home
       </Button>
-      <Button variant="ghost" className="justify-start w-full" onClick={() => handleNavigation('/new-booking')}>
+      <Button variant="ghost" className="justify-start w-full md:w-auto md:justify-center" onClick={() => handleNavigation('/new-booking')}>
         <CalendarIcon className="mr-2 h-4 w-4" />
         New Booking
       </Button>
-      <Button variant="ghost" className="justify-start w-full" onClick={() => handleNavigation('/all-bookings')}>
+      <Button variant="ghost" className="justify-start w-full md:w-auto md:justify-center" onClick={() => handleNavigation('/all-bookings')}>
         <ListChecks className="mr-2 h-4 w-4" />
         All Bookings
       </Button>
-      <Button variant="ghost" className="justify-start w-full" onClick={() => handleNavigation('/client-search')}>
+      <Button variant="ghost" className="justify-start w-full md:w-auto md:justify-center" onClick={() => handleNavigation('/client-search')}>
         <SearchIcon className="mr-2 h-4 w-4" />
         Client Search
       </Button>
@@ -55,6 +62,10 @@ export default function Header() {
               {currentUser.email}
             </div>
           )}
+          <Button variant="ghost" className="justify-start w-full" onClick={() => handleNavigation('/preferences')}>
+            <Settings className="mr-2 h-4 w-4" />
+            Manage Preferences
+          </Button>
           <Button variant="ghost" onClick={handleLogout} className="justify-start w-full text-destructive hover:text-destructive">
             <LogOut className="mr-2 h-4 w-4" />
             Logout
@@ -79,26 +90,35 @@ export default function Header() {
   return (
     <header className="bg-background py-3 shadow-sm sticky top-0 z-50">
       <div className="container max-w-5xl mx-auto flex items-center justify-between">
-        <Link href="/" className="text-xl sm:text-2xl font-bold text-primary">
+        <Link href="/" onClick={() => setIsSheetOpen(false)} className="text-xl sm:text-2xl font-bold text-primary">
           ServiceBooker Pro
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center space-x-2 sm:space-x-4">
+        <nav className="hidden md:flex items-center space-x-1 sm:space-x-2">
           {currentUser && commonNavLinks}
           {loading ? (
-            <div className="h-8 w-20 bg-muted rounded animate-pulse"></div>
+            <div className="h-8 w-28 bg-muted rounded animate-pulse ml-2"></div>
           ) : currentUser ? (
-            <>
-              <span className="text-xs sm:text-sm text-muted-foreground hidden lg:inline">
-                <UserCircle className="mr-1 h-4 w-4 inline"/>
-                {currentUser.email}
-              </span>
-              <Button variant="ghost" size="sm" onClick={handleLogout} className="text-xs sm:text-sm">
-                <LogOut className="mr-1 h-4 w-4" />
-                Logout
-              </Button>
-            </>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-xs sm:text-sm ml-2">
+                  <UserCircle className="mr-1 h-4 w-4"/>
+                  {currentUser.email}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => router.push('/preferences')}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Manage Preferences</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Logout</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : (
             <>
               <Button variant="ghost" size="sm" onClick={() => router.push('/login')} className="text-xs sm:text-sm">
@@ -122,18 +142,18 @@ export default function Header() {
                 <span className="sr-only">Open menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[280px] p-4 flex flex-col">
-              <div className="mb-4 border-b pb-2">
+            <SheetContent side="right" className="w-[280px] p-0 flex flex-col">
+              <div className="p-4 mb-2 border-b">
                 <Link href="/" onClick={() => setIsSheetOpen(false)} className="text-lg font-bold text-primary">
                   ServiceBooker Pro
                 </Link>
               </div>
-              <nav className="flex flex-col space-y-2 flex-grow">
+              <nav className="flex flex-col space-y-1 px-2 flex-grow">
                 {currentUser && commonNavLinks}
               </nav>
-              <div className="mt-auto pt-4 border-t">
+              <div className="mt-auto p-2 border-t">
                 {loading ? (
-                    <div className="space-y-2">
+                    <div className="space-y-2 px-2">
                         <div className="h-8 w-full bg-muted rounded animate-pulse"></div>
                         <div className="h-8 w-full bg-muted rounded animate-pulse"></div>
                     </div>
