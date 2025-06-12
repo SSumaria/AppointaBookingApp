@@ -7,8 +7,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { format, addMinutes, parse, getHours, getMinutes } from "date-fns";
-import { Calendar as CalendarIcon, Clock, AlertTriangle } from "lucide-react";
+import { format, addMinutes, parse, getHours, getMinutes, getDay } from "date-fns";
+import { Calendar as CalendarIcon, Clock, AlertTriangle, Loader2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +18,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-
 
 import { ref, set, get, query as rtQuery, orderByChild, equalTo, push } from "firebase/database";
 import { db } from '@/lib/firebaseConfig'; 
@@ -30,22 +29,45 @@ interface ExistingBooking {
   BookingStatus?: string;
 }
 
+// Definitions for WorkingHours (consistent with preferences page)
+const daysOfWeekConst = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
+type DayOfWeek = typeof daysOfWeekConst[number];
+
+interface DaySetting {
+  startTime: string;
+  endTime: string;
+  isUnavailable: boolean;
+}
+export type WorkingHours = Record<DayOfWeek, DaySetting>;
+
+const initialWorkingHoursDefaults: WorkingHours = {
+  monday:    { startTime: "09:00", endTime: "17:00", isUnavailable: false },
+  tuesday:   { startTime: "09:00", endTime: "17:00", isUnavailable: false },
+  wednesday: { startTime: "09:00", endTime: "17:00", isUnavailable: false },
+  thursday:  { startTime: "09:00", endTime: "17:00", isUnavailable: false },
+  friday:    { startTime: "09:00", endTime: "17:00", isUnavailable: false },
+  saturday:  { startTime: "09:00", endTime: "17:00", isUnavailable: true },
+  sunday:    { startTime: "09:00", endTime: "17:00", isUnavailable: true },
+};
+
+
 const generateTimeSlots = () => {
   const slots = [];
   let currentTime = new Date();
-  currentTime.setHours(6, 0, 0, 0); 
+  currentTime.setHours(0, 0, 0, 0); // Generate for the whole day initially, then filter
 
-  const endTimeLimit = new Date();
-  endTimeLimit.setHours(21, 0, 0, 0); 
+  const dayEndLimit = new Date();
+  dayEndLimit.setHours(23, 59, 0, 0); 
 
-  while (currentTime <= endTimeLimit) {
+  while (currentTime <= dayEndLimit) {
     slots.push(format(currentTime, "HH:mm"));
     currentTime = addMinutes(currentTime, 30);
   }
   return slots;
 };
 const timeSlots = generateTimeSlots();
-const MAX_BOOKING_HOUR = 21; // Bookings cannot end after 9 PM
+// MAX_BOOKING_HOUR is now less relevant as preferences dictate end times.
+// const MAX_BOOKING_HOUR = 21; 
 
 export default function PublicBookingPage() {
   console.log("--- PublicBookingPage (/book/[userId]/page.tsx) --- COMPONENT RENDERING ---");
@@ -65,109 +87,104 @@ export default function PublicBookingPage() {
   const [serviceProviderExists, setServiceProviderExists] = useState<boolean | null>(null);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
 
-
   const [bookedTimeSlotsForDate, setBookedTimeSlotsForDate] = useState<Set<string>>(new Set());
   const [isLoadingBookedSlots, setIsLoadingBookedSlots] = useState(false);
 
-  const checkServiceProvider = useCallback(async () => {
-    console.log(`PublicBookingPage: checkServiceProvider called for User ID: '${serviceProviderUserId}'. This check verifies if provider has existing data.`);
+  const [workingHoursPreferences, setWorkingHoursPreferences] = useState<WorkingHours | null>(null);
+  const [isLoadingPreferences, setIsLoadingPreferences] = useState(true);
 
-    if (!serviceProviderUserId) {
-      console.log("PublicBookingPage: No serviceProviderUserId available from URL params. Setting provider check as done, exists = false.");
+
+  const fetchUserPreferences = useCallback(async (userId: string) => {
+    if (!db || !userId) {
+        setWorkingHoursPreferences(initialWorkingHoursDefaults);
+        setIsLoadingPreferences(false);
+        return;
+    }
+    setIsLoadingPreferences(true);
+    try {
+        const preferencesRef = ref(db, `UserPreferences/${userId}/workingHours`);
+        const snapshot = await get(preferencesRef);
+        if (snapshot.exists()) {
+            const loadedPrefs = snapshot.val() as WorkingHours;
+            let isValid = true;
+            daysOfWeekConst.forEach(day => {
+                if (!loadedPrefs[day] || 
+                    typeof loadedPrefs[day].startTime !== 'string' ||
+                    typeof loadedPrefs[day].endTime !== 'string' ||
+                    typeof loadedPrefs[day].isUnavailable !== 'boolean'
+                ) {
+                    isValid = false;
+                }
+            });
+            if(isValid) {
+                setWorkingHoursPreferences(loadedPrefs);
+            } else {
+                console.warn(`Invalid preferences structure for provider ${userId}, using defaults.`);
+                setWorkingHoursPreferences(initialWorkingHoursDefaults); 
+            }
+        } else {
+            console.log(`No preferences found for provider ${userId}, using defaults.`);
+            setWorkingHoursPreferences(initialWorkingHoursDefaults);
+        }
+    } catch (error: any) {
+        console.error("Error fetching user preferences for public booking:", error);
+        toast({ title: "Error", description: "Could not load provider's availability settings.", variant: "destructive" });
+        setWorkingHoursPreferences(initialWorkingHoursDefaults);
+    } finally {
+        setIsLoadingPreferences(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (serviceProviderUserId && initialCheckDone && serviceProviderExists === true) { 
+        fetchUserPreferences(serviceProviderUserId);
+    } else if (initialCheckDone && serviceProviderExists === false) {
+        // For new/unrecognized providers, use defaults.
+        setWorkingHoursPreferences(initialWorkingHoursDefaults);
+        setIsLoadingPreferences(false);
+    }
+  }, [serviceProviderUserId, initialCheckDone, serviceProviderExists, fetchUserPreferences]);
+
+
+  const checkServiceProvider = useCallback(async () => {
+    console.log(`PublicBookingPage: checkServiceProvider called for User ID: '${serviceProviderUserId}'.`);
+    if (!serviceProviderUserId || !db) {
       setServiceProviderExists(false);
       setInitialCheckDone(true);
-      return;
-    }
-    if (!db) {
-      console.error("PublicBookingPage: CRITICAL - Firebase DB is not initialized. Cannot check service provider.");
-      setServiceProviderExists(false); 
-      setInitialCheckDone(true);
-      toast({ title: "System Error", description: "Booking system database is currently unavailable. Please try again later.", variant: "destructive" });
+      if (!db) console.error("PublicBookingPage: CRITICAL - Firebase DB is not initialized.");
       return;
     }
 
     let providerDataFound = false;
-    let attemptedPathForError = ""; 
-
     try {
-      const apptRefPath = `Appointments/${serviceProviderUserId}`;
-      attemptedPathForError = apptRefPath;
-      console.log(`PublicBookingPage: Attempting to read from Appointments path: '${apptRefPath}'`);
-      const apptRef = ref(db, apptRefPath);
+      const apptRef = ref(db, `Appointments/${serviceProviderUserId}`);
       const apptSnapshot = await get(apptRef);
-
-      if (apptSnapshot.exists()) {
-        const apptData = apptSnapshot.val();
-        if (apptData && Object.keys(apptData).length > 0) {
-          console.log(`PublicBookingPage: Data FOUND in Appointments for ID '${serviceProviderUserId}'. Provider has existing appointment data. Keys:`, Object.keys(apptData).length);
-          providerDataFound = true;
-        } else {
-          console.log(`PublicBookingPage: Data node EXISTS in Appointments for ID '${serviceProviderUserId}', but it's EMPTY. This is considered 'not found' for initial verification.`);
-        }
-      } else {
-        console.log(`PublicBookingPage: NO data node found at Appointments path for ID '${serviceProviderUserId}'.`);
-      }
+      if (apptSnapshot.exists() && Object.keys(apptSnapshot.val()).length > 0) providerDataFound = true;
 
       if (!providerDataFound) {
-        const clientRefPath = `Clients/${serviceProviderUserId}`;
-        attemptedPathForError = clientRefPath;
-        console.log(`PublicBookingPage: Attempting to read from Clients path: '${clientRefPath}' (as no appointment data found)`);
-        const clientRef = ref(db, clientRefPath);
+        const clientRef = ref(db, `Clients/${serviceProviderUserId}`);
         const clientSnapshot = await get(clientRef);
-
-        if (clientSnapshot.exists()) {
-          const clientData = clientSnapshot.val();
-          if (clientData && Object.keys(clientData).length > 0) {
-            console.log(`PublicBookingPage: Data FOUND in Clients for ID '${serviceProviderUserId}'. Provider has existing client data. Keys:`, Object.keys(clientData).length);
-            providerDataFound = true;
-          } else {
-            console.log(`PublicBookingPage: Data node EXISTS in Clients for ID '${serviceProviderUserId}', but it's EMPTY. This is considered 'not found' for initial verification.`);
-          }
-        } else {
-          console.log(`PublicBookingPage: NO data node found at Clients path for ID '${serviceProviderUserId}'.`);
-        }
+        if (clientSnapshot.exists() && Object.keys(clientSnapshot.val()).length > 0) providerDataFound = true;
       }
       
-      if (providerDataFound) {
-          console.log(`PublicBookingPage: Provider data VERIFIED (found in Appointments or Clients) for ID '${serviceProviderUserId}'. Setting serviceProviderExists to true.`);
-          setServiceProviderExists(true);
-      } else {
-          console.log(`PublicBookingPage: Provider data NOT VERIFIED for ID '${serviceProviderUserId}' (no data or empty data in Appointments/Clients). Setting serviceProviderExists to false.`);
-          setServiceProviderExists(false);
-      }
-
+      setServiceProviderExists(providerDataFound);
+      console.log(`PublicBookingPage: Provider ${providerDataFound ? 'VERIFIED' : 'NOT VERIFIED/NEW'}.`);
     } catch (error: any) {
-      let detailedErrorMessage = "An unexpected error occurred while checking provider status.";
-      if (error.code === 'PERMISSION_DENIED') {
-           detailedErrorMessage = `Database permission denied. Cannot verify provider. Path: '${attemptedPathForError}'. Ensure DB rules allow public read.`;
-           console.error(`PublicBookingPage: CRITICAL - PERMISSION DENIED while checking service provider ID '${serviceProviderUserId}'. Path: '${attemptedPathForError}'. Error: ${error.message} (Code: ${error.code})`, error);
-      } else if (error instanceof Error) {
-          detailedErrorMessage = error.message;
-          console.error(`PublicBookingPage: Error during database check for ID '${serviceProviderUserId}' (Code: ${error.code || 'N/A'}): ${detailedErrorMessage}`, error);
-      } else if (typeof error === 'string') {
-          detailedErrorMessage = error;
-          console.error(`PublicBookingPage: Error during database check for ID '${serviceProviderUserId}' (Code: ${error.code || 'N/A'}): ${detailedErrorMessage}`, error);
-      }
-       
-      toast({ 
-          title: "Error Verifying Provider Link", 
-          description: `Could not verify service provider status. Details: ${detailedErrorMessage}`, 
-          variant: "destructive", duration: 10000
-      });
+      console.error(`PublicBookingPage: Error during database check for ID '${serviceProviderUserId}':`, error);
+      toast({ title: "Error Verifying Provider", description: `Could not verify provider status. ${error.message}`, variant: "destructive" });
       setServiceProviderExists(false);
     } finally {
       setInitialCheckDone(true);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceProviderUserId, toast]); 
 
   useEffect(() => {
     if (serviceProviderUserId) { 
         checkServiceProvider();
     } else {
-        console.log("PublicBookingPage: useEffect for checkServiceProvider - serviceProviderUserId is missing from URL. Setting check as done, provider exists = false.");
         setServiceProviderExists(false); 
         setInitialCheckDone(true); 
+        setIsLoadingPreferences(false); // No provider, no prefs to load beyond defaults
     }
   }, [serviceProviderUserId, checkServiceProvider]);
 
@@ -180,7 +197,6 @@ export default function PublicBookingPage() {
     setIsLoadingBookedSlots(true);
     const formattedDate = format(selectedDate, "yyyy-MM-dd");
     const appointmentsRefPath = `Appointments/${serviceProviderUserId}`;
-    console.log(`PublicBookingPage: Fetching booked slots for provider '${serviceProviderUserId}' on date '${formattedDate}' from path '${appointmentsRefPath}'`);
     const appointmentsRef = ref(db, appointmentsRefPath);
     const appointmentsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'), equalTo(formattedDate));
 
@@ -188,7 +204,6 @@ export default function PublicBookingPage() {
       const snapshot = await get(appointmentsQuery);
       const newBookedSlots = new Set<string>();
       if (snapshot.exists()) {
-        console.log(`PublicBookingPage: Found ${snapshot.size} bookings for provider '${serviceProviderUserId}' on '${formattedDate}'.`);
         snapshot.forEach((childSnapshot) => {
           const booking = childSnapshot.val() as ExistingBooking;
           if (booking.BookingStatus === "Booked") {
@@ -196,7 +211,6 @@ export default function PublicBookingPage() {
                 const baseDateForParse = new Date(formattedDate + "T00:00:00");
                 const slotStartTime = parse(booking.AppointmentStartTime, "HH:mm", baseDateForParse);
                 const slotEndTime = parse(booking.AppointmentEndTime, "HH:mm", baseDateForParse);
-
                 let currentSlotTime = slotStartTime;
                 while (currentSlotTime < slotEndTime) {
                   newBookedSlots.add(format(currentSlotTime, "HH:mm"));
@@ -207,17 +221,11 @@ export default function PublicBookingPage() {
               }
           }
         });
-      } else {
-        console.log(`PublicBookingPage: No bookings found for provider '${serviceProviderUserId}' on '${formattedDate}'.`);
       }
       setBookedTimeSlotsForDate(newBookedSlots);
     } catch (error: any) {
       console.error("PublicBookingPage: Error fetching booked slots:", error);
-      toast({
-        title: "Error loading schedule",
-        description: `Could not fetch existing bookings. Error: ${error.message}`,
-        variant: "destructive",
-      });
+      toast({ title: "Error loading schedule", description: `Could not fetch existing bookings. ${error.message}`, variant: "destructive" });
       setBookedTimeSlotsForDate(new Set());
     } finally {
       setIsLoadingBookedSlots(false);
@@ -236,170 +244,120 @@ export default function PublicBookingPage() {
     setIsSubmitting(true);
 
     if (!serviceProviderUserId) {
-        toast({ title: "Error", description: "Service provider ID is missing from the link. Cannot process booking.", variant: "destructive" });
-        setIsSubmitting(false);
-        return;
+        toast({ title: "Error", description: "Service provider ID missing.", variant: "destructive" });
+        setIsSubmitting(false); return;
     }
-
     if (!clientName || !serviceProcedure || !date || !startTime || !clientEmail || !clientPhone) {
-        toast({ title: "Error", description: "Please fill in all required fields.", variant: "destructive" });
-        setIsSubmitting(false);
-        return;
+        toast({ title: "Error", description: "Please fill all required fields.", variant: "destructive" });
+        setIsSubmitting(false); return;
     }
 
     const selectedFormattedDate = format(date, "yyyy-MM-dd");
     const baseDateForSubmitParse = new Date(selectedFormattedDate + "T00:00:00");
     const startDateTime = parse(startTime, 'HH:mm', baseDateForSubmitParse);
-    
-    const endDateTime = addMinutes(startDateTime, 60);
+    const endDateTime = addMinutes(startDateTime, 60); // 1-hour booking
     const calculatedEndTime = format(endDateTime, "HH:mm");
 
-    const endHour = getHours(endDateTime);
-    const endMinutes = getMinutes(endDateTime);
+    // Validation against working hours preferences
+    const currentPrefs = workingHoursPreferences || initialWorkingHoursDefaults;
+    const dayName = daysOfWeekConst[getDay(date)] as DayOfWeek;
+    const dayPref = currentPrefs[dayName];
 
-    if (endHour > MAX_BOOKING_HOUR || (endHour === MAX_BOOKING_HOUR && endMinutes > 0)) {
-        toast({ 
-            title: "Booking Time Invalid", 
-            description: `A 1-hour booking from ${startTime} would end after ${MAX_BOOKING_HOUR}:00. Please select an earlier start time.`, 
-            variant: "destructive" 
-        });
-        setIsSubmitting(false);
-        return;
+    if (dayPref.isUnavailable) {
+        toast({ title: "Booking Error", description: "The selected day is marked as unavailable by the provider.", variant: "destructive" });
+        setIsSubmitting(false); return;
+    }
+    const prefStartTimeDt = parse(dayPref.startTime, 'HH:mm', baseDateForSubmitParse);
+    const prefEndTimeDt = parse(dayPref.endTime, 'HH:mm', baseDateForSubmitParse);
+
+    if (startDateTime < prefStartTimeDt) {
+        toast({ title: "Booking Error", description: `Booking cannot start before provider's opening time of ${dayPref.startTime}.`, variant: "destructive" });
+        setIsSubmitting(false); return;
+    }
+    if (endDateTime > prefEndTimeDt) {
+        toast({ title: "Booking Error", description: `A 1-hour booking from ${startTime} would end after provider's closing time of ${dayPref.endTime}.`, variant: "destructive" });
+        setIsSubmitting(false); return;
     }
 
     let tempSlot = startDateTime;
     let hasOverlap = false;
     while(tempSlot < endDateTime) { 
         if(bookedTimeSlotsForDate.has(format(tempSlot, "HH:mm"))) {
-            hasOverlap = true;
-            break;
+            hasOverlap = true; break;
         }
         tempSlot = addMinutes(tempSlot, 30);
     }
-
     if(hasOverlap) {
-        toast({ title: "Booking Conflict", description: "The selected 1-hour time slot is no longer available or overlaps with an existing booking.", variant: "destructive" });
-        setIsSubmitting(false);
-        if (date) fetchBookedSlots(date); 
-        return;
+        toast({ title: "Booking Conflict", description: "The selected 1-hour time slot is no longer available.", variant: "destructive" });
+        setIsSubmitting(false); if (date) fetchBookedSlots(date); return;
     }
 
-
     if (!db) {
-        toast({ title: "Error", description: "Database not initialized. Cannot process booking.", variant: "destructive" });
-        setIsSubmitting(false);
-        return;
+        toast({ title: "Error", description: "Database not initialized.", variant: "destructive" });
+        setIsSubmitting(false); return;
     }
 
     const now = new Date();
-    const clientDataToSave = {
-        ClientID: "", 
-        ClientName: clientName.trim(),
-        ClientEmail: clientEmail.trim(),
-        ClientContact: clientPhone.trim(), 
-        CreateDate: format(now, "yyyy-MM-dd"),
-        CreateTime: format(now, "HH:mm"),
-        CreatedByUserID: serviceProviderUserId 
-    };
-    
-    const appointmentDataToSave = {
-        AppointmentID: "", 
-        ClientID: "", 
-        ServiceProcedure: serviceProcedure,
-        AppointmentDate: selectedFormattedDate,
-        AppointmentStartTime: startTime,
-        AppointmentEndTime: calculatedEndTime, 
-        BookingStatus: "Booked",
-        BookedByUserID: serviceProviderUserId 
-    };
-
-    console.log("PublicBookingPage: Data to be saved for client:", clientDataToSave);
-    console.log("PublicBookingPage: Data to be saved for appointment:", appointmentDataToSave);
-
+    const clientDataToSave = { ClientID: "", ClientName: clientName.trim(), ClientEmail: clientEmail.trim(), ClientContact: clientPhone.trim(), CreateDate: format(now, "yyyy-MM-dd"), CreateTime: format(now, "HH:mm"), CreatedByUserID: serviceProviderUserId };
+    const appointmentDataToSave = { AppointmentID: "", ClientID: "", ServiceProcedure: serviceProcedure, AppointmentDate: selectedFormattedDate, AppointmentStartTime: startTime, AppointmentEndTime: calculatedEndTime, BookingStatus: "Booked", BookedByUserID: serviceProviderUserId };
 
     try {
         const providerClientsRefPath = `Clients/${serviceProviderUserId}`;
-        const clientsDbRef = ref(db, providerClientsRefPath);
-        const newClientRef = push(clientsDbRef);
-        const newClientId = newClientRef.key as string;
-
-        clientDataToSave.ClientID = newClientId; 
-
-        console.log("PublicBookingPage: Attempting to save new client data to path:", newClientRef.toString());
+        const newClientRef = push(ref(db, providerClientsRefPath));
+        clientDataToSave.ClientID = newClientRef.key as string;
         await set(newClientRef, clientDataToSave);
-        console.log("PublicBookingPage: New client data saved successfully. Client ID:", newClientId);
 
         const providerAppointmentsRefPath = `Appointments/${serviceProviderUserId}`;
-        const appointmentsRefForUser = ref(db, providerAppointmentsRefPath);
-        const newAppointmentRef = push(appointmentsRefForUser);
-        const appointmentId = newAppointmentRef.key as string;
-
-        appointmentDataToSave.AppointmentID = appointmentId;
-        appointmentDataToSave.ClientID = newClientId; 
-
-        console.log("PublicBookingPage: Attempting to save new appointment data to path:", newAppointmentRef.toString());
+        const newAppointmentRef = push(ref(db, providerAppointmentsRefPath));
+        appointmentDataToSave.AppointmentID = newAppointmentRef.key as string;
+        appointmentDataToSave.ClientID = clientDataToSave.ClientID;
         await set(newAppointmentRef, appointmentDataToSave);
-        console.log("PublicBookingPage: New appointment data saved successfully. Appointment ID:", appointmentId);
-
 
         toast({ title: "Booking Confirmed!", description: `Your 1-hour appointment for ${serviceProcedure} has been booked.` });
         if(date) fetchBookedSlots(date); 
-
-        setClientName('');
-        setClientEmail('');
-        setClientPhone(''); 
-        setServiceProcedure('');
-        setStartTime('');
-        
+        setClientName(''); setClientEmail(''); setClientPhone(''); setServiceProcedure(''); setStartTime('');
     } catch (error: any) {
-        console.error("Error during public booking submission:", error);
-        let detailedMessage = "An unexpected error occurred. Please try again.";
-        if (error.code === 'PERMISSION_DENIED') {
-            detailedMessage = `Database permission denied during booking. Please check Firebase Realtime Database rules. Error: ${error.message}`;
-        } else if (error.message) {
-            detailedMessage = error.message;
-        }
-        toast({ title: "Booking Error", description: detailedMessage, variant: "destructive", duration: 10000 });
+        handleAuthErrorSubmit(error, "An unexpected error occurred during booking.");
     } finally {
         setIsSubmitting(false);
     }
   };
+  
+  const handleAuthErrorSubmit = (error: any, defaultMessage: string) => {
+    console.error("Error during public booking submission:", error);
+    let detailedMessage = defaultMessage;
+    if (error.code === 'PERMISSION_DENIED') {
+        detailedMessage = `Database permission denied. Please check Firebase rules.`;
+    } else if (error.message) {
+        detailedMessage = error.message;
+    }
+    toast({ title: "Booking Error", description: detailedMessage, variant: "destructive", duration: 10000 });
+  };
+
 
   if (!serviceProviderUserId) { 
      return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-muted/40 p-4">
             <Card className="w-full max-w-md shadow-xl p-6 text-center">
-                <CardHeader>
-                    <CardTitle className="text-2xl font-bold text-destructive mb-4">Invalid Booking Link</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <CardDescription>
-                        The booking link is incomplete or invalid. Please ensure you have the correct link from your service provider.
-                    </CardDescription>
-                </CardContent>
+                <CardHeader><CardTitle className="text-2xl font-bold text-destructive mb-4">Invalid Link</CardTitle></CardHeader>
+                <CardContent><CardDescription>Booking link is incomplete or invalid.</CardDescription></CardContent>
             </Card>
-            <footer className="bg-transparent py-4 text-center text-sm text-muted-foreground mt-auto fixed bottom-0">
-                © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
-            </footer>
+            <footer className="fixed bottom-0 bg-transparent py-4 text-center text-sm text-muted-foreground">© {new Date().getFullYear()} ServiceBooker Pro.</footer>
         </div>
     );
   }
 
-  if (!initialCheckDone) { 
+  if (!initialCheckDone || isLoadingPreferences) { 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-muted/40 p-4">
-            <svg className="animate-spin mx-auto h-12 w-12 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p className="mt-4 text-muted-foreground">Verifying booking link, please wait...</p>
-             <footer className="bg-transparent py-4 text-center text-sm text-muted-foreground mt-auto fixed bottom-0">
-                © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
-            </footer>
+            <Loader2 className="animate-spin mx-auto h-12 w-12 text-primary" />
+            <p className="mt-4 text-muted-foreground">
+              {!initialCheckDone ? "Verifying booking link..." : "Loading provider availability..."}
+            </p>
+            <footer className="fixed bottom-0 bg-transparent py-4 text-center text-sm text-muted-foreground">© {new Date().getFullYear()} ServiceBooker Pro.</footer>
         </div>
     );
   }
-
 
   return (
     <div className="min-h-screen flex flex-col bg-muted/40">
@@ -415,82 +373,39 @@ export default function PublicBookingPage() {
                         <AlertTriangle className="h-4 w-4 !text-yellow-600 dark:!text-yellow-400" />
                         <AlertTitle>Notice: Unrecognized Provider Link</AlertTitle>
                         <AlertDescription>
-                            This booking link appears to be for a new or unrecognized service provider. 
-                            Your booking will proceed and create necessary records. Please ensure this link is correct.
+                            This booking link may be for a new provider. Bookings will use default availability until configured.
                         </AlertDescription>
                     </Alert>
                 )}
                 <Card className="shadow-xl">
                     <CardHeader>
                         <CardTitle className="text-xl font-bold text-center text-primary">New Appointment Booking</CardTitle>
-                        <CardDescription className="text-center">
-                            Fill in your details below to schedule your 1-hour appointment.
-                        </CardDescription>
+                        <CardDescription className="text-center">Fill in your details for a 1-hour appointment.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleSubmit} className="space-y-6 p-2 sm:p-0">
                             <div>
                                 <Label htmlFor="clientName" className="font-medium">Your Name *</Label>
-                                <Input
-                                    type="text"
-                                    id="clientName"
-                                    value={clientName}
-                                    onChange={(e) => setClientName(e.target.value)}
-                                    required
-                                    className="mt-1"
-                                    placeholder="Enter your full name"/>
-
+                                <Input type="text" id="clientName" value={clientName} onChange={(e) => setClientName(e.target.value)} required className="mt-1" placeholder="Enter your full name"/>
                             </div>
-                            {/* Client Contact Field Removed */}
-                            <div> {/* Wrap Label and Input in a div */}
+                            <div>
                                 <Label htmlFor="clientEmail" className="font-medium">Your Email *</Label>
-                                <Input
-                                    type="email"
-                                    id="clientEmail"
-                                    value={clientEmail}
-                                    onChange={(e) => setClientEmail(e.target.value)}
-                                    className="mt-1"
-                                    placeholder="Enter your email"
-                                />
-
+                                <Input type="email" id="clientEmail" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} required className="mt-1" placeholder="Enter your email" />
                             </div>
-                            
-                            {/* Client Phone Number Field Added */}
                             <div>
                                 <Label htmlFor="clientPhone" className="font-medium">Your Phone Number *</Label>
-                                <Input
-                                    type="tel"
-                                    id="clientPhone"
-                                    value={clientPhone}
-                                    onChange={(e) => setClientPhone(e.target.value)}
-                                    required
-                                    className="mt-1"
-                                    placeholder="Enter your phone number"/>
+                                <Input type="tel" id="clientPhone" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} required className="mt-1" placeholder="Enter your phone number"/>
                             </div>
-
                             <div>
                                 <Label htmlFor="serviceProcedure" className="font-medium">Service/Procedure Requested *</Label>
-                                <Textarea
-                                    id="serviceProcedure"
-                                    value={serviceProcedure}
-                                    onChange={(e) => setServiceProcedure(e.target.value)}
-                                    required
-                                    className="mt-1"
-                                    placeholder="Describe the service you need"
-                                />
+                                <Textarea id="serviceProcedure" value={serviceProcedure} onChange={(e) => setServiceProcedure(e.target.value)} required className="mt-1" placeholder="Describe the service you need" />
                             </div>
                             <div className="flex flex-col sm:flex-row gap-6">
                                 <div className="flex-1">
                                     <Label htmlFor="date" className="font-medium">Appointment Date *</Label>
                                     <Popover>
                                         <PopoverTrigger asChild>
-                                            <Button
-                                                variant={"outline"}
-                                                className={cn(
-                                                    "w-full justify-start text-left font-normal mt-1",
-                                                    !date && "text-muted-foreground"
-                                                )}
-                                            >
+                                            <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal mt-1", !date && "text-muted-foreground")} disabled={isLoadingPreferences}>
                                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                                 {date ? format(date, "PPP") : <span>Pick a date</span>}
                                             </Button>
@@ -499,11 +414,13 @@ export default function PublicBookingPage() {
                                             <CalendarIconLucideShadcn
                                                 mode="single"
                                                 selected={date}
-                                                onSelect={(selectedDay) => {
-                                                    setDate(selectedDay);
-                                                    setStartTime(''); 
+                                                onSelect={(selectedDay) => { setDate(selectedDay); setStartTime(''); }}
+                                                disabled={(d) => {
+                                                    if (d < new Date(new Date().setHours(0,0,0,0))) return true;
+                                                    if (isLoadingPreferences || !workingHoursPreferences) return false; // Allow selection if still loading prefs
+                                                    const dayName = daysOfWeekConst[getDay(d)] as DayOfWeek;
+                                                    return workingHoursPreferences[dayName]?.isUnavailable || false;
                                                 }}
-                                                disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))} 
                                                 initialFocus
                                             />
                                         </PopoverContent>
@@ -511,48 +428,56 @@ export default function PublicBookingPage() {
                                 </div>
                                 <div className="flex-1">
                                     <Label htmlFor="startTime" className="font-medium">Start Time *</Label>
-                                    <Select
-                                        value={startTime}
-                                        onValueChange={setStartTime}
-                                        disabled={isLoadingBookedSlots || !date}
-                                    >
+                                    <Select value={startTime} onValueChange={setStartTime} disabled={isLoadingBookedSlots || isLoadingPreferences || !date}>
                                         <SelectTrigger className="w-full mt-1">
-                                            <SelectValue placeholder={isLoadingBookedSlots ? "Loading..." : "Select start time"} />
+                                            <SelectValue placeholder={isLoadingBookedSlots || isLoadingPreferences ? "Loading..." : "Select start time"} />
                                         </SelectTrigger>
                                         <SelectContent>
-                                             {isLoadingBookedSlots && <SelectItem value="loading" disabled>Loading slots...</SelectItem>}
-                                             {!isLoadingBookedSlots && timeSlots.map(slot => {
-                                                let itemIsDisabled = bookedTimeSlotsForDate.has(slot);
-                                                let itemLabelSuffix = itemIsDisabled ? "(Unavailable)" : "";
-                                                
-                                                if (!itemIsDisabled && date) {
-                                                    const slotDateTime = parse(slot, "HH:mm", date);
-                                                    const slotEndDateTime = addMinutes(slotDateTime, 60);
-                                                    const slotEndHour = getHours(slotEndDateTime);
-                                                    const slotEndMinutes = getMinutes(slotEndDateTime);
+                                             {(isLoadingBookedSlots || isLoadingPreferences) && <SelectItem value="loading" disabled>Loading slots...</SelectItem>}
+                                             {!isLoadingBookedSlots && !isLoadingPreferences && timeSlots.map(slot => {
+                                                let itemIsDisabled = false;
+                                                let itemLabelSuffix = "";
+                                                const currentPrefs = workingHoursPreferences || initialWorkingHoursDefaults;
 
-                                                    if (slotEndHour > MAX_BOOKING_HOUR || (slotEndHour === MAX_BOOKING_HOUR && slotEndMinutes > 0)) {
+                                                if (!date) {
+                                                    itemIsDisabled = true;
+                                                } else {
+                                                    const dayName = daysOfWeekConst[getDay(date)] as DayOfWeek;
+                                                    const dayPref = currentPrefs[dayName];
+                                                    const currentSlotDateTime = parse(slot, "HH:mm", date);
+                                                    const currentSlotEndDateTime = addMinutes(currentSlotDateTime, 60);
+
+                                                    if (dayPref.isUnavailable) {
                                                         itemIsDisabled = true;
-                                                        itemLabelSuffix = "(Too late)";
+                                                        itemLabelSuffix = "(Day Off)";
                                                     } else {
-                                                        let tempCheckTime = slotDateTime;
-                                                        while(tempCheckTime < slotEndDateTime){
+                                                        const prefStartTimeDt = parse(dayPref.startTime, "HH:mm", date);
+                                                        const prefEndTimeDt = parse(dayPref.endTime, "HH:mm", date);
+
+                                                        if (currentSlotDateTime < prefStartTimeDt) {
+                                                            itemIsDisabled = true;
+                                                            itemLabelSuffix = `(Too early, opens ${dayPref.startTime})`;
+                                                        }
+                                                        if (!itemIsDisabled && currentSlotEndDateTime > prefEndTimeDt) {
+                                                            itemIsDisabled = true;
+                                                            itemLabelSuffix = `(Too late, closes ${dayPref.endTime})`;
+                                                        }
+                                                    }
+                                                    
+                                                    if (!itemIsDisabled) {
+                                                        let tempCheckTime = currentSlotDateTime;
+                                                        while(tempCheckTime < currentSlotEndDateTime){
                                                             if(bookedTimeSlotsForDate.has(format(tempCheckTime, "HH:mm"))){
                                                                 itemIsDisabled = true;
-                                                                itemLabelSuffix = "(Conflicts)";
+                                                                itemLabelSuffix = "(Unavailable)";
                                                                 break;
                                                             }
                                                             tempCheckTime = addMinutes(tempCheckTime, 30);
                                                         }
                                                     }
                                                 }
-
                                                 return (
-                                                    <SelectItem
-                                                        key={`start-${slot}`}
-                                                        value={slot}
-                                                        disabled={itemIsDisabled}
-                                                    >
+                                                    <SelectItem key={`start-${slot}`} value={slot} disabled={itemIsDisabled}>
                                                         {slot} {itemLabelSuffix}
                                                     </SelectItem>
                                                 );
@@ -561,18 +486,15 @@ export default function PublicBookingPage() {
                                     </Select>
                                 </div>
                             </div>
-                            {isLoadingBookedSlots && date && ( 
+                            {(isLoadingBookedSlots || isLoadingPreferences) && date && ( 
                                 <div className="flex items-center text-sm text-muted-foreground">
-                                    <Clock className="mr-2 h-4 w-4 animate-spin" />
-                                    Checking available slots for {format(date, "PPP")}...
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    {isLoadingPreferences ? "Loading availability..." : `Checking slots for ${format(date, "PPP")}...`}
                                 </div>
                             )}
-                            <Button type="submit" disabled={isSubmitting || isLoadingBookedSlots} className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-semibold py-3 mt-8">
-                                {isSubmitting ? (
-                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
+                            <Button type="submit" disabled={isSubmitting || isLoadingBookedSlots || isLoadingPreferences} className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-semibold py-3 mt-8">
+                                {isSubmitting || isLoadingBookedSlots || isLoadingPreferences ? (
+                                    <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5" />
                                 ) : "Submit Booking"}
                             </Button>
                         </form>
