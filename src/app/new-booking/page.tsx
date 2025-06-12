@@ -470,6 +470,8 @@ export default function NewBookingPage() {
                                 type="tel" // Use type="tel" for phone number
                                 id="clientPhone"
                                 value={clientPhone}
+                                onChange={(e) => setClientPhone(e.target.value)}
+                                required
                                 className="mt-1"
                                 placeholder="Enter client's email address"
                             />

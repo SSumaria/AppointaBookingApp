@@ -3,9 +3,9 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { DateRange, DayContentProps } from "react-day-picker";
-import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, CalendarDays, ChevronLeft, ChevronRight, Edit3 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, parseISO, isSameDay, addDays, subDays, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns";
+import { format, parse, parseISO, isSameDay, addDays, subDays, startOfWeek, endOfWeek, eachDayOfInterval, addMinutes, getHours, getMinutes } from "date-fns";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import Link from 'next/link';
@@ -28,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { ref, get, query as rtQuery, orderByChild, update } from "firebase/database";
+import { ref, get, query as rtQuery, orderByChild, equalTo, update } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
 import {
   AlertDialog,
@@ -50,11 +50,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import WeeklyCalendarView from '@/components/calendar/WeeklyCalendarView';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 interface Note {
@@ -68,6 +70,8 @@ interface Booking {
   AppointmentID: string;
   ClientID: string;
   ClientName?: string;
+  ClientEmail?: string;
+  ClientContact?: string;
   ServiceProcedure: string;
   AppointmentDate: string; // yyyy-MM-dd
   AppointmentStartTime: string;
@@ -76,6 +80,30 @@ interface Booking {
   Notes?: Note[];
   BookedByUserID?: string;
 }
+
+interface EditBookingFormState {
+  serviceProcedure: string;
+  appointmentDate: Date | undefined;
+  appointmentStartTime: string;
+  appointmentEndTime: string;
+}
+
+const generateTimeSlots = () => {
+  const slots = [];
+  let currentTime = new Date();
+  currentTime.setHours(6, 0, 0, 0); 
+
+  const endTimeLimit = new Date();
+  endTimeLimit.setHours(21, 0, 0, 0); 
+
+  while (currentTime <= endTimeLimit) {
+    slots.push(format(currentTime, "HH:mm"));
+    currentTime = addMinutes(currentTime, 30);
+  }
+  return slots;
+};
+const timeSlots = generateTimeSlots();
+
 
 const generateNoteId = () => {
   return Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9);
@@ -92,8 +120,15 @@ export default function AllBookingsPage() {
   const { currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+  const [editingBookingNotes, setEditingBookingNotes] = useState<Booking | null>(null);
   const [newNoteInputValue, setNewNoteInputValue] = useState('');
+  
+  const [bookingToEdit, setBookingToEdit] = useState<Booking | null>(null);
+  const [editFormState, setEditFormState] = useState<EditBookingFormState | null>(null);
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
+  const [editBookedTimeSlotsForDate, setEditBookedTimeSlotsForDate] = useState<Set<string>>(new Set());
+  const [isLoadingEditBookedSlots, setIsLoadingEditBookedSlots] = useState(false);
+
   const [calendarOverviewMonth, setCalendarOverviewMonth] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState<"month" | "week">("month");
   const [weekViewDate, setWeekViewDate] = useState<Date>(new Date());
@@ -178,7 +213,6 @@ export default function AllBookingsPage() {
 
     } catch (error: any) {
       console.error("Error fetching bookings:", error);
-      // Toast removed as per user request
     } finally {
       setIsLoading(false);
     }
@@ -205,10 +239,9 @@ export default function AllBookingsPage() {
       const bookingDate = parseISO(booking.AppointmentDate);
       return bookingDate >= fromDate && bookingDate <= toDate;
     });
-    // Toast removed as per user request
     setBookingsForDisplay(filtered);
     setIsLoading(false);
-  }, [allFetchedBookings, filterDateRange, currentUser, authLoading]);
+  }, [allFetchedBookings, filterDateRange]);
 
 
   const handleFilterDateChange = (selectedRange: DateRange | undefined) => {
@@ -256,23 +289,23 @@ export default function AllBookingsPage() {
   };
 
   const handleAddNote = async () => {
-    if (!currentUser?.uid || !editingBooking || !newNoteInputValue.trim()) {
+    if (!currentUser?.uid || !editingBookingNotes || !newNoteInputValue.trim()) {
       toast({ title: "Error", description: "Cannot add note.", variant: "destructive" });
       return;
     }
-    const bookingId = editingBooking.id;
+    const bookingId = editingBookingNotes.id;
     const newNote: Note = { id: generateNoteId(), text: newNoteInputValue.trim(), timestamp: Date.now() };
 
     try {
       const bookingRefPath = `Appointments/${currentUser.uid}/${bookingId}`;
-      let currentNotes: Note[] = Array.isArray(editingBooking.Notes) ? editingBooking.Notes : [];
+      let currentNotes: Note[] = Array.isArray(editingBookingNotes.Notes) ? editingBookingNotes.Notes : [];
       const updatedNotes = [...currentNotes, newNote];
 
       await update(ref(db, bookingRefPath), { Notes: updatedNotes });
       toast({ title: "Note Added", description: "The new note has been added." });
       setNewNoteInputValue('');
 
-      setEditingBooking(prev => prev ? {...prev, Notes: updatedNotes} : null);
+      setEditingBookingNotes(prev => prev ? {...prev, Notes: updatedNotes} : null);
       setAllFetchedBookings(prevBookings => prevBookings.map(b =>
           b.id === bookingId ? { ...b, Notes: updatedNotes } : b
       ));
@@ -281,6 +314,152 @@ export default function AllBookingsPage() {
       toast({ title: "Error Adding Note", description: error.message, variant: "destructive" });
     }
   };
+
+  // --- Edit Booking Logic ---
+  const fetchBookedSlotsForEditForm = useCallback(async (selectedDate: Date, currentEditingBookingId: string | null) => {
+    if (!currentUser || !selectedDate) {
+      setEditBookedTimeSlotsForDate(new Set());
+      return;
+    }
+    setIsLoadingEditBookedSlots(true);
+    const formattedDate = format(selectedDate, "yyyy-MM-dd");
+    const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
+    const appointmentsRef = ref(db, userAppointmentsRefPath);
+    const appointmentsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'), equalTo(formattedDate));
+
+    try {
+      const snapshot = await get(appointmentsQuery);
+      const newBookedSlots = new Set<string>();
+      if (snapshot.exists()) {
+        snapshot.forEach((childSnapshot) => {
+          const bookingId = childSnapshot.key;
+          // Exclude the booking currently being edited from conflict calculation
+          if (bookingId === currentEditingBookingId) return;
+
+          const booking = childSnapshot.val() as Booking;
+          if (booking.BookingStatus === "Booked") {
+            try {
+              const baseDateForParse = new Date(formattedDate + "T00:00:00");
+              const slotStartTime = parse(booking.AppointmentStartTime, "HH:mm", baseDateForParse);
+              const slotEndTime = parse(booking.AppointmentEndTime, "HH:mm", baseDateForParse);
+
+              let currentSlotTime = slotStartTime;
+              while (currentSlotTime < slotEndTime) {
+                newBookedSlots.add(format(currentSlotTime, "HH:mm"));
+                currentSlotTime = addMinutes(currentSlotTime, 30);
+              }
+            } catch (parseError) {
+              console.error("Error parsing booking times for edit form:", booking, parseError);
+            }
+          }
+        });
+      }
+      setEditBookedTimeSlotsForDate(newBookedSlots);
+    } catch (error) {
+      console.error("Error fetching booked slots for edit form:", error);
+      toast({
+        title: "Error loading schedule for edit",
+        description: "Could not fetch existing bookings for this date.",
+        variant: "destructive",
+      });
+      setEditBookedTimeSlotsForDate(new Set());
+    } finally {
+      setIsLoadingEditBookedSlots(false);
+    }
+  }, [currentUser, toast]);
+
+  useEffect(() => {
+    if (editFormState?.appointmentDate && bookingToEdit) {
+      fetchBookedSlotsForEditForm(editFormState.appointmentDate, bookingToEdit.id);
+    } else {
+      setEditBookedTimeSlotsForDate(new Set());
+    }
+  }, [editFormState?.appointmentDate, bookingToEdit, fetchBookedSlotsForEditForm]);
+
+
+  const handleEditBookingClick = (booking: Booking) => {
+    setBookingToEdit(booking);
+    setEditFormState({
+      serviceProcedure: booking.ServiceProcedure,
+      appointmentDate: parseISO(booking.AppointmentDate),
+      appointmentStartTime: booking.AppointmentStartTime,
+      appointmentEndTime: booking.AppointmentEndTime,
+    });
+  };
+
+  const handleUpdateBooking = async () => {
+    if (!currentUser?.uid || !bookingToEdit || !editFormState) {
+      toast({ title: "Error", description: "Cannot update booking. Missing information.", variant: "destructive" });
+      return;
+    }
+    setIsEditSubmitting(true);
+
+    const { serviceProcedure, appointmentDate, appointmentStartTime, appointmentEndTime } = editFormState;
+
+    if (!serviceProcedure || !appointmentDate || !appointmentStartTime || !appointmentEndTime) {
+        toast({ title: "Validation Error", description: "All fields are required.", variant: "destructive" });
+        setIsEditSubmitting(false);
+        return;
+    }
+    
+    const formattedDate = format(appointmentDate, "yyyy-MM-dd");
+    const baseDateForValidation = new Date(formattedDate + "T00:00:00");
+    const startDateTime = parse(appointmentStartTime, "HH:mm", baseDateForValidation);
+    const endDateTime = parse(appointmentEndTime, "HH:mm", baseDateForValidation);
+
+    if (endDateTime <= startDateTime) {
+      toast({ title: "Validation Error", description: "End time must be after start time.", variant: "destructive" });
+      setIsEditSubmitting(false);
+      return;
+    }
+
+    let tempSlot = startDateTime;
+    let hasOverlap = false;
+    while(tempSlot < endDateTime) {
+        if(editBookedTimeSlotsForDate.has(format(tempSlot, "HH:mm"))) {
+            hasOverlap = true;
+            break;
+        }
+        tempSlot = addMinutes(tempSlot, 30);
+    }
+
+    if(hasOverlap) {
+        toast({ title: "Booking Conflict", description: "The new time range overlaps with an existing booking.", variant: "destructive" });
+        setIsEditSubmitting(false);
+        return;
+    }
+
+    const updates: Partial<Booking> = {
+      ServiceProcedure: serviceProcedure,
+      AppointmentDate: formattedDate,
+      AppointmentStartTime: appointmentStartTime,
+      AppointmentEndTime: appointmentEndTime,
+    };
+
+    try {
+      const bookingRefPath = `Appointments/${currentUser.uid}/${bookingToEdit.id}`;
+      await update(ref(db, bookingRefPath), updates);
+      toast({ title: "Booking Updated", description: "The booking has been successfully updated." });
+      fetchAndSetAllBookings();
+      setBookingToEdit(null);
+      setEditFormState(null);
+    } catch (error: any) {
+      console.error("Error updating booking:", error);
+      toast({ title: "Error Updating Booking", description: error.message, variant: "destructive" });
+    } finally {
+      setIsEditSubmitting(false);
+    }
+  };
+
+  const handleEditFormChange = (field: keyof EditBookingFormState, value: any) => {
+    setEditFormState(prev => prev ? { ...prev, [field]: value } : null);
+    if (field === 'appointmentDate') {
+      // Reset times if date changes to force re-selection based on new availability
+      setEditFormState(prev => prev ? { ...prev, appointmentStartTime: '', appointmentEndTime: '' } : null);
+    }
+  };
+
+  // --- End of Edit Booking Logic ---
 
 
   const CustomDayContent = (props: DayContentProps) => {
@@ -356,7 +535,199 @@ export default function AllBookingsPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <Dialog open={!!editingBooking} onOpenChange={(isOpen) => { if (!isOpen) { setEditingBooking(null); setNewNoteInputValue('');} }}>
+      {/* Dialog for Editing Booking Notes */}
+      <Dialog open={!!editingBookingNotes} onOpenChange={(isOpen) => { if (!isOpen) { setEditingBookingNotes(null); setNewNoteInputValue('');} }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Manage Notes for {editingBookingNotes?.ClientName}
+            </DialogTitle>
+            <DialogDescription>
+              Appointment on {editingBookingNotes && format(parseISO(editingBookingNotes.AppointmentDate), "PPP")} at {editingBookingNotes?.AppointmentStartTime} - {editingBookingNotes?.AppointmentEndTime}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {editingBookingNotes?.Notes && editingBookingNotes.Notes.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm">Existing Notes:</h4>
+                <ScrollArea className="h-[150px] w-full rounded-md border p-3">
+                  <ul className="space-y-2">
+                    {editingBookingNotes.Notes.slice().sort((a,b) => b.timestamp - a.timestamp).map((note) => (
+                      <li key={note.id} className="text-xs p-2 bg-muted/50 rounded">
+                        <p className="whitespace-pre-wrap">{note.text}</p>
+                        <p className="text-muted-foreground text-right text-[10px] mt-1">
+                          {format(new Date(note.timestamp), "MMM d, yyyy h:mm a")}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </ScrollArea>
+              </div>
+            )}
+              {(editingBookingNotes?.Notes?.length === 0 || !editingBookingNotes?.Notes) && (
+              <p className="text-sm text-muted-foreground">No existing notes for this booking.</p>
+            )}
+            <div className="grid grid-cols-1 items-center gap-2 mt-4">
+              <Label htmlFor="new-notes-input" className="font-medium">
+                Add New Note
+              </Label>
+              <Textarea
+                id="new-notes-input"
+                value={newNoteInputValue}
+                onChange={(e) => setNewNoteInputValue(e.target.value)}
+                placeholder="Type your new note here..."
+                rows={3}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEditingBookingNotes(null); setNewNoteInputValue('');} }>Close</Button>
+            <Button onClick={handleAddNote} disabled={!newNoteInputValue.trim()}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add Note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Dialog for Editing Booking Details */}
+      <Dialog open={!!bookingToEdit} onOpenChange={(isOpen) => { if (!isOpen) { setBookingToEdit(null); setEditFormState(null);} }}>
+         <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Booking for {bookingToEdit?.ClientName}</DialogTitle>
+            <DialogDescription>
+              Modify the details for this appointment.
+            </DialogDescription>
+          </DialogHeader>
+          {editFormState && bookingToEdit && (
+            <div className="grid gap-4 py-4">
+              <div>
+                <Label htmlFor="editServiceProcedure">Service/Procedure *</Label>
+                <Textarea
+                  id="editServiceProcedure"
+                  value={editFormState.serviceProcedure}
+                  onChange={(e) => handleEditFormChange('serviceProcedure', e.target.value)}
+                  required
+                  className="mt-1"
+                  placeholder="Describe the service"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="sm:col-span-1">
+                  <Label htmlFor="editAppointmentDate">Date *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn("w-full justify-start text-left font-normal mt-1", !editFormState.appointmentDate && "text-muted-foreground")}
+                      >
+                        <CalendarIconLucide className="mr-2 h-4 w-4" />
+                        {editFormState.appointmentDate ? format(editFormState.appointmentDate, "PPP") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={editFormState.appointmentDate}
+                        onSelect={(day) => handleEditFormChange('appointmentDate', day)}
+                        disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="sm:col-span-1">
+                  <Label htmlFor="editAppointmentStartTime">Start Time *</Label>
+                  <Select
+                    value={editFormState.appointmentStartTime}
+                    onValueChange={(value) => handleEditFormChange('appointmentStartTime', value)}
+                    disabled={isLoadingEditBookedSlots || !editFormState.appointmentDate}
+                  >
+                    <SelectTrigger className="w-full mt-1">
+                      <SelectValue placeholder={isLoadingEditBookedSlots ? "Loading..." : "Select"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isLoadingEditBookedSlots && <SelectItem value="loading" disabled>Loading...</SelectItem>}
+                      {!isLoadingEditBookedSlots && timeSlots.map(slot => (
+                        <SelectItem
+                          key={`edit-start-${slot}`}
+                          value={slot}
+                          disabled={editBookedTimeSlotsForDate.has(slot)}
+                        >
+                          {slot}{editBookedTimeSlotsForDate.has(slot) ? " (Booked)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="sm:col-span-1">
+                  <Label htmlFor="editAppointmentEndTime">End Time *</Label>
+                  <Select
+                    value={editFormState.appointmentEndTime}
+                    onValueChange={(value) => handleEditFormChange('appointmentEndTime', value)}
+                    disabled={isLoadingEditBookedSlots || !editFormState.appointmentDate || !editFormState.appointmentStartTime}
+                  >
+                    <SelectTrigger className="w-full mt-1">
+                      <SelectValue placeholder={isLoadingEditBookedSlots ? "Loading..." : "Select"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isLoadingEditBookedSlots && <SelectItem value="loading" disabled>Loading...</SelectItem>}
+                      {!isLoadingEditBookedSlots && timeSlots.filter(slot => {
+                        if (!editFormState.appointmentStartTime || !editFormState.appointmentDate) return true;
+                        const baseDate = new Date(editFormState.appointmentDate); baseDate.setHours(0,0,0,0);
+                        return parse(slot, "HH:mm", baseDate) > parse(editFormState.appointmentStartTime, "HH:mm", baseDate);
+                      }).map(slot => {
+                        let itemIsDisabled = false;
+                        let itemLabelSuffix = "";
+                        if (editFormState.appointmentStartTime && editFormState.appointmentDate) {
+                            const baseDate = new Date(editFormState.appointmentDate); baseDate.setHours(0,0,0,0);
+                            const newBookingStart = parse(editFormState.appointmentStartTime, "HH:mm", baseDate);
+                            const potentialEnd = parse(slot, "HH:mm", baseDate);
+                            let tempCheck = newBookingStart;
+                            while (tempCheck < potentialEnd) {
+                                if (editBookedTimeSlotsForDate.has(format(tempCheck, "HH:mm"))) {
+                                    itemIsDisabled = true;
+                                    itemLabelSuffix = " (Conflicts)";
+                                    break;
+                                }
+                                tempCheck = addMinutes(tempCheck, 30);
+                            }
+                        } else if (!editFormState.appointmentStartTime) {
+                            itemIsDisabled = true;
+                        }
+                        return (
+                          <SelectItem key={`edit-end-${slot}`} value={slot} disabled={itemIsDisabled}>
+                            {slot}{itemLabelSuffix}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+               {isLoadingEditBookedSlots && editFormState.appointmentDate && (
+                  <div className="text-xs text-muted-foreground flex items-center">
+                    <svg className="animate-spin mr-1 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    Checking availability...
+                  </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setBookingToEdit(null); setEditFormState(null); }}>Cancel</Button>
+            <Button onClick={handleUpdateBooking} disabled={isEditSubmitting || isLoadingEditBookedSlots || !editFormState}>
+              {isEditSubmitting ? (
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
         <main className="flex-grow py-10">
           <div className="container max-w-7xl mx-auto space-y-8">
             <Card className="shadow-xl">
@@ -441,6 +812,11 @@ export default function AllBookingsPage() {
                         onDayClick={(date) => {
                             handleCalendarDayClick(date);
                         }}
+                        onBookingClick={(booking) => {
+                          if (booking.BookingStatus !== "Cancelled") {
+                            handleEditBookingClick(booking);
+                          }
+                        }}
                       />
                     </div>
                   </TabsContent>
@@ -454,7 +830,7 @@ export default function AllBookingsPage() {
                   <ListFilter className="mr-2 h-6 w-6" /> Bookings List
                 </CardTitle>
                 <CardDescription>
-                  View and filter all your bookings by date range. Click the <Edit className="inline h-4 w-4" /> icon to manage notes.
+                  View and filter all your bookings. Click the <Edit className="inline h-4 w-4" /> icon to manage notes, or <Edit3 className="inline h-4 w-4" /> to edit booking details.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -520,9 +896,9 @@ export default function AllBookingsPage() {
                         <TableHead>Date</TableHead>
                         <TableHead>Start</TableHead>
                         <TableHead>End</TableHead>
-                        <TableHead className="w-[200px]">Latest Note</TableHead>
+                        <TableHead className="w-[150px]">Latest Note</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead className="w-[180px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -543,22 +919,21 @@ export default function AllBookingsPage() {
                           <TableCell>{booking.AppointmentEndTime}</TableCell>
                           <TableCell className="text-sm text-muted-foreground ">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="truncate max-w-[120px]" title={booking.Notes && booking.Notes.length > 0 ? booking.Notes[booking.Notes.length - 1].text : 'N/A'}>
+                              <span className="truncate max-w-[100px]" title={booking.Notes && booking.Notes.length > 0 ? booking.Notes[booking.Notes.length - 1].text : 'N/A'}>
                                 {booking.Notes && booking.Notes.length > 0 ? booking.Notes[booking.Notes.length - 1].text : 'N/A'}
                               </span>
-                              <DialogTrigger asChild>
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-6 w-6 p-0"
+                                  className="h-6 w-6 p-0 shrink-0"
                                   onClick={() => {
-                                    setEditingBooking(booking);
+                                    setEditingBookingNotes(booking);
                                     setNewNoteInputValue('');
                                   }}
                                 >
                                   <Edit className="h-4 w-4" />
+                                  <span className="sr-only">Manage Notes</span>
                                 </Button>
-                              </DialogTrigger>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -572,29 +947,36 @@ export default function AllBookingsPage() {
                             </span>
                           </TableCell>
                           <TableCell>
-                            {booking.BookingStatus === "Booked" && (
-                               <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="destructive" size="sm">
-                                    <XCircle className="mr-1 h-4 w-4" /> Cancel
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This action will cancel the booking for {booking.ClientName} on {format(parseISO(booking.AppointmentDate), "PPP")} at {booking.AppointmentStartTime}. This cannot be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Keep Booking</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleCancelBooking(booking.id)}>
-                                      Confirm Cancellation
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            )}
+                            <div className="flex items-center gap-1">
+                              {booking.BookingStatus !== "Cancelled" && (
+                                <Button variant="outline" size="sm" className="h-8 px-2 py-1" onClick={() => handleEditBookingClick(booking)}>
+                                  <Edit3 className="mr-1 h-3 w-3" /> Edit
+                                </Button>
+                              )}
+                              {booking.BookingStatus === "Booked" && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="destructive" size="sm" className="h-8 px-2 py-1">
+                                      <XCircle className="mr-1 h-3 w-3" /> Cancel
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This action will cancel the booking for {booking.ClientName} on {format(parseISO(booking.AppointmentDate), "PPP")} at {booking.AppointmentStartTime}. This cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Keep Booking</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleCancelBooking(booking.id)}>
+                                        Confirm Cancellation
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -613,66 +995,10 @@ export default function AllBookingsPage() {
             </Card>
           </div>
         </main>
-
-        {editingBooking && (
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                Manage Notes for {editingBooking.ClientName}
-              </DialogTitle>
-              <DialogDescription>
-                Appointment on {format(parseISO(editingBooking.AppointmentDate), "PPP")} at {editingBooking.AppointmentStartTime} - {editingBooking.AppointmentEndTime}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              {editingBooking.Notes && editingBooking.Notes.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm">Existing Notes:</h4>
-                  <ScrollArea className="h-[150px] w-full rounded-md border p-3">
-                    <ul className="space-y-2">
-                      {editingBooking.Notes.slice().sort((a,b) => b.timestamp - a.timestamp).map((note) => (
-                        <li key={note.id} className="text-xs p-2 bg-muted/50 rounded">
-                          <p className="whitespace-pre-wrap">{note.text}</p>
-                          <p className="text-muted-foreground text-right text-[10px] mt-1">
-                            {format(new Date(note.timestamp), "MMM d, yyyy h:mm a")}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  </ScrollArea>
-                </div>
-              )}
-               {(editingBooking.Notes?.length === 0 || !editingBooking.Notes) && (
-                <p className="text-sm text-muted-foreground">No existing notes for this booking.</p>
-              )}
-
-              <div className="grid grid-cols-1 items-center gap-2 mt-4">
-                <Label htmlFor="new-notes-input" className="font-medium">
-                  Add New Note
-                </Label>
-                <Textarea
-                  id="new-notes-input"
-                  value={newNoteInputValue}
-                  onChange={(e) => setNewNoteInputValue(e.target.value)}
-                  placeholder="Type your new note here..."
-                  rows={3}
-                  className="col-span-3"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => { setEditingBooking(null); setNewNoteInputValue('');} }>Close</Button>
-              <Button onClick={handleAddNote} disabled={!newNoteInputValue.trim()}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Note
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        )}
-      </Dialog>
-
       <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
         © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
       </footer>
     </div>
   );
 }
+

@@ -438,12 +438,12 @@ export default function PublicBookingPage() {
                                     onChange={(e) => setClientName(e.target.value)}
                                     required
                                     className="mt-1"
-                                    placeholder="Enter your full name"
-                                />
+                                    placeholder="Enter your full name"/>
+
                             </div>
                             {/* Client Contact Field Removed */}
-                             <div>
-                                <Label htmlFor="clientEmail" className="font-medium">Your Email (Optional)</Label>
+                            <div> {/* Wrap Label and Input in a div */}
+                                <Label htmlFor="clientEmail" className="font-medium">Your Email *</Label>
                                 <Input
                                     type="email"
                                     id="clientEmail"
@@ -452,6 +452,20 @@ export default function PublicBookingPage() {
                                     className="mt-1"
                                     placeholder="Enter your email"
                                 />
+
+                            </div>
+                            
+                            {/* Client Phone Number Field Added */}
+                            <div>
+                                <Label htmlFor="clientPhone" className="font-medium">Your Phone Number *</Label>
+                                <Input
+                                    type="tel"
+                                    id="clientPhone"
+                                    value={clientPhone}
+                                    onChange={(e) => setClientPhone(e.target.value)}
+                                    required
+                                    className="mt-1"
+                                    placeholder="Enter your phone number"/>
                             </div>
 
                             <div>
