@@ -28,7 +28,8 @@ interface Client {
   id: string;
   ClientID: string;
   ClientName: string;
-  ClientContact?: string;
+  ClientEmail?: string; // Added ClientEmail
+  ClientContact?: string; // This is primarily used for phone now
   CreateDate: string;
   CreateTime: string;
   CreatedByUserID?: string;
@@ -235,10 +236,16 @@ export default function ClientDetailsPage() {
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3">
                 <h3 className="text-lg font-semibold text-muted-foreground">Client Information</h3>
-                {client.ClientContact && (
+                {client.ClientEmail && (
                   <p className="flex items-center">
-                    {client.ClientContact.includes('@') ? <Mail className="mr-2 h-5 w-5 text-primary/80" /> : <Phone className="mr-2 h-5 w-5 text-primary/80" />}
-                    <span className="font-medium">Contact:</span> {client.ClientContact}
+                    <Mail className="mr-2 h-5 w-5 text-primary/80" />
+                    <span className="font-medium">Email:</span> {client.ClientEmail}
+                  </p>
+                )}
+                {client.ClientContact && ( // ClientContact is now primarily phone
+                  <p className="flex items-center">
+                    <Phone className="mr-2 h-5 w-5 text-primary/80" />
+                    <span className="font-medium">Phone:</span> {client.ClientContact}
                   </p>
                 )}
                 <p className="flex items-center"><CalendarIconLucide className="mr-2 h-5 w-5 text-primary/80" /> <span className="font-medium">Date Created:</span> {format(parseISO(client.CreateDate), "PPP")}</p>
