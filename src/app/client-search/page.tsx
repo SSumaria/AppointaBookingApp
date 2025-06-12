@@ -29,8 +29,9 @@ import { db } from '@/lib/firebaseConfig';
 
 interface Client {
   id: string; // This will be the Firebase key
-  ClientID: string; // The generated alphanumeric ID stored in the client object
+  ClientID: string; // The generated alphanumeric ID stored in the client object (still needed for linking)
   ClientName: string;
+  ClientEmail?: string; // Added ClientEmail
   ClientContact?: string;
   CreateDate: string;
   CreateTime: string;
@@ -114,6 +115,7 @@ export default function ClientSearchPage() {
                 id: childSnapshot.key as string, // The Firebase key for this client entry
                 ClientID: data.ClientID,
                 ClientName: data.ClientName,
+                ClientEmail: data.ClientEmail, // Populate ClientEmail
                 ClientContact: data.ClientContact,
                 CreateDate: data.CreateDate,
                 CreateTime: data.CreateTime,
@@ -225,8 +227,8 @@ export default function ClientSearchPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[200px]">Client Name</TableHead>
-                      <TableHead>Client ID (Internal)</TableHead>
-                      <TableHead>Contact</TableHead>
+                      <TableHead>Client Email</TableHead>
+                      <TableHead>Phone Contact</TableHead>
                       <TableHead>Date Created</TableHead>
                       <TableHead>Time Created</TableHead>
                     </TableRow>
@@ -239,7 +241,7 @@ export default function ClientSearchPage() {
                             {client.ClientName}
                           </Link>
                         </TableCell>
-                        <TableCell>{client.ClientID}</TableCell>
+                        <TableCell>{client.ClientEmail || 'N/A'}</TableCell>
                         <TableCell>{client.ClientContact || 'N/A'}</TableCell>
                         <TableCell>{client.CreateDate}</TableCell>
                         <TableCell>{client.CreateTime}</TableCell>
