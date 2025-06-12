@@ -81,7 +81,6 @@ const generateNoteId = () => {
 
 export default function NewBookingPage() {
     const [clientName, setClientName] = useState('');
-    // const [clientContact, setClientContact] = useState(''); // Removed
     const [clientEmail, setClientEmail] = useState('');
     const [serviceProcedure, setServiceProcedure] = useState('');
     const [date, setDate] = useState<Date | undefined>(new Date());
@@ -172,9 +171,8 @@ export default function NewBookingPage() {
         setSelectedClientFirebaseKey(null); 
         
         if (query.trim() === '') {
-          // setClientContact(''); // No longer needed as clientContact state is removed
- setClientEmail(''); // Clear email if name is cleared
- setClientPhone(''); // Clear phone if name is cleared
+ setClientEmail(''); 
+ setClientPhone(''); 
         }
 
 
@@ -219,9 +217,8 @@ export default function NewBookingPage() {
 
     const handleSuggestionClick = (suggestion: ClientSuggestion) => {
         setClientName(suggestion.ClientName);
-        setClientEmail(suggestion.ClientEmail || ''); // Set email from suggestion
-        setClientPhone(suggestion.ClientContact || ''); // Set phone from suggestion
-        // setClientContact(suggestion.ClientContact || ''); // Removed
+        setClientEmail(suggestion.ClientEmail || ''); 
+        setClientPhone(suggestion.ClientContact || ''); 
         setSelectedClientFirebaseKey(suggestion.id);
         setShowSuggestions(false);
         setSuggestions([]);
@@ -292,8 +289,8 @@ export default function NewBookingPage() {
 
         let clientIdToUse: string | null = selectedClientFirebaseKey;
         let finalClientName = clientName.trim();
-        let finalClientEmail = clientEmail.trim(); // Use the email from the form
-        let finalClientPhone = clientPhone.trim(); // Use the phone from the form
+        let finalClientEmail = clientEmail.trim(); 
+        let finalClientPhone = clientPhone.trim(); 
 
         const finalNotes: Note[] = [];
         if (notesInput.trim()) {
@@ -318,10 +315,10 @@ export default function NewBookingPage() {
                         const clientData = childSnapshot.val() as ClientData;
                         const dbNameLower = (clientData.ClientName || "").trim().toLowerCase();
                         
-                        if (dbNameLower === inputNameLower) { // Match by name ONLY
+                        if (dbNameLower === inputNameLower) { 
                             clientIdToUse = childSnapshot.key;
                             finalClientName = clientData.ClientName;
- finalClientEmail = clientData.ClientEmail || ''; // Preserve existing email from DB if client was selected
+ finalClientEmail = clientData.ClientEmail || ''; 
                             foundExisting = true;
                             return true; 
                         }
@@ -335,8 +332,8 @@ export default function NewBookingPage() {
                     await set(newClientRef, {
                         ClientID: clientIdToUse, 
                         ClientName: finalClientName, 
-                        ClientContact: '', // New client contact is empty
-                        ClientEmail: finalClientEmail, // Use form email for new client
+                        ClientContact: finalClientPhone, 
+                        ClientEmail: finalClientEmail, 
                         CreateDate: format(now, "yyyy-MM-dd"),
                         CreateTime: format(now, "HH:mm"),
                         CreatedByUserID: currentUser.uid
@@ -348,7 +345,7 @@ export default function NewBookingPage() {
                 if(clientSnapshot.exists()){
                     const clientData = clientSnapshot.val() as ClientData;
                     finalClientName = clientData.ClientName;
-                    finalClientEmail = clientData.ClientEmail || ''; // Use existing email from DB if client was selected
+                    finalClientEmail = clientData.ClientEmail || ''; 
                 }
             }
 
@@ -362,8 +359,8 @@ export default function NewBookingPage() {
                 AppointmentID: appointmentId,
                 ClientID: clientIdToUse, 
                 ServiceProcedure: serviceProcedure,
-                ClientEmail: finalClientEmail, // Save the email with the booking
-                ClientContact: finalClientPhone, // Save the phone with the booking
+                ClientEmail: finalClientEmail, 
+                ClientContact: finalClientPhone, 
                 AppointmentDate: selectedFormattedDate,
                 AppointmentStartTime: startTime,
                 AppointmentEndTime: endTime,
@@ -376,9 +373,8 @@ export default function NewBookingPage() {
             if(date) fetchBookedSlots(date);
 
             setClientName('');
-            // setClientContact(''); // Removed
-            setClientEmail(''); // Clear email field after successful booking
-            setClientPhone(''); // Clear phone field after successful booking
+            setClientEmail(''); 
+            setClientPhone(''); 
             setServiceProcedure('');
             setNotesInput('');
             setStartTime('');
@@ -442,18 +438,18 @@ export default function NewBookingPage() {
                                             className="px-3 py-2 hover:bg-accent hover:text-accent-foreground cursor-pointer"
                                             onClick={() => handleSuggestionClick(suggestion)}
                                         >
-                                            {suggestion.ClientName} {/* Contact info removed from suggestion display */}
+                                            {suggestion.ClientName} 
                                         </div>
                                     ))}
                                 </div>
                             )}
                         </div>
 
-                        {/* Client Email Field */}
+                        
                         <div>
                             <Label htmlFor="clientEmail" className="font-medium">Client Email *</Label>
                             <Input
-                                type="email" // Use type="email" for email validation hint
+                                type="email" 
                                 id="clientEmail"
                                 value={clientEmail}
                                 onChange={(e) => setClientEmail(e.target.value)}
@@ -463,17 +459,17 @@ export default function NewBookingPage() {
                             />
                         </div>
 
-                        {/* Client Phone Number Field */}
+                        
                         <div>
                             <Label htmlFor="clientPhone" className="font-medium">Client Phone Number *</Label>
                             <Input
-                                type="tel" // Use type="tel" for phone number
+                                type="tel" 
                                 id="clientPhone"
                                 value={clientPhone}
                                 onChange={(e) => setClientPhone(e.target.value)}
                                 required
                                 className="mt-1"
-                                placeholder="Enter client's email address"
+                                placeholder="Enter client's phone number"
                             />
                         </div>
 
