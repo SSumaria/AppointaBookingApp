@@ -77,7 +77,7 @@ export default function PreferencesPage() {
       const snapshot = await get(preferencesRef);
       if (snapshot.exists()) {
         const loadedPreferences = snapshot.val() as WorkingHours;
-        // Validate loaded preferences structure
+        
         let isValid = true;
         daysOfWeek.forEach(day => {
             if (!loadedPreferences[day] || 
@@ -92,18 +92,22 @@ export default function PreferencesPage() {
             setWorkingHours(loadedPreferences);
         } else {
             console.warn("Loaded preferences from Firebase have an invalid structure. Using defaults.");
-            setWorkingHours(initialWorkingHours); // Fallback to defaults
-            // Optionally, save valid initialWorkingHours back to Firebase here if structure was corrupt
+            setWorkingHours(initialWorkingHours); 
         }
       } else {
         // No preferences saved yet, use initial (already set)
       }
     } catch (error: any) {
       console.error("Error fetching user preferences:", error);
+      let description = error.message || "Could not load your saved working hours.";
+      if (error.message && error.message.toLowerCase().includes("permission denied")) {
+        description = "Permission denied when fetching preferences. Please ensure your Firebase Realtime Database rules allow users to read their own preferences. Example rule for UserPreferences: '{ \"$uid\": { \".read\": \"auth != null && auth.uid === $uid\", \".write\": \"auth != null && auth.uid === $uid\" } }'";
+      }
       toast({
         title: "Error Loading Preferences",
-        description: error.message || "Could not load your saved working hours.",
+        description: description,
         variant: "destructive",
+        duration: 10000, 
       });
     } finally {
       setIsLoadingPreferences(false);
@@ -129,10 +133,10 @@ export default function PreferencesPage() {
       const currentEndTime = parse(newHours[day].endTime, "HH:mm", new Date());
 
       if (type === 'startTime' && currentEndTime < currentStartTime) {
-        newHours[day].endTime = value; // Set end time to be same as start time
+        newHours[day].endTime = value; 
       }
       if (type === 'endTime' && currentStartTime > currentEndTime) {
-        newHours[day].startTime = value; // Set start time to be same as end time
+        newHours[day].startTime = value; 
       }
       return newHours;
     });
@@ -155,7 +159,6 @@ export default function PreferencesPage() {
         return;
     }
 
-    // Validate all day settings
     for (const day of daysOfWeek) {
         const { startTime, endTime, isUnavailable } = workingHours[day];
         if (!isUnavailable) {
@@ -182,10 +185,15 @@ export default function PreferencesPage() {
       });
     } catch (error: any) {
       console.error("Error saving user preferences:", error);
+      let description = error.message || "Could not save your working hours.";
+      if (error.message && error.message.toLowerCase().includes("permission denied")) {
+        description = "Permission denied when saving preferences. Please ensure your Firebase Realtime Database rules allow users to write their own preferences. Example rule for UserPreferences: '{ \"$uid\": { \".read\": \"auth != null && auth.uid === $uid\", \".write\": \"auth != null && auth.uid === $uid\" } }'";
+      }
       toast({
         title: "Error Saving Preferences",
-        description: error.message || "Could not save your working hours.",
+        description: description,
         variant: "destructive",
+        duration: 10000,
       });
     } finally {
       setIsSaving(false);
