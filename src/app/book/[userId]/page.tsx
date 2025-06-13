@@ -3,7 +3,7 @@
 
 console.log("--- PublicBookingPage (/book/[userId]/page.tsx) --- MODULE SCRIPT EXECUTING (TOP LEVEL)");
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -54,7 +54,7 @@ const initialWorkingHoursDefaults: WorkingHours = {
 const generateTimeSlots = () => {
   const slots = [];
   let currentTime = new Date();
-  currentTime.setHours(0, 0, 0, 0); // Generate for the whole day initially, then filter
+  currentTime.setHours(0, 0, 0, 0); 
 
   const dayEndLimit = new Date();
   dayEndLimit.setHours(23, 59, 0, 0); 
@@ -65,9 +65,8 @@ const generateTimeSlots = () => {
   }
   return slots;
 };
-const timeSlots = generateTimeSlots();
-// MAX_BOOKING_HOUR is now less relevant as preferences dictate end times.
-// const MAX_BOOKING_HOUR = 21; 
+const allDayTimeSlots = generateTimeSlots();
+
 
 export default function PublicBookingPage() {
   console.log("--- PublicBookingPage (/book/[userId]/page.tsx) --- COMPONENT RENDERING ---");
@@ -128,7 +127,11 @@ export default function PublicBookingPage() {
         }
     } catch (error: any) {
         console.error("Error fetching user preferences for public booking:", error);
-        toast({ title: "Error", description: "Could not load provider's availability settings.", variant: "destructive" });
+        let description = error.message || "Could not load provider's availability settings.";
+        if (error.message && error.message.toLowerCase().includes("permission denied")) {
+            description = "Permission denied fetching provider availability. The provider's settings might not be publicly accessible. Please ensure Firebase rules allow reading 'UserPreferences/$uid/workingHours'.";
+        }
+        toast({ title: "Error", description: description, variant: "destructive", duration: 10000 });
         setWorkingHoursPreferences(initialWorkingHoursDefaults);
     } finally {
         setIsLoadingPreferences(false);
@@ -157,6 +160,8 @@ export default function PublicBookingPage() {
 
     let providerDataFound = false;
     try {
+      // Check if provider has any data (e.g., appointments or clients or preferences)
+      // This is a basic check. A more robust check might involve a dedicated 'serviceProviders' node.
       const apptRef = ref(db, `Appointments/${serviceProviderUserId}`);
       const apptSnapshot = await get(apptRef);
       if (apptSnapshot.exists() && Object.keys(apptSnapshot.val()).length > 0) providerDataFound = true;
@@ -166,13 +171,18 @@ export default function PublicBookingPage() {
         const clientSnapshot = await get(clientRef);
         if (clientSnapshot.exists() && Object.keys(clientSnapshot.val()).length > 0) providerDataFound = true;
       }
+      if (!providerDataFound) {
+        const prefsRef = ref(db, `UserPreferences/${serviceProviderUserId}`);
+        const prefsSnapshot = await get(prefsRef);
+        if (prefsSnapshot.exists()) providerDataFound = true;
+      }
       
       setServiceProviderExists(providerDataFound);
       console.log(`PublicBookingPage: Provider ${providerDataFound ? 'VERIFIED' : 'NOT VERIFIED/NEW'}.`);
     } catch (error: any) {
       console.error(`PublicBookingPage: Error during database check for ID '${serviceProviderUserId}':`, error);
       toast({ title: "Error Verifying Provider", description: `Could not verify provider status. ${error.message}`, variant: "destructive" });
-      setServiceProviderExists(false);
+      setServiceProviderExists(false); // Assume not verified on error
     } finally {
       setInitialCheckDone(true);
     }
@@ -238,6 +248,27 @@ export default function PublicBookingPage() {
     }
   }, [date, serviceProviderUserId, initialCheckDone, fetchBookedSlots]);
 
+  const displayableTimeSlots = useMemo(() => {
+    if (!date || isLoadingPreferences || !workingHoursPreferences) return [];
+
+    const dayName = daysOfWeekConst[getDay(date)] as DayOfWeek;
+    const dayPref = workingHoursPreferences[dayName];
+
+    if (dayPref.isUnavailable) return [];
+
+    const prefStartTimeDt = parse(dayPref.startTime, "HH:mm", date);
+    const prefEndTimeDt = parse(dayPref.endTime, "HH:mm", date);
+
+    return allDayTimeSlots.filter(slot => {
+      const currentSlotDateTime = parse(slot, "HH:mm", date);
+      // For a 1-hour booking, the slot itself must be bookable, and it must end within working hours.
+      // The end of a 1-hour booking starting at `slot` is `addMinutes(currentSlotDateTime, 60)`.
+      const bookingEndDateTime = addMinutes(currentSlotDateTime, 60);
+      
+      return currentSlotDateTime >= prefStartTimeDt && bookingEndDateTime <= prefEndTimeDt;
+    });
+  }, [date, workingHoursPreferences, isLoadingPreferences]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -274,6 +305,7 @@ export default function PublicBookingPage() {
         toast({ title: "Booking Error", description: `Booking cannot start before provider's opening time of ${dayPref.startTime}.`, variant: "destructive" });
         setIsSubmitting(false); return;
     }
+    // For a 1-hour booking, it must END by the provider's closing time.
     if (endDateTime > prefEndTimeDt) {
         toast({ title: "Booking Error", description: `A 1-hour booking from ${startTime} would end after provider's closing time of ${dayPref.endTime}.`, variant: "destructive" });
         setIsSubmitting(false); return;
@@ -417,7 +449,7 @@ export default function PublicBookingPage() {
                                                 onSelect={(selectedDay) => { setDate(selectedDay); setStartTime(''); }}
                                                 disabled={(d) => {
                                                     if (d < new Date(new Date().setHours(0,0,0,0))) return true;
-                                                    if (isLoadingPreferences || !workingHoursPreferences) return false; // Allow selection if still loading prefs
+                                                    if (isLoadingPreferences || !workingHoursPreferences) return false; 
                                                     const dayName = daysOfWeekConst[getDay(d)] as DayOfWeek;
                                                     return workingHoursPreferences[dayName]?.isUnavailable || false;
                                                 }}
@@ -428,54 +460,36 @@ export default function PublicBookingPage() {
                                 </div>
                                 <div className="flex-1">
                                     <Label htmlFor="startTime" className="font-medium">Start Time *</Label>
-                                    <Select value={startTime} onValueChange={setStartTime} disabled={isLoadingBookedSlots || isLoadingPreferences || !date}>
+                                    <Select value={startTime} onValueChange={setStartTime} disabled={isLoadingBookedSlots || isLoadingPreferences || !date || displayableTimeSlots.length === 0}>
                                         <SelectTrigger className="w-full mt-1">
-                                            <SelectValue placeholder={isLoadingBookedSlots || isLoadingPreferences ? "Loading..." : "Select start time"} />
+                                            <SelectValue placeholder={isLoadingBookedSlots || isLoadingPreferences ? "Loading..." : (displayableTimeSlots.length === 0 && date && !isLoadingPreferences ? "No slots" : "Select start time")} />
                                         </SelectTrigger>
                                         <SelectContent>
                                              {(isLoadingBookedSlots || isLoadingPreferences) && <SelectItem value="loading" disabled>Loading slots...</SelectItem>}
-                                             {!isLoadingBookedSlots && !isLoadingPreferences && timeSlots.map(slot => {
+                                             {!isLoadingBookedSlots && !isLoadingPreferences && displayableTimeSlots.length === 0 && date && (
+                                                <SelectItem value="no-slots" disabled>No available slots</SelectItem>
+                                             )}
+                                             {!isLoadingBookedSlots && !isLoadingPreferences && displayableTimeSlots.map(slot => {
                                                 let itemIsDisabled = false;
                                                 let itemLabelSuffix = "";
-                                                const currentPrefs = workingHoursPreferences || initialWorkingHoursDefaults;
-
-                                                if (!date) {
-                                                    itemIsDisabled = true;
-                                                } else {
-                                                    const dayName = daysOfWeekConst[getDay(date)] as DayOfWeek;
-                                                    const dayPref = currentPrefs[dayName];
+                                                
+                                                if (date) { // date should always be defined if displayableTimeSlots has items
                                                     const currentSlotDateTime = parse(slot, "HH:mm", date);
-                                                    const currentSlotEndDateTime = addMinutes(currentSlotDateTime, 60);
-
-                                                    if (dayPref.isUnavailable) {
-                                                        itemIsDisabled = true;
-                                                        itemLabelSuffix = "(Day Off)";
-                                                    } else {
-                                                        const prefStartTimeDt = parse(dayPref.startTime, "HH:mm", date);
-                                                        const prefEndTimeDt = parse(dayPref.endTime, "HH:mm", date);
-
-                                                        if (currentSlotDateTime < prefStartTimeDt) {
-                                                            itemIsDisabled = true;
-                                                            itemLabelSuffix = `(Too early, opens ${dayPref.startTime})`;
-                                                        }
-                                                        if (!itemIsDisabled && currentSlotEndDateTime > prefEndTimeDt) {
-                                                            itemIsDisabled = true;
-                                                            itemLabelSuffix = `(Too late, closes ${dayPref.endTime})`;
-                                                        }
-                                                    }
+                                                    const currentSlotEndDateTime = addMinutes(currentSlotDateTime, 60); // Assumes 1-hour booking
                                                     
-                                                    if (!itemIsDisabled) {
-                                                        let tempCheckTime = currentSlotDateTime;
-                                                        while(tempCheckTime < currentSlotEndDateTime){
-                                                            if(bookedTimeSlotsForDate.has(format(tempCheckTime, "HH:mm"))){
-                                                                itemIsDisabled = true;
-                                                                itemLabelSuffix = "(Unavailable)";
-                                                                break;
-                                                            }
-                                                            tempCheckTime = addMinutes(tempCheckTime, 30);
+                                                    let tempCheckTime = currentSlotDateTime;
+                                                    while(tempCheckTime < currentSlotEndDateTime){
+                                                        if(bookedTimeSlotsForDate.has(format(tempCheckTime, "HH:mm"))){
+                                                            itemIsDisabled = true;
+                                                            itemLabelSuffix = "(Unavailable)";
+                                                            break;
                                                         }
+                                                        tempCheckTime = addMinutes(tempCheckTime, 30);
                                                     }
+                                                } else {
+                                                    itemIsDisabled = true; // Should not happen if displayableTimeSlots is populated
                                                 }
+
                                                 return (
                                                     <SelectItem key={`start-${slot}`} value={slot} disabled={itemIsDisabled}>
                                                         {slot} {itemLabelSuffix}
