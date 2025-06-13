@@ -6,13 +6,14 @@ import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Settings, Clock, Ban, Loader2 } from "lucide-react";
+import { Settings, Clock, Ban, Loader2, Moon, Sun } from "lucide-react";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { format, addMinutes, parse } from 'date-fns';
+import { Switch } from "@/components/ui/switch"; // Added Switch import
 
 // Firebase imports
 import { ref, set, get } from "firebase/database";
@@ -64,6 +65,33 @@ export default function PreferencesPage() {
   const [workingHours, setWorkingHours] = useState<WorkingHours>(initialWorkingHours);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Effect for initializing and updating dark mode based on localStorage
+  useEffect(() => {
+    const storedDarkMode = localStorage.getItem('darkMode') === 'true';
+    setIsDarkMode(storedDarkMode);
+    if (storedDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
+  // Effect for applying dark mode changes and saving to localStorage
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('darkMode', 'true');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('darkMode', 'false');
+    }
+  }, [isDarkMode]);
+
+  const handleDarkModeToggle = (checked: boolean) => {
+    setIsDarkMode(checked);
+  };
 
   const fetchUserPreferences = useCallback(async (userId: string) => {
     if (!db) {
@@ -101,7 +129,7 @@ export default function PreferencesPage() {
       console.error("Error fetching user preferences:", error);
       let description = error.message || "Could not load your saved working hours.";
       if (error.message && error.message.toLowerCase().includes("permission denied")) {
-        description = "Permission denied when fetching preferences. Please ensure your Firebase Realtime Database rules allow users to read their own preferences. Example rule for UserPreferences: '{ \"$uid\": { \".read\": \"auth != null && auth.uid === $uid\", \".write\": \"auth != null && auth.uid === $uid\" } }'";
+        description = "Permission denied when fetching preferences. Ensure Firebase rules allow users to read 'UserPreferences/$uid/workingHours'. Example: { \"rules\": { \"UserPreferences\": { \"$uid\": { \"workingHours\": { \".read\": true }, \".write\": \"auth != null && auth.uid === $uid\", \".read\": \"auth != null && auth.uid === $uid\" } } } }";
       }
       toast({
         title: "Error Loading Preferences",
@@ -187,7 +215,7 @@ export default function PreferencesPage() {
       console.error("Error saving user preferences:", error);
       let description = error.message || "Could not save your working hours.";
       if (error.message && error.message.toLowerCase().includes("permission denied")) {
-        description = "Permission denied when saving preferences. Please ensure your Firebase Realtime Database rules allow users to write their own preferences. Example rule for UserPreferences: '{ \"$uid\": { \".read\": \"auth != null && auth.uid === $uid\", \".write\": \"auth != null && auth.uid === $uid\" } }'";
+        description = "Permission denied when saving preferences. Ensure Firebase rules allow users to write to 'UserPreferences/$uid'. Example: { \"rules\": { \"UserPreferences\": { \"$uid\": { \".write\": \"auth != null && auth.uid === $uid\" } } } }";
       }
       toast({
         title: "Error Saving Preferences",
@@ -204,7 +232,7 @@ export default function PreferencesPage() {
     return string.charAt(0).toUpperCase() + string.slice(1);
   }
 
-  if (authLoading || (!currentUser && !authLoading) || isLoadingPreferences) {
+  if (authLoading || (!currentUser && !authLoading) || isLoadingPreferences && !currentUser) { // Adjusted loading condition
     return (
       <div className="min-h-screen flex flex-col">
         <Header />
@@ -235,13 +263,27 @@ export default function PreferencesPage() {
                 <Settings className="mr-2 h-6 w-6" /> Manage Preferences
               </CardTitle>
               <CardDescription>
-                Adjust your application settings and preferences here.
+                Adjust your application settings and display options here.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Define your standard working hours and days off.
-              </p>
+            <CardContent className="space-y-6">
+               <div>
+                <Label htmlFor="darkModeToggle" className="font-medium flex items-center">
+                  {isDarkMode ? <Moon className="mr-2 h-5 w-5" /> : <Sun className="mr-2 h-5 w-5" />}
+                   Dark Mode
+                </Label>
+                <div className="flex items-center space-x-2 mt-2">
+                  <Switch
+                    id="darkModeToggle"
+                    checked={isDarkMode}
+                    onCheckedChange={handleDarkModeToggle}
+                    aria-label="Toggle dark mode"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    Enable to switch to a darker color theme.
+                  </span>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -256,73 +298,82 @@ export default function PreferencesPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {daysOfWeek.map((day) => (
-                <div key={day} className="grid grid-cols-1 sm:grid-cols-[100px_1fr_1fr_auto] items-center gap-3 p-3 border rounded-md bg-muted/20">
-                  <Label htmlFor={`${day}-unavailable`} className="font-medium text-sm sm:text-base col-span-1 sm:col-span-1">
-                    {capitalizeFirstLetter(day)}
-                  </Label>
-                  
-                  <div className="grid grid-cols-2 gap-3 col-span-1 sm:col-span-2">
-                    <div>
-                      <Label htmlFor={`${day}-startTime`} className="text-xs text-muted-foreground">Start Time</Label>
-                      <Select
-                        value={workingHours[day].startTime}
-                        onValueChange={(value) => handleTimeChange(day, 'startTime', value)}
-                        disabled={workingHours[day].isUnavailable || isSaving || isLoadingPreferences}
-                      >
-                        <SelectTrigger id={`${day}-startTime`} className="w-full mt-1">
-                          <SelectValue placeholder="Start time" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {allTimeSlots.map(slot => (
-                            <SelectItem key={`${day}-start-${slot}`} value={slot}>
-                              {slot}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor={`${day}-endTime`} className="text-xs text-muted-foreground">End Time</Label>
-                      <Select
-                        value={workingHours[day].endTime}
-                        onValueChange={(value) => handleTimeChange(day, 'endTime', value)}
-                        disabled={workingHours[day].isUnavailable || isSaving || isLoadingPreferences}
-                      >
-                        <SelectTrigger id={`${day}-endTime`} className="w-full mt-1">
-                          <SelectValue placeholder="End time" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {allTimeSlots.map(slot => (
-                            <SelectItem key={`${day}-end-${slot}`} value={slot} disabled={!workingHours[day].isUnavailable && slot <= workingHours[day].startTime && workingHours[day].startTime !== "00:00"}>
-                              {slot}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2 justify-self-start sm:justify-self-end pt-2 sm:pt-0 col-span-1 sm:col-span-1">
-                    <Checkbox
-                      id={`${day}-unavailable`}
-                      checked={workingHours[day].isUnavailable}
-                      onCheckedChange={(checked) => handleUnavailableChange(day, !!checked)}
-                      disabled={isSaving || isLoadingPreferences}
-                    />
-                    <Label htmlFor={`${day}-unavailable`} className="text-xs sm:text-sm text-muted-foreground flex items-center">
-                      <Ban className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> Unavailable
-                    </Label>
-                  </div>
+              {isLoadingPreferences && currentUser ? (
+                <div className="text-center py-6">
+                  <Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" />
+                  <p className="mt-2 text-muted-foreground">Loading working hours settings...</p>
                 </div>
-              ))}
-              <div className="flex justify-end mt-6">
-                <Button onClick={handleSaveChanges} disabled={isSaving || isLoadingPreferences}>
-                  {isSaving ? (
-                    <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5" />
-                  ) : "Save Changes"}
-                </Button>
-              </div>
+              ) : (
+                <>
+                  {daysOfWeek.map((day) => (
+                    <div key={day} className="grid grid-cols-1 sm:grid-cols-[100px_1fr_1fr_auto] items-center gap-3 p-3 border rounded-md bg-muted/20 dark:bg-background/30">
+                      <Label htmlFor={`${day}-unavailable`} className="font-medium text-sm sm:text-base col-span-1 sm:col-span-1">
+                        {capitalizeFirstLetter(day)}
+                      </Label>
+                      
+                      <div className="grid grid-cols-2 gap-3 col-span-1 sm:col-span-2">
+                        <div>
+                          <Label htmlFor={`${day}-startTime`} className="text-xs text-muted-foreground">Start Time</Label>
+                          <Select
+                            value={workingHours[day].startTime}
+                            onValueChange={(value) => handleTimeChange(day, 'startTime', value)}
+                            disabled={workingHours[day].isUnavailable || isSaving || isLoadingPreferences}
+                          >
+                            <SelectTrigger id={`${day}-startTime`} className="w-full mt-1">
+                              <SelectValue placeholder="Start time" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allTimeSlots.map(slot => (
+                                <SelectItem key={`${day}-start-${slot}`} value={slot}>
+                                  {slot}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor={`${day}-endTime`} className="text-xs text-muted-foreground">End Time</Label>
+                          <Select
+                            value={workingHours[day].endTime}
+                            onValueChange={(value) => handleTimeChange(day, 'endTime', value)}
+                            disabled={workingHours[day].isUnavailable || isSaving || isLoadingPreferences}
+                          >
+                            <SelectTrigger id={`${day}-endTime`} className="w-full mt-1">
+                              <SelectValue placeholder="End time" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allTimeSlots.map(slot => (
+                                <SelectItem key={`${day}-end-${slot}`} value={slot} disabled={!workingHours[day].isUnavailable && slot <= workingHours[day].startTime && workingHours[day].startTime !== "00:00"}>
+                                  {slot}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2 justify-self-start sm:justify-self-end pt-2 sm:pt-0 col-span-1 sm:col-span-1">
+                        <Checkbox
+                          id={`${day}-unavailable`}
+                          checked={workingHours[day].isUnavailable}
+                          onCheckedChange={(checked) => handleUnavailableChange(day, !!checked)}
+                          disabled={isSaving || isLoadingPreferences}
+                        />
+                        <Label htmlFor={`${day}-unavailable`} className="text-xs sm:text-sm text-muted-foreground flex items-center">
+                          <Ban className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> Unavailable
+                        </Label>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex justify-end mt-6">
+                    <Button onClick={handleSaveChanges} disabled={isSaving || isLoadingPreferences}>
+                      {isSaving ? (
+                        <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5" />
+                      ) : "Save Changes"}
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -335,3 +386,5 @@ export default function PreferencesPage() {
   );
 }
 
+
+    
