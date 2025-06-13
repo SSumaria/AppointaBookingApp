@@ -13,7 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { format, addMinutes, parse } from 'date-fns';
-import { Switch } from "@/components/ui/switch"; // Added Switch import
+import { Switch } from "@/components/ui/switch";
 
 // Firebase imports
 import { ref, set, get } from "firebase/database";
@@ -65,29 +65,30 @@ export default function PreferencesPage() {
   const [workingHours, setWorkingHours] = useState<WorkingHours>(initialWorkingHours);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // Effect for initializing and updating dark mode based on localStorage
-  useEffect(() => {
-    const storedDarkMode = localStorage.getItem('darkMode') === 'true';
-    setIsDarkMode(storedDarkMode);
-    if (storedDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('darkMode') === 'true';
     }
+    return false;
+  });
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
   }, []);
 
-  // Effect for applying dark mode changes and saving to localStorage
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('darkMode', 'true');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('darkMode', 'false');
+    if (isClient) {
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('darkMode', 'true');
+      } else {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('darkMode', 'false');
+      }
     }
-  }, [isDarkMode]);
+  }, [isDarkMode, isClient]);
 
   const handleDarkModeToggle = (checked: boolean) => {
     setIsDarkMode(checked);
@@ -232,7 +233,7 @@ export default function PreferencesPage() {
     return string.charAt(0).toUpperCase() + string.slice(1);
   }
 
-  if (authLoading || (!currentUser && !authLoading) || isLoadingPreferences && !currentUser) { // Adjusted loading condition
+  if (authLoading || (!currentUser && !authLoading) || isLoadingPreferences && !currentUser) {
     return (
       <div className="min-h-screen flex flex-col">
         <Header />
@@ -385,6 +386,3 @@ export default function PreferencesPage() {
     </div>
   );
 }
-
-
-    
