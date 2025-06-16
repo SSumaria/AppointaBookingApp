@@ -3,12 +3,12 @@
 
 console.log("--- PublicBookingPage (/book/[userId]/page.tsx) --- MODULE SCRIPT EXECUTING (TOP LEVEL)");
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format, addMinutes, parse, getHours, getMinutes, getDay } from "date-fns";
-import { Calendar as CalendarIcon, Clock, AlertTriangle, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, AlertTriangle, Loader2, User } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,7 +29,6 @@ interface ExistingBooking {
   BookingStatus?: string;
 }
 
-// Definitions for WorkingHours (consistent with preferences page)
 const daysOfWeekConst = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
 type DayOfWeek = typeof daysOfWeekConst[number];
 
@@ -50,15 +49,12 @@ const initialWorkingHoursDefaults: WorkingHours = {
   sunday:    { startTime: "09:00", endTime: "17:00", isUnavailable: true },
 };
 
-
 const generateTimeSlots = () => {
   const slots = [];
   let currentTime = new Date();
   currentTime.setHours(0, 0, 0, 0); 
-
   const dayEndLimit = new Date();
   dayEndLimit.setHours(23, 59, 0, 0); 
-
   while (currentTime <= dayEndLimit) {
     slots.push(format(currentTime, "HH:mm"));
     currentTime = addMinutes(currentTime, 30);
@@ -66,6 +62,13 @@ const generateTimeSlots = () => {
   return slots;
 };
 const allDayTimeSlots = generateTimeSlots();
+
+interface FoundClientData {
+  ClientName: string;
+  ClientContact: string; // This is phone
+  firebaseKey: string; // The actual Firebase key of the client
+  ClientEmail: string;
+}
 
 
 export default function PublicBookingPage() {
@@ -91,6 +94,11 @@ export default function PublicBookingPage() {
 
   const [workingHoursPreferences, setWorkingHoursPreferences] = useState<WorkingHours | null>(null);
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(true);
+
+  const [isLookingUpClient, setIsLookingUpClient] = useState(false);
+  const [foundExistingClientData, setFoundExistingClientData] = useState<FoundClientData | null>(null);
+  const [clientLookupMessage, setClientLookupMessage] = useState<string | null>(null);
+  const emailDebounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
 
   const fetchUserPreferences = useCallback(async (userId: string) => {
@@ -142,7 +150,6 @@ export default function PublicBookingPage() {
     if (serviceProviderUserId && initialCheckDone && serviceProviderExists === true) { 
         fetchUserPreferences(serviceProviderUserId);
     } else if (initialCheckDone && serviceProviderExists === false) {
-        // For new/unrecognized providers, use defaults.
         setWorkingHoursPreferences(initialWorkingHoursDefaults);
         setIsLoadingPreferences(false);
     }
@@ -160,8 +167,6 @@ export default function PublicBookingPage() {
 
     let providerDataFound = false;
     try {
-      // Check if provider has any data (e.g., appointments or clients or preferences)
-      // This is a basic check. A more robust check might involve a dedicated 'serviceProviders' node.
       const apptRef = ref(db, `Appointments/${serviceProviderUserId}`);
       const apptSnapshot = await get(apptRef);
       if (apptSnapshot.exists() && Object.keys(apptSnapshot.val()).length > 0) providerDataFound = true;
@@ -182,7 +187,7 @@ export default function PublicBookingPage() {
     } catch (error: any) {
       console.error(`PublicBookingPage: Error during database check for ID '${serviceProviderUserId}':`, error);
       toast({ title: "Error Verifying Provider", description: `Could not verify provider status. ${error.message}`, variant: "destructive" });
-      setServiceProviderExists(false); // Assume not verified on error
+      setServiceProviderExists(false); 
     } finally {
       setInitialCheckDone(true);
     }
@@ -194,7 +199,7 @@ export default function PublicBookingPage() {
     } else {
         setServiceProviderExists(false); 
         setInitialCheckDone(true); 
-        setIsLoadingPreferences(false); // No provider, no prefs to load beyond defaults
+        setIsLoadingPreferences(false);
     }
   }, [serviceProviderUserId, checkServiceProvider]);
 
@@ -250,24 +255,94 @@ export default function PublicBookingPage() {
 
   const displayableTimeSlots = useMemo(() => {
     if (!date || isLoadingPreferences || !workingHoursPreferences) return [];
-
     const dayName = daysOfWeekConst[getDay(date)] as DayOfWeek;
     const dayPref = workingHoursPreferences[dayName];
-
     if (dayPref.isUnavailable) return [];
-
     const prefStartTimeDt = parse(dayPref.startTime, "HH:mm", date);
     const prefEndTimeDt = parse(dayPref.endTime, "HH:mm", date);
-
     return allDayTimeSlots.filter(slot => {
       const currentSlotDateTime = parse(slot, "HH:mm", date);
-      // For a 1-hour booking, the slot itself must be bookable, and it must end within working hours.
-      // The end of a 1-hour booking starting at `slot` is `addMinutes(currentSlotDateTime, 60)`.
       const bookingEndDateTime = addMinutes(currentSlotDateTime, 60);
-      
       return currentSlotDateTime >= prefStartTimeDt && bookingEndDateTime <= prefEndTimeDt;
     });
   }, [date, workingHoursPreferences, isLoadingPreferences]);
+
+
+  const fetchExistingClientByEmail = useCallback(async (emailToSearch: string) => {
+    if (!serviceProviderUserId || !emailToSearch.trim() || !db) {
+        setFoundExistingClientData(null);
+        setClientLookupMessage(null);
+        return;
+    }
+    setIsLookingUpClient(true);
+    setClientLookupMessage("Checking for existing record...");
+
+    try {
+        const clientsRefPath = `Clients/${serviceProviderUserId}`;
+        const clientsRef = ref(db, clientsRefPath);
+        const clientQuery = rtQuery(clientsRef, orderByChild('ClientEmail'), equalTo(emailToSearch.trim().toLowerCase()));
+        
+        const snapshot = await get(clientQuery);
+        if (snapshot.exists()) {
+            let clientFound: FoundClientData | null = null;
+            snapshot.forEach(childSnapshot => { // Should typically be one, but loop to grab first
+                const data = childSnapshot.val();
+                clientFound = {
+                    firebaseKey: childSnapshot.key as string,
+                    ClientName: data.ClientName,
+                    ClientContact: data.ClientContact,
+                    ClientEmail: data.ClientEmail // Store original case email if needed, or store as searched
+                };
+                return true; // stop iterating after first match
+            });
+
+            if (clientFound) {
+                setClientName(clientFound.ClientName);
+                setClientPhone(clientFound.ClientContact || '');
+                setFoundExistingClientData(clientFound);
+                setClientLookupMessage(`Welcome back, ${clientFound.ClientName}! Your details have been pre-filled.`);
+            } else { // Should not happen if snapshot.exists() is true and forEach ran
+                setFoundExistingClientData(null);
+                setClientLookupMessage("No existing record found. Please complete your details.");
+            }
+        } else {
+            setFoundExistingClientData(null);
+            if (clientName && foundExistingClientData) { // If previously found, but now email changed to non-existing
+                setClientName(''); setClientPhone('');
+            }
+            setClientLookupMessage("No existing record found. Please complete your details.");
+        }
+    } catch (error) {
+        console.error("Error looking up client by email:", error);
+        setFoundExistingClientData(null);
+        setClientLookupMessage("Error checking email. Please try again.");
+        toast({ title: "Lookup Error", description: "Could not check for existing client records.", variant: "destructive"});
+    } finally {
+        setIsLookingUpClient(false);
+    }
+  }, [serviceProviderUserId, toast, clientName, foundExistingClientData]);
+
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEmail = e.target.value;
+    setClientEmail(newEmail);
+    setFoundExistingClientData(null); // Reset if email changes
+    setClientLookupMessage(null);
+    if (!newEmail.trim()) { // Clear prefill if email is cleared
+        setClientName('');
+        setClientPhone('');
+    }
+
+    if (emailDebounceTimeoutRef.current) {
+        clearTimeout(emailDebounceTimeoutRef.current);
+    }
+
+    if (newEmail.trim().length > 2 && newEmail.includes('@')) { // Basic validation before search
+        emailDebounceTimeoutRef.current = setTimeout(() => {
+            fetchExistingClientByEmail(newEmail);
+        }, 750); // Debounce for 750ms
+    }
+  };
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -286,10 +361,9 @@ export default function PublicBookingPage() {
     const selectedFormattedDate = format(date, "yyyy-MM-dd");
     const baseDateForSubmitParse = new Date(selectedFormattedDate + "T00:00:00");
     const startDateTime = parse(startTime, 'HH:mm', baseDateForSubmitParse);
-    const endDateTime = addMinutes(startDateTime, 60); // 1-hour booking
+    const endDateTime = addMinutes(startDateTime, 60); 
     const calculatedEndTime = format(endDateTime, "HH:mm");
 
-    // Validation against working hours preferences
     const currentPrefs = workingHoursPreferences || initialWorkingHoursDefaults;
     const dayName = daysOfWeekConst[getDay(date)] as DayOfWeek;
     const dayPref = currentPrefs[dayName];
@@ -305,7 +379,6 @@ export default function PublicBookingPage() {
         toast({ title: "Booking Error", description: `Booking cannot start before provider's opening time of ${dayPref.startTime}.`, variant: "destructive" });
         setIsSubmitting(false); return;
     }
-    // For a 1-hour booking, it must END by the provider's closing time.
     if (endDateTime > prefEndTimeDt) {
         toast({ title: "Booking Error", description: `A 1-hour booking from ${startTime} would end after provider's closing time of ${dayPref.endTime}.`, variant: "destructive" });
         setIsSubmitting(false); return;
@@ -329,25 +402,56 @@ export default function PublicBookingPage() {
         setIsSubmitting(false); return;
     }
 
+    let clientIDToUse: string;
     const now = new Date();
-    const clientDataToSave = { ClientID: "", ClientName: clientName.trim(), ClientEmail: clientEmail.trim(), ClientContact: clientPhone.trim(), CreateDate: format(now, "yyyy-MM-dd"), CreateTime: format(now, "HH:mm"), CreatedByUserID: serviceProviderUserId };
-    const appointmentDataToSave = { AppointmentID: "", ClientID: "", ServiceProcedure: serviceProcedure, AppointmentDate: selectedFormattedDate, AppointmentStartTime: startTime, AppointmentEndTime: calculatedEndTime, BookingStatus: "Booked", BookedByUserID: serviceProviderUserId };
 
     try {
-        const providerClientsRefPath = `Clients/${serviceProviderUserId}`;
-        const newClientRef = push(ref(db, providerClientsRefPath));
-        clientDataToSave.ClientID = newClientRef.key as string;
-        await set(newClientRef, clientDataToSave);
+        if (foundExistingClientData) {
+            clientIDToUse = foundExistingClientData.firebaseKey;
+        } else {
+            // Create new client
+            const providerClientsRefPath = `Clients/${serviceProviderUserId}`;
+            const newClientRef = push(ref(db, providerClientsRefPath));
+            clientIDToUse = newClientRef.key as string;
+            const newClientData = { 
+                ClientID: clientIDToUse, // Store Firebase key as ClientID for consistency
+                ClientName: clientName.trim(), 
+                ClientEmail: clientEmail.trim().toLowerCase(), // Store email in lowercase for consistency
+                ClientContact: clientPhone.trim(), 
+                CreateDate: format(now, "yyyy-MM-dd"), 
+                CreateTime: format(now, "HH:mm"), 
+                CreatedByUserID: serviceProviderUserId // Mark who this client "belongs" to
+            };
+            await set(newClientRef, newClientData);
+        }
+
+        const appointmentDataToSave = { 
+            AppointmentID: "", 
+            ClientID: clientIDToUse, 
+            ServiceProcedure: serviceProcedure, 
+            AppointmentDate: selectedFormattedDate, 
+            AppointmentStartTime: startTime, 
+            AppointmentEndTime: calculatedEndTime, 
+            BookingStatus: "Booked", 
+            BookedByUserID: serviceProviderUserId // Mark who this appt "belongs" to
+        };
 
         const providerAppointmentsRefPath = `Appointments/${serviceProviderUserId}`;
         const newAppointmentRef = push(ref(db, providerAppointmentsRefPath));
         appointmentDataToSave.AppointmentID = newAppointmentRef.key as string;
-        appointmentDataToSave.ClientID = clientDataToSave.ClientID;
         await set(newAppointmentRef, appointmentDataToSave);
 
         toast({ title: "Booking Confirmed!", description: `Your 1-hour appointment for ${serviceProcedure} has been booked.` });
         if(date) fetchBookedSlots(date); 
-        setClientName(''); setClientEmail(''); setClientPhone(''); setServiceProcedure(''); setStartTime('');
+        
+        setClientName(''); 
+        setClientEmail(''); 
+        setClientPhone(''); 
+        setServiceProcedure(''); 
+        setStartTime('');
+        setFoundExistingClientData(null);
+        setClientLookupMessage(null);
+
     } catch (error: any) {
         handleAuthErrorSubmit(error, "An unexpected error occurred during booking.");
     } finally {
@@ -417,16 +521,22 @@ export default function PublicBookingPage() {
                     <CardContent>
                         <form onSubmit={handleSubmit} className="space-y-6 p-2 sm:p-0">
                             <div>
-                                <Label htmlFor="clientName" className="font-medium">Your Name *</Label>
-                                <Input type="text" id="clientName" value={clientName} onChange={(e) => setClientName(e.target.value)} required className="mt-1" placeholder="Enter your full name"/>
+                                <Label htmlFor="clientEmail" className="font-medium">Your Email *</Label>
+                                <Input type="email" id="clientEmail" value={clientEmail} onChange={handleEmailChange} required className="mt-1" placeholder="Enter your email to check for existing details" />
+                                {isLookingUpClient && <p className="text-xs text-muted-foreground mt-1 flex items-center"><Loader2 className="h-3 w-3 animate-spin mr-1" />Checking...</p>}
+                                {clientLookupMessage && !isLookingUpClient && (
+                                    <p className={cn("text-xs mt-1", foundExistingClientData ? "text-green-600" : "text-muted-foreground")}>
+                                        {clientLookupMessage}
+                                    </p>
+                                )}
                             </div>
                             <div>
-                                <Label htmlFor="clientEmail" className="font-medium">Your Email *</Label>
-                                <Input type="email" id="clientEmail" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} required className="mt-1" placeholder="Enter your email" />
+                                <Label htmlFor="clientName" className="font-medium">Your Name *</Label>
+                                <Input type="text" id="clientName" value={clientName} onChange={(e) => setClientName(e.target.value)} required className="mt-1" placeholder="Enter your full name" readOnly={!!foundExistingClientData} />
                             </div>
                             <div>
                                 <Label htmlFor="clientPhone" className="font-medium">Your Phone Number *</Label>
-                                <Input type="tel" id="clientPhone" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} required className="mt-1" placeholder="Enter your phone number"/>
+                                <Input type="tel" id="clientPhone" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} required className="mt-1" placeholder="Enter your phone number" readOnly={!!foundExistingClientData}/>
                             </div>
                             <div>
                                 <Label htmlFor="serviceProcedure" className="font-medium">Service/Procedure Requested *</Label>
@@ -472,11 +582,9 @@ export default function PublicBookingPage() {
                                              {!isLoadingBookedSlots && !isLoadingPreferences && displayableTimeSlots.map(slot => {
                                                 let itemIsDisabled = false;
                                                 let itemLabelSuffix = "";
-                                                
-                                                if (date) { // date should always be defined if displayableTimeSlots has items
+                                                if (date) {
                                                     const currentSlotDateTime = parse(slot, "HH:mm", date);
-                                                    const currentSlotEndDateTime = addMinutes(currentSlotDateTime, 60); // Assumes 1-hour booking
-                                                    
+                                                    const currentSlotEndDateTime = addMinutes(currentSlotDateTime, 60);
                                                     let tempCheckTime = currentSlotDateTime;
                                                     while(tempCheckTime < currentSlotEndDateTime){
                                                         if(bookedTimeSlotsForDate.has(format(tempCheckTime, "HH:mm"))){
@@ -487,9 +595,8 @@ export default function PublicBookingPage() {
                                                         tempCheckTime = addMinutes(tempCheckTime, 30);
                                                     }
                                                 } else {
-                                                    itemIsDisabled = true; // Should not happen if displayableTimeSlots is populated
+                                                    itemIsDisabled = true; 
                                                 }
-
                                                 return (
                                                     <SelectItem key={`start-${slot}`} value={slot} disabled={itemIsDisabled}>
                                                         {slot} {itemLabelSuffix}
@@ -506,8 +613,8 @@ export default function PublicBookingPage() {
                                     {isLoadingPreferences ? "Loading availability..." : `Checking slots for ${format(date, "PPP")}...`}
                                 </div>
                             )}
-                            <Button type="submit" disabled={isSubmitting || isLoadingBookedSlots || isLoadingPreferences} className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-semibold py-3 mt-8">
-                                {isSubmitting || isLoadingBookedSlots || isLoadingPreferences ? (
+                            <Button type="submit" disabled={isSubmitting || isLoadingBookedSlots || isLoadingPreferences || isLookingUpClient} className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-semibold py-3 mt-8">
+                                {isSubmitting || isLoadingBookedSlots || isLoadingPreferences || isLookingUpClient ? (
                                     <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5" />
                                 ) : "Submit Booking"}
                             </Button>
