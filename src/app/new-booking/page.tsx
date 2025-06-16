@@ -287,10 +287,10 @@ export default function NewBookingPage() {
             return;
         }
 
-        let clientIdToUse: string | null = selectedClientFirebaseKey;
-        let finalClientName = clientName.trim();
-        let finalClientEmail = clientEmail.trim();
-        let finalClientPhone = clientPhone.trim();
+        let determinedClientId: string | null = null;
+        let finalClientNameForAppointment = clientName.trim();
+        let finalClientEmailForAppointment = clientEmail.trim().toLowerCase();
+        let finalClientPhoneForAppointment = clientPhone.trim();
 
         const finalNotes: Note[] = [];
         if (notesInput.trim()) {
@@ -302,63 +302,70 @@ export default function NewBookingPage() {
         }
 
         try {
-            if (!clientIdToUse) { 
-                const userClientsRefPath = `Clients/${currentUser.uid}`;
-                const clientsDbRef = ref(db, userClientsRefPath);
-                
-                const clientQuery = rtQuery(clientsDbRef, orderByChild('ClientEmail'), equalTo(finalClientEmail.toLowerCase()));
+            if (selectedClientFirebaseKey) {
+                // Path 1: Client was selected from suggestions
+                const clientRef = ref(db, `Clients/${currentUser.uid}/${selectedClientFirebaseKey}`);
+                const snapshot = await get(clientRef);
+
+                if (snapshot.exists()) {
+                    determinedClientId = selectedClientFirebaseKey;
+                    const clientData = snapshot.val() as ClientData;
+                    
+                    finalClientNameForAppointment = clientData.ClientName; // Use DB name for appointment
+                    finalClientPhoneForAppointment = clientData.ClientContact || ''; // Use DB phone for appointment
+
+                    const formEmailTrimmedLower = clientEmail.trim().toLowerCase();
+                    if (clientData.ClientEmail !== formEmailTrimmedLower) {
+                        await update(clientRef, { ClientEmail: formEmailTrimmedLower });
+                        finalClientEmailForAppointment = formEmailTrimmedLower; // Use updated email for appointment
+                        toast({ title: "Client Email Updated", description: `Email for ${clientData.ClientName} updated to lowercase.`});
+                    } else {
+                        finalClientEmailForAppointment = clientData.ClientEmail || ''; // Use existing DB email
+                    }
+                } else {
+                    toast({ title: "Error", description: "Previously selected client not found. Please re-select or enter details for a new client.", variant: "destructive" });
+                    setIsSubmitting(false);
+                    return;
+                }
+            } else {
+                // Path 2: No client selected - try to find by email or create new
+                const clientsDbRef = ref(db, `Clients/${currentUser.uid}`);
+                const emailToQuery = clientEmail.trim().toLowerCase();
+                const clientQuery = rtQuery(clientsDbRef, orderByChild('ClientEmail'), equalTo(emailToQuery));
                 const existingClientSnapshot = await get(clientQuery);
-                let foundExistingByEmail = false;
 
                 if (existingClientSnapshot.exists()) {
-                    existingClientSnapshot.forEach((childSnapshot) => {
-                        const clientData = childSnapshot.val() as ClientData;
-                        clientIdToUse = childSnapshot.key;
-                        finalClientName = clientData.ClientName;
-                        finalClientEmail = clientData.ClientEmail || ''; 
-                        finalClientPhone = clientData.ClientContact || '';
-                        foundExistingByEmail = true;
+                    existingClientSnapshot.forEach((childSnapshot) => { 
+                        determinedClientId = childSnapshot.key as string;
+                        const data = childSnapshot.val();
+                        finalClientNameForAppointment = data.ClientName;
+                        finalClientEmailForAppointment = data.ClientEmail; // Already lowercase
+                        finalClientPhoneForAppointment = data.ClientContact || '';
                         return true; 
                     });
-                }
-
-
-                if (!foundExistingByEmail) { 
+                } else {
                     const newClientRef = push(clientsDbRef);
-                    clientIdToUse = newClientRef.key as string;
+                    determinedClientId = newClientRef.key as string;
                     const now = new Date();
                     await set(newClientRef, {
-                        ClientID: clientIdToUse, 
-                        ClientName: finalClientName, 
-                        ClientContact: finalClientPhone, 
-                        ClientEmail: finalClientEmail.toLowerCase(), 
+                        ClientID: determinedClientId,
+                        ClientName: clientName.trim(), // from form
+                        ClientContact: clientPhone.trim(), // from form
+                        ClientEmail: clientEmail.trim().toLowerCase(), // from form, ensure lowercase
                         CreateDate: format(now, "yyyy-MM-dd"),
                         CreateTime: format(now, "HH:mm"),
                         CreatedByUserID: currentUser.uid
                     });
-                }
-            } else { 
-                const selectedClientRef = ref(db, `Clients/${currentUser.uid}/${clientIdToUse}`);
-                const clientSnapshot = await get(selectedClientRef);
-                if(clientSnapshot.exists()){
-                    const clientData = clientSnapshot.val() as ClientData;
-                    finalClientName = clientData.ClientName; 
-                    finalClientEmail = clientData.ClientEmail || ''; 
-                    finalClientPhone = clientData.ClientContact || '';
-                    
-                    if (clientData.ClientEmail && clientData.ClientEmail !== clientData.ClientEmail.toLowerCase()) {
-                        try {
-                            await update(selectedClientRef, { ClientEmail: clientData.ClientEmail.toLowerCase() });
-                            finalClientEmail = clientData.ClientEmail.toLowerCase();
-                            toast({ title: "Client Updated", description: `Email for ${finalClientName} corrected to lowercase.`, variant: "default" });
-                        } catch (updateError) {
-                            console.error("Error updating client email to lowercase:", updateError);
-                            toast({ title: "Client Update Error", description: `Could not update email for ${finalClientName} to lowercase. Booking will proceed.`, variant: "destructive" });
-                        }
-                    }
+                    // finalClientNameForAppointment, finalClientEmailForAppointment, finalClientPhoneForAppointment are already set from form inputs
+                    // finalClientEmailForAppointment is already .toLowerCase()
                 }
             }
 
+            if (!determinedClientId) {
+                toast({ title: "Client ID Error", description: "Could not establish a client ID for the booking.", variant: "destructive" });
+                setIsSubmitting(false);
+                return;
+            }
 
             const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
             const appointmentsRefForUser = ref(db, userAppointmentsRefPath);
@@ -367,7 +374,7 @@ export default function NewBookingPage() {
 
             await set(newAppointmentRef, {
                 AppointmentID: appointmentId,
-                ClientID: clientIdToUse, 
+                ClientID: determinedClientId, 
                 ServiceProcedure: serviceProcedure,
                 AppointmentDate: selectedFormattedDate,
                 AppointmentStartTime: startTime,
@@ -377,7 +384,7 @@ export default function NewBookingPage() {
                 BookedByUserID: currentUser.uid
             });
 
-            toast({ title: "Success", description: `Booking Confirmed for ${finalClientName}!` });
+            toast({ title: "Success", description: `Booking Confirmed for ${finalClientNameForAppointment}!` });
             if(date) fetchBookedSlots(date);
 
             setClientName('');
@@ -639,3 +646,4 @@ export default function NewBookingPage() {
         </div>
     );
 }
+
