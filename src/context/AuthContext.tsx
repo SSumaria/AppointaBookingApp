@@ -43,6 +43,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Apply theme on initial client-side load
+    if (typeof window !== 'undefined') {
+      const storedDarkMode = localStorage.getItem('darkMode');
+      if (storedDarkMode === 'true') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  }, []); // Empty dependency array ensures this runs once on mount (client-side)
+
+
+  useEffect(() => {
     console.log("--- AuthProvider useEffect (AuthContext.tsx) --- Setting up onAuthStateChanged. Current 'auth' service status:", auth ? `DEFINED (App Name: ${auth.name})` : "UNDEFINED");
     if (!auth) {
       console.error("--- AuthProvider useEffect (AuthContext.tsx) --- CRITICAL: Firebase 'auth' service is UNDEFINED. Cannot set up onAuthStateChanged. Firebase might not have initialized correctly in firebaseConfig.ts (e.g., API key missing/invalid or other init error). Authentication will not work.");
@@ -76,7 +89,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log("--- AuthProvider useEffect CLEANUP (AuthContext.tsx) --- Unsubscribing from onAuthStateChanged for app:", auth?.name || "N/A");
       unsubscribe();
     };
-  }, []); // Added 'auth' to dependency array if it were to change, but it's module-scoped so it won't. Empty array is fine.
+  }, []); 
 
   const handleAuthError = (error: AuthError, defaultMessage: string, operation?: 'googleSignIn') => {
     console.error(`Authentication error during ${operation || 'operation'} (AuthContext.tsx for app: ${auth?.name || 'N/A'}):`, error.code, error.message);
