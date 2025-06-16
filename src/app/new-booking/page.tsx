@@ -437,7 +437,7 @@ export default function NewBookingPage() {
                                     {suggestions.map((suggestion) => (
                                         <div
                                             key={suggestion.id}
-                                            className="px-3 py-2 hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
+                                            className="px-3 py-2 border-2 border-transparent hover:border-primary cursor-pointer text-sm"
                                             onClick={() => handleSuggestionClick(suggestion)}
                                         >
                                             {suggestion.ClientName} 
