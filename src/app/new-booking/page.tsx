@@ -18,7 +18,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { ref, set, get, query as rtQuery, orderByChild, equalTo, push, startAt, endAt } from "firebase/database";
+import { ref, set, get, query as rtQuery, orderByChild, equalTo, push, startAt, endAt, update } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
 
 interface Note {
@@ -289,8 +289,8 @@ export default function NewBookingPage() {
 
         let clientIdToUse: string | null = selectedClientFirebaseKey;
         let finalClientName = clientName.trim();
-        let finalClientEmail = clientEmail.trim(); 
-        let finalClientPhone = clientPhone.trim(); 
+        let finalClientEmail = clientEmail.trim();
+        let finalClientPhone = clientPhone.trim();
 
         const finalNotes: Note[] = [];
         if (notesInput.trim()) {
@@ -306,23 +306,19 @@ export default function NewBookingPage() {
                 const userClientsRefPath = `Clients/${currentUser.uid}`;
                 const clientsDbRef = ref(db, userClientsRefPath);
                 
-                // More robust check for existing client by lowercase email
                 const clientQuery = rtQuery(clientsDbRef, orderByChild('ClientEmail'), equalTo(finalClientEmail.toLowerCase()));
                 const existingClientSnapshot = await get(clientQuery);
                 let foundExistingByEmail = false;
 
                 if (existingClientSnapshot.exists()) {
                     existingClientSnapshot.forEach((childSnapshot) => {
-                        // Check if name also matches, or decide if email alone is sufficient unique identifier
                         const clientData = childSnapshot.val() as ClientData;
-                        // For simplicity, first match by email is taken.
-                        // Could add name comparison: if (clientData.ClientName.toLowerCase() === finalClientName.toLowerCase())
                         clientIdToUse = childSnapshot.key;
-                        finalClientName = clientData.ClientName; // Use existing name
-                        finalClientEmail = clientData.ClientEmail || ''; // Use existing email (already lowercase from query)
-                        finalClientPhone = clientData.ClientContact || ''; // Use existing phone
+                        finalClientName = clientData.ClientName;
+                        finalClientEmail = clientData.ClientEmail || ''; 
+                        finalClientPhone = clientData.ClientContact || '';
                         foundExistingByEmail = true;
-                        return true; // break loop
+                        return true; 
                     });
                 }
 
@@ -335,26 +331,31 @@ export default function NewBookingPage() {
                         ClientID: clientIdToUse, 
                         ClientName: finalClientName, 
                         ClientContact: finalClientPhone, 
-                        ClientEmail: finalClientEmail.toLowerCase(), // Save email in lowercase
+                        ClientEmail: finalClientEmail.toLowerCase(), 
                         CreateDate: format(now, "yyyy-MM-dd"),
                         CreateTime: format(now, "HH:mm"),
                         CreatedByUserID: currentUser.uid
                     });
                 }
             } else { 
-                // If clientIdToUse was set from suggestion, ensure we use the data from that suggestion or re-fetch
-                // For now, we assume the data in state (finalClientName, finalClientEmail, finalClientPhone) is accurate
-                // if a suggestion was clicked. If the user manually changed email/phone AFTER clicking a suggestion,
-                // we might want to update the client record here, or simply use the selected existing client's stored data.
-                // For simplicity, we'll use the data potentially modified in the form but link to existing client.
-                // To ensure we use the *exact* stored email for the selected client:
                 const selectedClientRef = ref(db, `Clients/${currentUser.uid}/${clientIdToUse}`);
                 const clientSnapshot = await get(selectedClientRef);
                 if(clientSnapshot.exists()){
                     const clientData = clientSnapshot.val() as ClientData;
-                    finalClientName = clientData.ClientName; // Prefer stored name
-                    finalClientEmail = clientData.ClientEmail || ''; // Prefer stored email
-                    finalClientPhone = clientData.ClientContact || ''; // Prefer stored phone
+                    finalClientName = clientData.ClientName; 
+                    finalClientEmail = clientData.ClientEmail || ''; 
+                    finalClientPhone = clientData.ClientContact || '';
+                    
+                    if (clientData.ClientEmail && clientData.ClientEmail !== clientData.ClientEmail.toLowerCase()) {
+                        try {
+                            await update(selectedClientRef, { ClientEmail: clientData.ClientEmail.toLowerCase() });
+                            finalClientEmail = clientData.ClientEmail.toLowerCase();
+                            toast({ title: "Client Updated", description: `Email for ${finalClientName} corrected to lowercase.`, variant: "default" });
+                        } catch (updateError) {
+                            console.error("Error updating client email to lowercase:", updateError);
+                            toast({ title: "Client Update Error", description: `Could not update email for ${finalClientName} to lowercase. Booking will proceed.`, variant: "destructive" });
+                        }
+                    }
                 }
             }
 
@@ -368,10 +369,6 @@ export default function NewBookingPage() {
                 AppointmentID: appointmentId,
                 ClientID: clientIdToUse, 
                 ServiceProcedure: serviceProcedure,
-                // ClientEmail and ClientContact are not typically stored on the appointment, 
-                // but on the client record. However, if you need a snapshot:
-                // ClientEmail: finalClientEmail, (snapshot, could be redundant)
-                // ClientContact: finalClientPhone, (snapshot, could be redundant)
                 AppointmentDate: selectedFormattedDate,
                 AppointmentStartTime: startTime,
                 AppointmentEndTime: endTime,
@@ -642,4 +639,3 @@ export default function NewBookingPage() {
         </div>
     );
 }
-
