@@ -171,8 +171,8 @@ export default function NewBookingPage() {
         setSelectedClientFirebaseKey(null); 
         
         if (query.trim() === '') {
- setClientEmail(''); 
- setClientPhone(''); 
+         setClientEmail(''); 
+         setClientPhone(''); 
         }
 
 
@@ -318,7 +318,8 @@ export default function NewBookingPage() {
                         if (dbNameLower === inputNameLower) { 
                             clientIdToUse = childSnapshot.key;
                             finalClientName = clientData.ClientName;
- finalClientEmail = clientData.ClientEmail || ''; 
+                            finalClientEmail = clientData.ClientEmail || ''; 
+                            finalClientPhone = clientData.ClientContact || '';
                             foundExisting = true;
                             return true; 
                         }
@@ -346,6 +347,7 @@ export default function NewBookingPage() {
                     const clientData = clientSnapshot.val() as ClientData;
                     finalClientName = clientData.ClientName;
                     finalClientEmail = clientData.ClientEmail || ''; 
+                    finalClientPhone = clientData.ClientContact || ''; 
                 }
             }
 
@@ -435,10 +437,11 @@ export default function NewBookingPage() {
                                     {suggestions.map((suggestion) => (
                                         <div
                                             key={suggestion.id}
-                                            className="px-3 py-2 hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                                            className="px-3 py-2 hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
                                             onClick={() => handleSuggestionClick(suggestion)}
                                         >
                                             {suggestion.ClientName} 
+                                            {suggestion.ClientContact && <span className="text-xs text-muted-foreground ml-2">({suggestion.ClientContact})</span>}
                                         </div>
                                     ))}
                                 </div>
