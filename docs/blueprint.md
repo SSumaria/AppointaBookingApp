@@ -1,4 +1,4 @@
-# **App Name**: ServiceBooker Pro
+# **App Name**: Apointa
 
 ## Core Features:
 
