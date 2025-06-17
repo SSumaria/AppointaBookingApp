@@ -289,7 +289,7 @@ export default function NewBookingPage() {
 
         let determinedClientId: string | null = null;
         let finalClientNameForAppointment = clientName.trim();
-        let finalClientEmailForAppointment = clientEmail.trim().toLowerCase(); // Default to form email, lowercased
+        let finalClientEmailForAppointment = clientEmail.trim().toLowerCase(); 
         let finalClientPhoneForAppointment = clientPhone.trim();
 
         const finalNotes: Note[] = [];
@@ -308,64 +308,55 @@ export default function NewBookingPage() {
                 const snapshot = await get(clientRef);
 
                 if (snapshot.exists()) {
-                    determinedClientId = selectedClientFirebaseKey; // Use the ID of the selected client
-                    const clientData = snapshot.val() as ClientData;
+                    determinedClientId = selectedClientFirebaseKey; 
+                    const clientDataFromDB = snapshot.val() as ClientData;
                     
-                    // For the appointment record, primarily use DB data for consistency if client was selected
-                    finalClientNameForAppointment = clientData.ClientName; 
-                    finalClientPhoneForAppointment = clientData.ClientContact || ''; 
+                    finalClientNameForAppointment = clientDataFromDB.ClientName; 
+                    finalClientPhoneForAppointment = clientDataFromDB.ClientContact || ''; 
 
-                    const formEmailTrimmedLower = clientEmail.trim().toLowerCase(); // Email from the form field (user might have edited it)
+                    const formEmailLower = clientEmail.trim().toLowerCase();
                     
-                    // If the email from form (intended to be the correct one now, and lowercased) 
-                    // is different from the one stored in DB for the selected client, update the DB record.
-                    if (clientData.ClientEmail !== formEmailTrimmedLower) {
-                        await update(clientRef, { ClientEmail: formEmailTrimmedLower });
-                        finalClientEmailForAppointment = formEmailTrimmedLower; // Use the (potentially updated) form email for the appointment
-                        toast({ title: "Client Email Updated", description: `Email for ${clientData.ClientName} updated to ${formEmailTrimmedLower}.`});
+                    if (clientDataFromDB.ClientEmail !== formEmailLower) {
+                        await update(clientRef, { ClientEmail: formEmailLower });
+                        finalClientEmailForAppointment = formEmailLower; 
+                        toast({ title: "Client Email Updated", description: `Email for ${clientDataFromDB.ClientName} updated to ${formEmailLower}.`});
                     } else {
-                        finalClientEmailForAppointment = clientData.ClientEmail; // Use existing DB email (which is same as form's or already lowercase)
+                        finalClientEmailForAppointment = clientDataFromDB.ClientEmail; 
                     }
                 } else {
-                    // This case should ideally not happen if selectedClientFirebaseKey is valid
                     toast({ title: "Error", description: "Selected client not found. Please try again.", variant: "destructive" });
                     setIsSubmitting(false);
                     return;
                 }
             } else {
-                // Path 2: No client selected from suggestions - try to find by email (lowercase) or create new
+                // Path 2: No client selected - find by email (lowercase) or create new
                 const clientsDbRef = ref(db, `Clients/${currentUser.uid}`);
-                const emailToQuery = clientEmail.trim().toLowerCase(); // Email from form, lowercased for query
+                const emailToQuery = clientEmail.trim().toLowerCase();
                 const clientQuery = rtQuery(clientsDbRef, orderByChild('ClientEmail'), equalTo(emailToQuery));
                 const existingClientSnapshot = await get(clientQuery);
 
                 if (existingClientSnapshot.exists()) {
-                    // Found existing client by lowercase email query
                     existingClientSnapshot.forEach((childSnapshot) => { 
                         determinedClientId = childSnapshot.key as string;
                         const data = childSnapshot.val();
-                        // Use data from the found client for the appointment
                         finalClientNameForAppointment = data.ClientName;
-                        finalClientEmailForAppointment = data.ClientEmail; // Already lowercase from DB
+                        finalClientEmailForAppointment = data.ClientEmail; 
                         finalClientPhoneForAppointment = data.ClientContact || '';
-                        return true; // Stop after first match
+                        return true; 
                     });
                 } else {
-                    // No existing client found by this email, create a new one
                     const newClientRef = push(clientsDbRef);
                     determinedClientId = newClientRef.key as string;
                     const now = new Date();
                     await set(newClientRef, {
                         ClientID: determinedClientId,
-                        ClientName: clientName.trim(), // from form
-                        ClientContact: clientPhone.trim(), // from form
-                        ClientEmail: clientEmail.trim().toLowerCase(), // from form, ensure lowercase
+                        ClientName: clientName.trim(), 
+                        ClientContact: clientPhone.trim(), 
+                        ClientEmail: clientEmail.trim().toLowerCase(),
                         CreateDate: format(now, "yyyy-MM-dd"),
                         CreateTime: format(now, "HH:mm"),
                         CreatedByUserID: currentUser.uid
                     });
-                    // finalClientNameForAppointment, finalClientEmailForAppointment, finalClientPhoneForAppointment
-                    // are already set from form inputs, with email lowercased.
                 }
             }
 
@@ -391,8 +382,6 @@ export default function NewBookingPage() {
                 BookingStatus: "Booked",
                 Notes: finalNotes,
                 BookedByUserID: currentUser.uid,
-                // Store the client details used for this specific booking for audit/snapshot if needed,
-                // though primary client data is in Clients/{uid}/{determinedClientId}
                 _ClientNameSnapshot: finalClientNameForAppointment,
                 _ClientEmailSnapshot: finalClientEmailForAppointment,
                 _ClientPhoneSnapshot: finalClientPhoneForAppointment,
@@ -409,8 +398,8 @@ export default function NewBookingPage() {
             setNotesInput('');
             setStartTime('');
             setEndTime('');
-            setSelectedClientFirebaseKey(null); // Clear selection
-            setShowSuggestions(false); // Hide suggestions
+            setSelectedClientFirebaseKey(null); 
+            setShowSuggestions(false); 
 
         } catch (error: any) {
             console.error("Error during booking:", error);
@@ -434,7 +423,7 @@ export default function NewBookingPage() {
                 </div>
             </main>
              <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
-                © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
+                © {new Date().getFullYear()} Apointa. All rights reserved.
             </footer>
         </div>
       );
@@ -656,9 +645,8 @@ export default function NewBookingPage() {
                 </div>
             </main>
             <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
-                 © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
+                 © {new Date().getFullYear()} Apointa. All rights reserved.
             </footer>
         </div>
     );
 }
-

@@ -80,7 +80,7 @@ export default function HomePage() {
                 </div>
             </main>
              <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
-                © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
+                © {new Date().getFullYear()} Apointa. All rights reserved.
             </footer>
         </div>
     );
@@ -93,7 +93,7 @@ export default function HomePage() {
       <main className="flex-grow py-12">
         <div className="container max-w-5xl mx-auto text-center">
           <h1 className="text-4xl font-extrabold text-primary mb-4">
-            Welcome to ServiceBooker Pro
+            Welcome to Apointa
           </h1>
           <p className="text-lg text-muted-foreground mb-8">
             The easiest way to manage appointments and keep track of your clients.
@@ -155,9 +155,8 @@ export default function HomePage() {
       </main>
 
       <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
-        © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
+        © {new Date().getFullYear()} Apointa. All rights reserved.
       </footer>
     </div>
   );
 }
-

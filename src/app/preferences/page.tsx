@@ -130,7 +130,7 @@ export default function PreferencesPage() {
       console.error("Error fetching user preferences:", error);
       let description = error.message || "Could not load your saved working hours.";
       if (error.message && error.message.toLowerCase().includes("permission denied")) {
-        description = "Permission denied when fetching preferences. Ensure Firebase rules allow users to read 'UserPreferences/$uid/workingHours'. Example: { \"rules\": { \"UserPreferences\": { \"$uid\": { \"workingHours\": { \".read\": true }, \".write\": \"auth != null && auth.uid === $uid\", \".read\": \"auth != null && auth.uid === $uid\" } } } }";
+        description = "Permission denied when fetching preferences. Ensure Firebase rules allow users to read their own 'UserPreferences/$uid/workingHours'. Example: { \"rules\": { \"UserPreferences\": { \"$uid\": { \".read\": \"auth != null && auth.uid === $uid\", \"workingHours\": { \".read\": true }, \".write\": \"auth != null && auth.uid === $uid\" } } } }";
       }
       toast({
         title: "Error Loading Preferences",
@@ -216,7 +216,7 @@ export default function PreferencesPage() {
       console.error("Error saving user preferences:", error);
       let description = error.message || "Could not save your working hours.";
       if (error.message && error.message.toLowerCase().includes("permission denied")) {
-        description = "Permission denied when saving preferences. Ensure Firebase rules allow users to write to 'UserPreferences/$uid'. Example: { \"rules\": { \"UserPreferences\": { \"$uid\": { \".write\": \"auth != null && auth.uid === $uid\" } } } }";
+        description = "Permission denied when saving preferences. Ensure Firebase rules allow users to write to 'UserPreferences/$uid/workingHours'. Example: { \"rules\": { \"UserPreferences\": { \"$uid\": { \".write\": \"auth != null && auth.uid === $uid\", \"workingHours\": { \".read\": true }, \".read\": \"auth != null && auth.uid === $uid\" } } } }";
       }
       toast({
         title: "Error Saving Preferences",
@@ -246,7 +246,7 @@ export default function PreferencesPage() {
           </div>
         </main>
         <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
-          © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
+          © {new Date().getFullYear()} Apointa. All rights reserved.
         </footer>
       </div>
     );
@@ -381,7 +381,7 @@ export default function PreferencesPage() {
         </div>
       </main>
       <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
-        © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
+        © {new Date().getFullYear()} Apointa. All rights reserved.
       </footer>
     </div>
   );

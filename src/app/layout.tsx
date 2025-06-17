@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'ServiceBooker Pro', // Updated title
-  description: 'Manage your service bookings efficiently.', // Updated description
+  title: 'Apointa', // Updated title
+  description: 'Manage your appointments efficiently.', // Updated description
 };
 
 export default function RootLayout({

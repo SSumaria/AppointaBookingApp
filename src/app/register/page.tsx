@@ -57,7 +57,7 @@ export default function RegisterPage() {
         <Card className="w-full max-w-md shadow-xl">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold text-primary">Create an Account</CardTitle>
-            <CardDescription>Join ServiceBooker Pro today.</CardDescription>
+            <CardDescription>Join Apointa today.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <form onSubmit={handleEmailRegister} className="space-y-4">
@@ -144,7 +144,7 @@ export default function RegisterPage() {
         </Card>
       </main>
       <footer className="bg-background py-4 text-center text-sm text-muted-foreground">
-        © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
+        © {new Date().getFullYear()} Apointa. All rights reserved.
       </footer>
     </div>
   );

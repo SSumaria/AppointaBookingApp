@@ -166,7 +166,7 @@ export default function ClientSearchPage() {
                 </div>
             </main>
              <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
-                © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
+                © {new Date().getFullYear()} Apointa. All rights reserved.
             </footer>
         </div>
     );
@@ -260,7 +260,7 @@ export default function ClientSearchPage() {
         </div>
       </main>
       <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
-        © {new Date().getFullYear()} ServiceBooker Pro. All rights reserved.
+        © {new Date().getFullYear()} Apointa. All rights reserved.
       </footer>
     </div>
   );
