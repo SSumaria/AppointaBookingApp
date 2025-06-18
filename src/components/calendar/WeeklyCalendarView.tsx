@@ -134,7 +134,7 @@ const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({ bookings, curre
                       key={booking.id}
                       className={cn(
                         "absolute left-[2px] right-[2px] bg-primary/80 text-primary-foreground p-1 rounded shadow-sm overflow-hidden cursor-pointer hover:bg-primary focus-visible:ring-2 focus-visible:ring-ring",
-                        "dark:bg-primary/70 dark:hover:bg-primary/90 flex flex-col justify-start"
+                        "dark:bg-primary/70 dark:text-white dark:hover:bg-primary/90 flex flex-col justify-start"
                       )}
                       style={{ top: `${top}px`, height: `${displayHeight}px` }}
                       title={`${booking.AppointmentStartTime}-${booking.AppointmentEndTime}: ${booking.ClientName} - ${booking.ServiceProcedure}`}
@@ -170,3 +170,4 @@ const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({ bookings, curre
 };
 
 export default WeeklyCalendarView;
+
