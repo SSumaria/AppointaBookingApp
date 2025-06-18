@@ -13,7 +13,7 @@ const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 const messagingSenderId = process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID;
 const appIdEnv = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
 const measurementId = process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID;
-const databaseURL = "https://bookerpro-e5c9f-default-rtdb.firebaseio.com/"; // Ensure this is correct
+const databaseURL = "https://servicebooker-pro-default-rtdb.europe-west1.firebasedatabase.app/"; // Ensure this is correct
 
 console.log("RAW NEXT_PUBLIC_FIREBASE_API_KEY (firebaseConfig.ts):", process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
 console.log("Processed apiKey variable (firebaseConfig.ts):", apiKey ? "EXISTS" : "MISSING_OR_EMPTY");
