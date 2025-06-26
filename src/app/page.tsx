@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import React, { useEffect } from 'react';
 import Image from 'next/image';
-import { CalendarPlus, Users, Share2, ArrowRight } from "lucide-react";
+import { CalendarPlus, Users, Share2, ArrowRight, CheckCircle2 } from "lucide-react";
 
 export default function LandingPage() {
   const { currentUser, loading } = useAuth();
@@ -48,7 +48,7 @@ export default function LandingPage() {
               Effortless Appointment Scheduling
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
-              Apointa simplifies your booking process, manages your client relationships, and gives you back your time. Focus on your service, not your schedule.
+              Apointa is the all-in-one solution for independent professionals and small businesses. Simplify your booking process, manage client relationships with a built-in CRM, and get back your valuable time. Focus on what you do best—we'll handle the schedule.
             </p>
             <div className="flex justify-center items-center gap-4">
               <Link href="/register">
@@ -67,8 +67,8 @@ export default function LandingPage() {
         <section className="py-20 bg-muted/40">
           <div className="container mx-auto px-4">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold">Everything You Need to Succeed</h2>
-              <p className="text-lg text-muted-foreground mt-2">Powerful features to streamline your business.</p>
+              <h2 className="text-3xl md:text-4xl font-bold">A Better Way to Run Your Business</h2>
+              <p className="text-lg text-muted-foreground mt-2">Powerful, intuitive features to streamline your operations.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="text-center p-8 bg-card rounded-lg shadow-lg">
@@ -78,7 +78,7 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Intuitive Booking</h3>
-                <p className="text-muted-foreground">Quickly create, view, and manage all your appointments from a powerful, centralized calendar and dashboard.</p>
+                <p className="text-muted-foreground">A powerful and clear calendar to quickly create, view, and manage all appointments. Color-coded views and multiple layouts (month, week) help you see your schedule at a glance.</p>
               </div>
               <div className="text-center p-8 bg-card rounded-lg shadow-lg">
                 <div className="flex justify-center items-center mb-4">
@@ -87,7 +87,7 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Client Management</h3>
-                <p className="text-muted-foreground">Keep detailed records of all your clients, including their contact information and complete appointment history.</p>
+                <p className="text-muted-foreground">A simple, integrated CRM. Keep detailed records of your clients, including contact info, booking history, and private notes. Search and access client details in seconds.</p>
               </div>
               <div className="text-center p-8 bg-card rounded-lg shadow-lg">
                 <div className="flex justify-center items-center mb-4">
@@ -96,24 +96,24 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Public Booking Page</h3>
-                <p className="text-muted-foreground">Share a personal link with your clients, allowing them to book appointments with you directly based on your availability.</p>
+                <p className="text-muted-foreground">Stop the back-and-forth. Get a personal, shareable link where clients can see your real-time availability and book appointments directly, based on the working hours you set.</p>
               </div>
             </div>
           </div>
         </section>
         
-        {/* Image Feature Section */}
+        {/* Image Feature Section 1 */}
         <section className="py-20">
           <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
-            <div className="prose lg:prose-lg dark:prose-invert">
+            <div className="prose lg:prose-lg dark:prose-invert max-w-none">
                 <h2 className="text-3xl font-bold text-primary">Your Business, Your Schedule</h2>
                 <p className="text-muted-foreground">
-                    Stop the back-and-forth emails. Apointa provides a clean, professional booking page you can share anywhere. Clients see your real-time availability and can book a slot in seconds.
+                    Stop the back-and-forth emails. Apointa provides a clean, professional booking page you can share anywhere. Clients see your real-time availability and can book a slot in seconds, making scheduling painless for everyone.
                 </p>
-                <ul>
-                    <li>Set custom working hours for each day.</li>
-                    <li>Bookings automatically block out your calendar.</li>
-                    <li>Reduce no-shows with a clear, confirmed schedule.</li>
+                <ul className="space-y-2">
+                    <li className="flex items-start"><CheckCircle2 className="h-6 w-6 text-green-500 mr-3 mt-1 flex-shrink-0" /><span>Set custom working hours for each day of the week.</span></li>
+                    <li className="flex items-start"><CheckCircle2 className="h-6 w-6 text-green-500 mr-3 mt-1 flex-shrink-0" /><span>New bookings automatically block out your calendar to prevent conflicts.</span></li>
+                    <li className="flex items-start"><CheckCircle2 className="h-6 w-6 text-green-500 mr-3 mt-1 flex-shrink-0" /><span>Reduce no-shows and confusion with a clear, confirmed schedule.</span></li>
                 </ul>
             </div>
              <div>
@@ -129,12 +129,41 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* Image Feature Section 2 */}
+        <section className="py-20 bg-muted/40">
+          <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
+             <div className="md:order-2">
+                <div className="prose lg:prose-lg dark:prose-invert max-w-none">
+                    <h2 className="text-3xl font-bold text-primary">Your Command Center</h2>
+                    <p className="text-muted-foreground">
+                        Manage your entire business from one place. The Apointa dashboard gives you a complete overview of your appointments, with powerful views and tools to keep you organized and in control.
+                    </p>
+                    <ul className="space-y-2">
+                       <li className="flex items-start"><CheckCircle2 className="h-6 w-6 text-green-500 mr-3 mt-1 flex-shrink-0" /><span>Visualize your schedule with interactive monthly and weekly calendars.</span></li>
+                       <li className="flex items-start"><CheckCircle2 className="h-6 w-6 text-green-500 mr-3 mt-1 flex-shrink-0" /><span>Quickly edit, cancel, or add notes to any booking.</span></li>
+                       <li className="flex items-start"><CheckCircle2 className="h-6 w-6 text-green-500 mr-3 mt-1 flex-shrink-0" /><span>Filter and view bookings by date to easily find what you're looking for.</span></li>
+                    </ul>
+                </div>
+             </div>
+             <div className="md:order-1">
+               <Image 
+                 src="https://placehold.co/600x400.png" 
+                 alt="Apointa dashboard calendar view" 
+                 width={600} 
+                 height={400} 
+                 className="rounded-lg shadow-2xl"
+                 data-ai-hint="dashboard calendar"
+                />
+             </div>
+          </div>
+        </section>
+
 
         {/* Call to Action Section */}
-        <section className="py-20 bg-muted/40">
+        <section className="py-20">
           <div className="container mx-auto px-4 text-center">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Simplify Your Business?</h2>
-            <p className="text-lg text-muted-foreground mb-8">Join today and take control of your appointments.</p>
+            <p className="text-lg text-muted-foreground mb-8">Join today and take control of your appointments. It's free to get started.</p>
             <Link href="/register">
               <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
                 Sign Up Now
@@ -143,7 +172,7 @@ export default function LandingPage() {
           </div>
         </section>
       </main>
-      <footer className="bg-background py-6">
+      <footer className="bg-background py-6 border-t">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
           © {new Date().getFullYear()} Apointa. All rights reserved.
         </div>
