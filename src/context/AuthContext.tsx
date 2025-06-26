@@ -154,7 +154,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       toast({ title: 'Registration Successful', description: 'Welcome!' });
-      router.push('/');
+      router.push('/dashboard');
       return userCredential.user;
     } catch (error) {
       return handleAuthError(error as AuthError, 'Failed to register.');
@@ -172,7 +172,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
       toast({ title: 'Login Successful', description: 'Welcome back!' });
-      router.push('/');
+      router.push('/dashboard');
       return userCredential.user;
     } catch (error) {
       return handleAuthError(error as AuthError, 'Failed to sign in.');
@@ -192,7 +192,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const result = await signInWithPopup(auth, provider);
       toast({ title: 'Google Sign-In Successful', description: 'Welcome!' });
-      router.push('/');
+      router.push('/dashboard');
       return result.user;
     } catch (error) {
       console.error("--- AuthContext.tsx --- Google Sign-In failed:", error);
@@ -232,4 +232,3 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   console.log("--- AuthProvider (AuthContext.tsx) --- Rendering with value:", { currentUser: currentUser?.uid || null, loading, appName: auth?.name || "N/A" });
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-

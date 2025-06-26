@@ -2,11 +2,11 @@
 "use client";
 
 import Link from 'next/link';
-import { Home, Calendar as CalendarIcon, Search as SearchIcon, ListChecks, LogIn, LogOut, UserPlus, UserCircle, Menu, Settings } from "lucide-react";
+import { LayoutDashboard, Calendar as CalendarIcon, Search as SearchIcon, ListChecks, LogIn, LogOut, UserPlus, UserCircle, Menu, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'; // SheetClose removed as it's not explicitly used for programmatic close here
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useState } from 'react';
 import {
   DropdownMenu,
@@ -33,9 +33,9 @@ export default function Header() {
 
   const commonNavLinks = (
     <>
-      <Button variant="ghost" className="justify-start w-full md:w-auto md:justify-center" onClick={() => handleNavigation('/')}>
-        <Home className="mr-2 h-4 w-4" />
-        Home
+      <Button variant="ghost" className="justify-start w-full md:w-auto md:justify-center" onClick={() => handleNavigation('/dashboard')}>
+        <LayoutDashboard className="mr-2 h-4 w-4" />
+        Dashboard
       </Button>
       <Button variant="ghost" className="justify-start w-full md:w-auto md:justify-center" onClick={() => handleNavigation('/new-booking')}>
         <CalendarIcon className="mr-2 h-4 w-4" />
@@ -90,7 +90,7 @@ export default function Header() {
   return (
     <header className="bg-background py-3 shadow-sm sticky top-0 z-50">
       <div className="container max-w-5xl mx-auto flex items-center justify-between">
-        <Link href="/" onClick={() => setIsSheetOpen(false)} className="text-xl sm:text-2xl font-bold text-primary">
+        <Link href={currentUser ? '/dashboard' : '/'} onClick={() => setIsSheetOpen(false)} className="text-xl sm:text-2xl font-bold text-primary">
           Apointa
         </Link>
 
@@ -144,7 +144,7 @@ export default function Header() {
             </SheetTrigger>
             <SheetContent side="right" className="w-[280px] p-0 flex flex-col">
               <div className="p-4 mb-2 border-b">
-                <Link href="/" onClick={() => setIsSheetOpen(false)} className="text-lg font-bold text-primary">
+                <Link href={currentUser ? '/dashboard' : '/'} onClick={() => setIsSheetOpen(false)} className="text-lg font-bold text-primary">
                   Apointa
                 </Link>
               </div>
