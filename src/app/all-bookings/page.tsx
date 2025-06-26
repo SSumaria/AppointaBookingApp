@@ -81,10 +81,16 @@ interface Booking {
   BookedByUserID?: string;
 }
 
+interface Client {
+    id: string;
+    ClientName: string;
+}
+
 interface EditBookingFormState {
   serviceProcedure: string;
   appointmentDate: Date | undefined;
   appointmentStartTime: string;
+
   appointmentEndTime: string;
 }
 
@@ -115,7 +121,6 @@ export default function AllBookingsPage() {
   const [bookingsForDisplay, setBookingsForDisplay] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [filterDateRange, setFilterDateRange] = useState<DateRange | undefined>(undefined);
-  const [clientsCache, setClientsCache] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const { currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -140,83 +145,75 @@ export default function AllBookingsPage() {
     }
   }, [currentUser, authLoading, router]);
 
-  const fetchClientName = useCallback(async (clientId: string): Promise<string> => {
-    if (!currentUser?.uid) return "Unknown Client";
-    if (clientsCache[clientId]) {
-      return clientsCache[clientId];
-    }
-    try {
-      const clientRef = ref(db, `Clients/${currentUser.uid}/${clientId}/ClientName`);
-      const snapshot = await get(clientRef);
-      if (snapshot.exists()) {
-        const clientName = snapshot.val();
-        setClientsCache(prev => ({ ...prev, [clientId]: clientName }));
-        return clientName;
-      }
-      return "Client Not Found";
-    } catch (error) {
-      console.error("Error fetching client name:", error);
-      return "Error Fetching Name";
-    }
-  }, [currentUser?.uid, clientsCache]);
-
   const fetchAndSetAllBookings = useCallback(async () => {
     if (!currentUser?.uid) return;
 
     setIsLoading(true);
     try {
-      const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
-      const appointmentsRef = ref(db, userAppointmentsRefPath);
-      const bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'));
+        // Step 1: Fetch all clients for the user and create a lookup map.
+        const userClientsRefPath = `Clients/${currentUser.uid}`;
+        const clientsRef = ref(db, userClientsRefPath);
+        const clientsSnapshot = await get(clientsRef);
+        const clientsMap = new Map<string, string>();
+        if (clientsSnapshot.exists()) {
+            clientsSnapshot.forEach(child => {
+                clientsMap.set(child.key as string, child.val().ClientName);
+            });
+        }
 
-      const snapshot = await get(bookingsQuery);
-      const fetchedBookings: Booking[] = [];
-      if (snapshot.exists()) {
-        snapshot.forEach((childSnapshot) => {
-          const data = childSnapshot.val();
-          let processedNotes: Note[] = [];
-            if (data.Notes) {
-            if (Array.isArray(data.Notes)) {
-              processedNotes = data.Notes.filter((n: any) => n && typeof n.text === 'string' && typeof n.timestamp === 'number' && typeof n.id === 'string');
-            } else if (typeof data.Notes === 'object' && !Array.isArray(data.Notes)) {
-              processedNotes = Object.values(data.Notes as Record<string, Note>).filter((n: any) => n && typeof n.text === 'string' && typeof n.timestamp === 'number' && typeof n.id === 'string');
-            } else if (typeof data.Notes === 'string' && data.Notes.trim() !== '') {
-              processedNotes = [{
-                id: generateNoteId(),
-                text: data.Notes,
-                timestamp: data.timestamp || Date.now()
-              }];
-            }
-          }
-          fetchedBookings.push({
-            id: childSnapshot.key as string,
-            ...data,
-            Notes: processedNotes,
-          });
+        // Step 2: Fetch all appointments for the user.
+        const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
+        const appointmentsRef = ref(db, userAppointmentsRefPath);
+        const bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'));
+        const snapshot = await get(bookingsQuery);
+        
+        const fetchedBookings: Booking[] = [];
+        if (snapshot.exists()) {
+            snapshot.forEach((childSnapshot) => {
+                const data = childSnapshot.val();
+                let processedNotes: Note[] = [];
+                if (data.Notes) {
+                    if (Array.isArray(data.Notes)) {
+                        processedNotes = data.Notes.filter((n: any) => n && typeof n.text === 'string' && typeof n.timestamp === 'number' && typeof n.id === 'string');
+                    } else if (typeof data.Notes === 'object' && !Array.isArray(data.Notes)) {
+                        processedNotes = Object.values(data.Notes as Record<string, Note>).filter((n: any) => n && typeof n.text === 'string' && typeof n.timestamp === 'number' && typeof n.id === 'string');
+                    } else if (typeof data.Notes === 'string' && data.Notes.trim() !== '') {
+                        processedNotes = [{
+                            id: generateNoteId(),
+                            text: data.Notes,
+                            timestamp: data.timestamp || Date.now()
+                        }];
+                    }
+                }
+                
+                // Step 3: Use the client map to add the client name to each booking.
+                const clientName = clientsMap.get(data.ClientID) || "Unknown Client";
+
+                fetchedBookings.push({
+                    id: childSnapshot.key as string,
+                    ...data,
+                    ClientName: clientName,
+                    Notes: processedNotes,
+                });
+            });
+        }
+
+        fetchedBookings.sort((a, b) => {
+            const dateComparison = b.AppointmentDate.localeCompare(a.AppointmentDate);
+            if (dateComparison !== 0) return dateComparison;
+            return b.AppointmentStartTime.localeCompare(a.AppointmentStartTime);
         });
-      }
 
-      const bookingsWithClientNames = await Promise.all(
-        fetchedBookings.map(async (booking) => {
-          const clientName = await fetchClientName(booking.ClientID);
-          return { ...booking, ClientName: clientName };
-        })
-      );
-
-      bookingsWithClientNames.sort((a, b) => {
-        const dateComparison = b.AppointmentDate.localeCompare(a.AppointmentDate);
-        if (dateComparison !== 0) return dateComparison;
-        return b.AppointmentStartTime.localeCompare(a.AppointmentStartTime);
-      });
-
-      setAllFetchedBookings(bookingsWithClientNames);
+        setAllFetchedBookings(fetchedBookings);
 
     } catch (error: any) {
-      console.error("Error fetching bookings:", error);
+        console.error("Error fetching bookings:", error);
+        toast({ title: "Error", description: "Failed to fetch bookings.", variant: "destructive" });
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
-  }, [currentUser?.uid, fetchClientName]);
+  }, [currentUser?.uid, toast]);
+
 
   useEffect(() => {
     if (currentUser) {
