@@ -6,9 +6,56 @@ import { Button } from "@/components/ui/button";
 import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
 import { CalendarPlus, Users, Share2, ArrowRight, CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+// Helper component for animations
+const AnimatedSection = ({ children, delay = 0, initialClasses = "opacity-0 translate-y-8" }: { children: React.ReactNode, delay?: number, initialClasses?: string }) => {
+    const [isVisible, setIsVisible] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const element = ref.current;
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    setTimeout(() => {
+                       setIsVisible(true);
+                    }, delay);
+                    if (element) {
+                      observer.unobserve(element);
+                    }
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        if (element) {
+            observer.observe(element);
+        }
+
+        return () => {
+            if (element) {
+                observer.unobserve(element);
+            }
+        };
+    }, [delay]);
+
+    return (
+        <div
+            ref={ref}
+            className={cn(
+                "transition-all duration-700 ease-out",
+                isVisible ? "opacity-100 translate-y-0" : initialClasses
+            )}
+        >
+            {children}
+        </div>
+    );
+};
+
 
 export default function LandingPage() {
   const { currentUser, loading } = useAuth();
@@ -44,12 +91,17 @@ export default function LandingPage() {
         {/* Hero Section */}
         <section className="py-20 sm:py-32">
           <div className="container mx-auto px-4 text-center">
-            <h1 className="text-4xl md:text-6xl font-extrabold text-primary mb-4 tracking-tight">
-              Effortless Appointment Scheduling
-            </h1>
+            <AnimatedSection>
+              <h1 className="text-4xl md:text-6xl font-extrabold text-primary mb-4 tracking-tight">
+                Effortless Appointment Scheduling
+              </h1>
+            </AnimatedSection>
+            <AnimatedSection delay={150}>
             <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
               Apointa is the all-in-one solution for independent professionals and small businesses. Simplify your booking process, manage client relationships with a built-in CRM, and get back your valuable time. Focus on what you do best—we'll handle the schedule.
             </p>
+            </AnimatedSection>
+            <AnimatedSection delay={300}>
             <div className="flex justify-center items-center gap-4">
               <Link href="/register">
                 <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">Get Started for Free <ArrowRight className="ml-2 h-5 w-5" /></Button>
@@ -60,18 +112,22 @@ export default function LandingPage() {
                 </Button>
               </Link>
             </div>
+            </AnimatedSection>
           </div>
         </section>
 
         {/* Features Section */}
         <section className="py-20 bg-muted/40">
           <div className="container mx-auto px-4">
+            <AnimatedSection>
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-bold">A Better Way to Run Your Business</h2>
               <p className="text-lg text-muted-foreground mt-2">Powerful, intuitive features to streamline your operations.</p>
             </div>
+            </AnimatedSection>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="text-center p-8 bg-card rounded-lg shadow-lg">
+              <AnimatedSection delay={0}>
+              <div className="text-center p-8 bg-card rounded-lg shadow-lg h-full">
                 <div className="flex justify-center items-center mb-4">
                   <div className="p-4 bg-primary/10 rounded-full">
                     <CalendarPlus className="h-8 w-8 text-primary" />
@@ -80,7 +136,9 @@ export default function LandingPage() {
                 <h3 className="text-xl font-semibold mb-2">Intuitive Booking</h3>
                 <p className="text-muted-foreground">A powerful and clear calendar to quickly create, view, and manage all appointments. Color-coded views and multiple layouts (month, week) help you see your schedule at a glance.</p>
               </div>
-              <div className="text-center p-8 bg-card rounded-lg shadow-lg">
+              </AnimatedSection>
+              <AnimatedSection delay={200}>
+              <div className="text-center p-8 bg-card rounded-lg shadow-lg h-full">
                 <div className="flex justify-center items-center mb-4">
                   <div className="p-4 bg-primary/10 rounded-full">
                     <Users className="h-8 w-8 text-primary" />
@@ -89,7 +147,9 @@ export default function LandingPage() {
                 <h3 className="text-xl font-semibold mb-2">Client Management</h3>
                 <p className="text-muted-foreground">A simple, integrated CRM. Keep detailed records of your clients, including contact info, booking history, and private notes. Search and access client details in seconds.</p>
               </div>
-              <div className="text-center p-8 bg-card rounded-lg shadow-lg">
+              </AnimatedSection>
+              <AnimatedSection delay={400}>
+              <div className="text-center p-8 bg-card rounded-lg shadow-lg h-full">
                 <div className="flex justify-center items-center mb-4">
                   <div className="p-4 bg-primary/10 rounded-full">
                     <Share2 className="h-8 w-8 text-primary" />
@@ -98,13 +158,15 @@ export default function LandingPage() {
                 <h3 className="text-xl font-semibold mb-2">Public Booking Page</h3>
                 <p className="text-muted-foreground">Stop the back-and-forth. Get a personal, shareable link where clients can see your real-time availability and book appointments directly, based on the working hours you set.</p>
               </div>
+              </AnimatedSection>
             </div>
           </div>
         </section>
         
         {/* Image Feature Section 1 */}
-        <section className="py-20">
+        <section className="py-20 overflow-x-hidden">
           <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
+            <AnimatedSection initialClasses="opacity-0 -translate-x-12">
             <div className="prose lg:prose-lg dark:prose-invert max-w-none">
                 <h2 className="text-3xl font-bold text-primary">Your Business, Your Schedule</h2>
                 <p className="text-muted-foreground">
@@ -116,7 +178,8 @@ export default function LandingPage() {
                     <li className="flex items-start"><CheckCircle2 className="h-6 w-6 text-green-500 mr-3 mt-1 flex-shrink-0" /><span>Reduce no-shows and confusion with a clear, confirmed schedule.</span></li>
                 </ul>
             </div>
-             <div>
+            </AnimatedSection>
+             <AnimatedSection initialClasses="opacity-0 translate-x-12">
                <Image 
                  src="/images/bookings.png" 
                  alt="A screenshot of the Apointa public booking page" 
@@ -124,13 +187,14 @@ export default function LandingPage() {
                  height={400} 
                  className="rounded-lg shadow-2xl"
                 />
-             </div>
+             </AnimatedSection>
           </div>
         </section>
 
         {/* Image Feature Section 2 */}
-        <section className="py-20 bg-muted/40">
+        <section className="py-20 bg-muted/40 overflow-x-hidden">
           <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
+             <AnimatedSection initialClasses="opacity-0 translate-x-12" delay={200}>
              <div className="md:order-2">
                 <div className="prose lg:prose-lg dark:prose-invert max-w-none">
                     <h2 className="text-3xl font-bold text-primary">Your Command Center</h2>
@@ -144,6 +208,8 @@ export default function LandingPage() {
                     </ul>
                 </div>
              </div>
+             </AnimatedSection>
+             <AnimatedSection initialClasses="opacity-0 -translate-x-12" delay={200}>
              <div className="md:order-1">
                <Image 
                  src="/images/command-centre.png" 
@@ -153,6 +219,7 @@ export default function LandingPage() {
                  className="rounded-lg shadow-2xl"
                 />
              </div>
+             </AnimatedSection>
           </div>
         </section>
 
@@ -160,13 +227,15 @@ export default function LandingPage() {
         {/* Call to Action Section */}
         <section className="py-20">
           <div className="container mx-auto px-4 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Simplify Your Business?</h2>
-            <p className="text-lg text-muted-foreground mb-8">Join today and take control of your appointments. It's free to get started.</p>
-            <Link href="/register">
-              <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
-                Sign Up Now
-              </Button>
-            </Link>
+            <AnimatedSection>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Simplify Your Business?</h2>
+              <p className="text-lg text-muted-foreground mb-8">Join today and take control of your appointments. It's free to get started.</p>
+              <Link href="/register">
+                <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
+                  Sign Up Now
+                </Button>
+              </Link>
+            </AnimatedSection>
           </div>
         </section>
       </main>
