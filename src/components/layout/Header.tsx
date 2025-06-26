@@ -89,7 +89,7 @@ export default function Header() {
 
   return (
     <header className="bg-background py-3 shadow-sm sticky top-0 z-50">
-      <div className="container max-w-5xl mx-auto flex items-center justify-between">
+      <div className="container max-w-5xl mx-auto flex items-center justify-between px-4">
         <Link href={currentUser ? '/dashboard' : '/'} onClick={() => setIsSheetOpen(false)} className="text-xl sm:text-2xl font-bold text-primary">
           Appointa
         </Link>
@@ -166,5 +166,3 @@ export default function Header() {
     </header>
   );
 }
-
-    
