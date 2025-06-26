@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Apointa', // Updated title
+  title: 'Appointa', // Updated title
   description: 'Manage your appointments efficiently.', // Updated description
 };
 
@@ -36,3 +36,5 @@ export default function RootLayout({
     </html>
   );
 }
+
+    

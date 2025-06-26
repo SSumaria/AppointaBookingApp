@@ -45,7 +45,7 @@ export default function LoginPage() {
       <main className="flex-grow flex items-center justify-center p-4">
         <Card className="w-full max-w-md shadow-xl">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-primary">Login to Apointa</CardTitle>
+            <CardTitle className="text-2xl font-bold text-primary">Login to Appointa</CardTitle>
             <CardDescription>Access your account to manage bookings.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -118,8 +118,10 @@ export default function LoginPage() {
         </Card>
       </main>
       <footer className="bg-background py-4 text-center text-sm text-muted-foreground">
-        © {new Date().getFullYear()} Apointa. All rights reserved.
+        © {new Date().getFullYear()} Appointa. All rights reserved.
       </footer>
     </div>
   );
 }
+
+    

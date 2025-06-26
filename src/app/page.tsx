@@ -98,7 +98,7 @@ export default function LandingPage() {
             </AnimatedSection>
             <AnimatedSection delay={150}>
             <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
-              Apointa is the all-in-one solution for independent professionals and small businesses. Simplify your booking process, manage client relationships with a built-in CRM, and get back your valuable time. Focus on what you do best—we'll handle the schedule.
+              Appointa is the all-in-one solution for independent professionals and small businesses. Simplify your booking process, manage client relationships with a built-in CRM, and get back your valuable time. Focus on what you do best—we'll handle the schedule.
             </p>
             </AnimatedSection>
             <AnimatedSection delay={300}>
@@ -170,7 +170,7 @@ export default function LandingPage() {
             <div className="prose lg:prose-lg dark:prose-invert max-w-none">
                 <h2 className="text-3xl font-bold text-primary">Your Business, Your Schedule</h2>
                 <p className="text-muted-foreground">
-                    Stop the back-and-forth emails. Apointa provides a clean, professional booking page you can share anywhere. Clients see your real-time availability and can book a slot in seconds, making scheduling painless for everyone.
+                    Stop the back-and-forth emails. Appointa provides a clean, professional booking page you can share anywhere. Clients see your real-time availability and can book a slot in seconds, making scheduling painless for everyone.
                 </p>
                 <ul className="space-y-2">
                     <li className="flex items-start"><CheckCircle2 className="h-6 w-6 text-green-500 mr-3 mt-1 flex-shrink-0" /><span>Set custom working hours for each day of the week.</span></li>
@@ -182,7 +182,7 @@ export default function LandingPage() {
              <AnimatedSection initialClasses="opacity-0 translate-x-12">
                <Image 
                  src="/images/bookings.png" 
-                 alt="A screenshot of the Apointa public booking page" 
+                 alt="A screenshot of the Appointa public booking page" 
                  width={600} 
                  height={400} 
                  className="rounded-lg shadow-2xl"
@@ -197,7 +197,7 @@ export default function LandingPage() {
              <AnimatedSection initialClasses="opacity-0 -translate-x-12" delay={200}>
                <Image 
                  src="/images/command-centre.png" 
-                 alt="Apointa dashboard and calendar view" 
+                 alt="Appointa dashboard and calendar view" 
                  width={600} 
                  height={400} 
                  className="rounded-lg shadow-2xl"
@@ -207,7 +207,7 @@ export default function LandingPage() {
                 <div className="prose lg:prose-lg dark:prose-invert max-w-none">
                     <h2 className="text-3xl font-bold text-primary">Your Command Center</h2>
                     <p className="text-muted-foreground">
-                        Manage your entire business from one place. The Apointa dashboard gives you a complete overview of your appointments, with powerful views and tools to keep you organized and in control.
+                        Manage your entire business from one place. The Appointa dashboard gives you a complete overview of your appointments, with powerful views and tools to keep you organized and in control.
                     </p>
                     <ul className="space-y-2">
                        <li className="flex items-start"><CheckCircle2 className="h-6 w-6 text-green-500 mr-3 mt-1 flex-shrink-0" /><span>Visualize your schedule with interactive monthly and weekly calendars.</span></li>
@@ -237,9 +237,11 @@ export default function LandingPage() {
       </main>
       <footer className="bg-background py-6 border-t">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} Apointa. All rights reserved.
+          © {new Date().getFullYear()} Appointa. All rights reserved.
         </div>
       </footer>
     </div>
   );
 }
+
+    

@@ -584,7 +584,7 @@ export default function AllBookingsPage() {
           </div>
         </main>
         <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
-          © {new Date().getFullYear()} Apointa. All rights reserved.
+          © {new Date().getFullYear()} Appointa. All rights reserved.
         </footer>
       </div>
     );
@@ -1054,8 +1054,10 @@ export default function AllBookingsPage() {
           </div>
         </main>
       <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
-        © {new Date().getFullYear()} Apointa. All rights reserved.
+        © {new Date().getFullYear()} Appointa. All rights reserved.
       </footer>
     </div>
   );
 }
+
+    

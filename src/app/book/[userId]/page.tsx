@@ -478,7 +478,7 @@ export default function PublicBookingPage() {
                 <CardHeader><CardTitle className="text-2xl font-bold text-destructive mb-4">Invalid Link</CardTitle></CardHeader>
                 <CardContent><CardDescription>Booking link is incomplete or invalid.</CardDescription></CardContent>
             </Card>
-            <footer className="fixed bottom-0 bg-transparent py-4 text-center text-sm text-muted-foreground">© {new Date().getFullYear()} Apointa.</footer>
+            <footer className="fixed bottom-0 bg-transparent py-4 text-center text-sm text-muted-foreground">© {new Date().getFullYear()} Appointa.</footer>
         </div>
     );
   }
@@ -490,7 +490,7 @@ export default function PublicBookingPage() {
             <p className="mt-4 text-muted-foreground">
               {!initialCheckDone ? "Verifying booking link..." : "Loading provider availability..."}
             </p>
-            <footer className="fixed bottom-0 bg-transparent py-4 text-center text-sm text-muted-foreground">© {new Date().getFullYear()} Apointa.</footer>
+            <footer className="fixed bottom-0 bg-transparent py-4 text-center text-sm text-muted-foreground">© {new Date().getFullYear()} Appointa.</footer>
         </div>
     );
   }
@@ -624,8 +624,10 @@ export default function PublicBookingPage() {
             </div>
         </main>
         <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
-            © {new Date().getFullYear()} Apointa. All rights reserved.
+            © {new Date().getFullYear()} Appointa. All rights reserved.
         </footer>
     </div>
   );
 }
+
+    

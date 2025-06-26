@@ -80,7 +80,7 @@ export default function DashboardPage() {
                 </div>
             </main>
              <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
-                © {new Date().getFullYear()} Apointa. All rights reserved.
+                © {new Date().getFullYear()} Appointa. All rights reserved.
             </footer>
         </div>
     );
@@ -93,7 +93,7 @@ export default function DashboardPage() {
       <main className="flex-grow py-12">
         <div className="container max-w-5xl mx-auto text-center">
           <h1 className="text-4xl font-extrabold text-primary mb-4">
-            Welcome to Apointa
+            Welcome to Appointa
           </h1>
           <p className="text-lg text-muted-foreground mb-8">
             The easiest way to manage appointments and keep track of your clients.
@@ -155,8 +155,10 @@ export default function DashboardPage() {
       </main>
 
       <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
-        © {new Date().getFullYear()} Apointa. All rights reserved.
+        © {new Date().getFullYear()} Appointa. All rights reserved.
       </footer>
     </div>
   );
 }
+
+    
