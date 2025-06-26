@@ -194,8 +194,8 @@ export default function LandingPage() {
         {/* Image Feature Section 2 */}
         <section className="py-20 bg-muted overflow-x-hidden">
           <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
-             <AnimatedSection initialClasses="opacity-0 translate-x-12" delay={200}>
-             <div className="md:order-2">
+             <AnimatedSection initialClasses="opacity-0 -translate-x-12" delay={200}>
+             <div className="md:order-1">
                 <div className="prose lg:prose-lg dark:prose-invert max-w-none">
                     <h2 className="text-3xl font-bold text-primary">Your Command Center</h2>
                     <p className="text-muted-foreground">
@@ -209,8 +209,8 @@ export default function LandingPage() {
                 </div>
              </div>
              </AnimatedSection>
-             <AnimatedSection initialClasses="opacity-0 -translate-x-12" delay={200}>
-             <div className="md:order-1">
+             <AnimatedSection initialClasses="opacity-0 translate-x-12" delay={200}>
+             <div className="md:order-2">
                <Image 
                  src="/images/command-centre.png" 
                  alt="Apointa dashboard and calendar view" 
