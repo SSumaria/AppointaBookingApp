@@ -118,7 +118,7 @@ export default function LandingPage() {
             </div>
              <div>
                <Image 
-                 src="/images/bookings.png" 
+                 src="/home/user/studio/images/bookings.png" 
                  alt="A screenshot of the Apointa booking page." 
                  width={600} 
                  height={400} 
