@@ -118,12 +118,11 @@ export default function LandingPage() {
             </div>
              <div>
                <Image 
-                 src="https://placehold.co/600x400.png" 
-                 alt="Apointa public booking page screenshot" 
+                 src="/images/landing-booking.png" 
+                 alt="A close-up of a mobile phone screen showing an appointment booking calendar." 
                  width={600} 
                  height={400} 
                  className="rounded-lg shadow-2xl"
-                 data-ai-hint="online booking"
                 />
              </div>
           </div>
