@@ -118,8 +118,8 @@ export default function LandingPage() {
             </div>
              <div>
                <Image 
-                 src="/images/landing-booking.png" 
-                 alt="A close-up of a mobile phone screen showing an appointment booking calendar." 
+                 src="/images/bookings.png" 
+                 alt="A screenshot of the Apointa booking page." 
                  width={600} 
                  height={400} 
                  className="rounded-lg shadow-2xl"
