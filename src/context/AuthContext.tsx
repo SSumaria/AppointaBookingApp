@@ -6,8 +6,10 @@ import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, si
 import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth } from '@/lib/firebaseConfig'; // auth can be undefined if firebaseConfig fails
+import { auth, db } from '@/lib/firebaseConfig'; // auth can be undefined if firebaseConfig fails
 import { useToast } from '@/hooks/use-toast';
+import { ref, set, get } from "firebase/database";
+
 
 // Log the imported auth object immediately
 console.log("--- AuthContext.tsx --- MODULE EXECUTING. Imported 'auth' from firebaseConfig:", auth ? `DEFINED (App Name: ${auth.name})` : "UNDEFINED");
@@ -91,6 +93,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []); 
 
+  const ensureUserRecordInDB = async (user: FirebaseUser) => {
+    if (!db || !user || !user.email) return;
+    const userRef = ref(db, `Users/${user.uid}`);
+    const snapshot = await get(userRef);
+    if (!snapshot.exists()) {
+      console.log(`Creating database record for new user: ${user.uid}`);
+      try {
+        await set(userRef, {
+          email: user.email,
+          createdAt: new Date().toISOString(),
+        });
+      } catch (dbError) {
+        console.error("Failed to create user record in RTDB:", dbError);
+        // This is a background task. We don't toast here to avoid interrupting the user flow.
+      }
+    }
+  };
+
   const handleAuthError = (error: AuthError, defaultMessage: string, operation?: 'googleSignIn') => {
     console.error(`Authentication error during ${operation || 'operation'} (AuthContext.tsx for app: ${auth?.name || 'N/A'}):`, error.code, error.message);
     let message = defaultMessage;
@@ -153,6 +173,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+      await ensureUserRecordInDB(userCredential.user);
       toast({ title: 'Registration Successful', description: 'Welcome!' });
       router.push('/dashboard');
       return userCredential.user;
@@ -171,6 +192,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
+      await ensureUserRecordInDB(userCredential.user);
       toast({ title: 'Login Successful', description: 'Welcome back!' });
       router.push('/dashboard');
       return userCredential.user;
@@ -191,6 +213,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
+      await ensureUserRecordInDB(result.user);
       toast({ title: 'Google Sign-In Successful', description: 'Welcome!' });
       router.push('/dashboard');
       return result.user;

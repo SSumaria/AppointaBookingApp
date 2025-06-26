@@ -57,6 +57,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import WeeklyCalendarView from '@/components/calendar/WeeklyCalendarView';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { emailService } from '@/lib/emailService';
 
 
 interface Note {
@@ -84,13 +85,14 @@ interface Booking {
 interface Client {
     id: string;
     ClientName: string;
+    ClientEmail?: string;
+    ClientContact?: string;
 }
 
 interface EditBookingFormState {
   serviceProcedure: string;
   appointmentDate: Date | undefined;
   appointmentStartTime: string;
-
   appointmentEndTime: string;
 }
 
@@ -150,18 +152,22 @@ export default function AllBookingsPage() {
 
     setIsLoading(true);
     try {
-        // Step 1: Fetch all clients for the user and create a lookup map.
         const userClientsRefPath = `Clients/${currentUser.uid}`;
         const clientsRef = ref(db, userClientsRefPath);
         const clientsSnapshot = await get(clientsRef);
-        const clientsMap = new Map<string, string>();
+        const clientsMap = new Map<string, Client>();
         if (clientsSnapshot.exists()) {
             clientsSnapshot.forEach(child => {
-                clientsMap.set(child.key as string, child.val().ClientName);
+                const clientData = child.val();
+                clientsMap.set(child.key as string, {
+                    id: child.key as string,
+                    ClientName: clientData.ClientName,
+                    ClientEmail: clientData.ClientEmail,
+                    ClientContact: clientData.ClientContact,
+                });
             });
         }
 
-        // Step 2: Fetch all appointments for the user.
         const userAppointmentsRefPath = `Appointments/${currentUser.uid}`;
         const appointmentsRef = ref(db, userAppointmentsRefPath);
         const bookingsQuery = rtQuery(appointmentsRef, orderByChild('AppointmentDate'));
@@ -186,13 +192,14 @@ export default function AllBookingsPage() {
                     }
                 }
                 
-                // Step 3: Use the client map to add the client name to each booking.
-                const clientName = clientsMap.get(data.ClientID) || "Unknown Client";
+                const clientDetails = clientsMap.get(data.ClientID);
 
                 fetchedBookings.push({
                     id: childSnapshot.key as string,
                     ...data,
-                    ClientName: clientName,
+                    ClientName: clientDetails?.ClientName || "Unknown Client",
+                    ClientEmail: clientDetails?.ClientEmail,
+                    ClientContact: clientDetails?.ClientContact,
                     Notes: processedNotes,
                 });
             });
@@ -262,18 +269,44 @@ export default function AllBookingsPage() {
     setFilterDateRange(undefined);
   };
 
-  const handleCancelBooking = async (bookingId: string) => {
-    if (!currentUser?.uid) {
+  const handleCancelBooking = async (booking: Booking) => {
+    if (!currentUser?.uid || !currentUser.email) {
       toast({ title: "Error", description: "You must be logged in.", variant: "destructive" });
       return;
     }
     try {
-      const bookingRefPath = `Appointments/${currentUser.uid}/${bookingId}`;
+      const bookingRefPath = `Appointments/${currentUser.uid}/${booking.id}`;
       await update(ref(db, bookingRefPath), { BookingStatus: "Cancelled" });
-      toast({
-        title: "Booking Cancelled",
-        description: "The booking has been successfully cancelled.",
-      });
+
+      if (booking.ClientEmail) {
+        try {
+            await emailService.sendCancellationNotice({
+                providerEmail: currentUser.email,
+                clientName: booking.ClientName || 'Valued Client',
+                clientEmail: booking.ClientEmail,
+                appointmentDate: format(parseISO(booking.AppointmentDate), "PPP"),
+                appointmentTime: `${booking.AppointmentStartTime} - ${booking.AppointmentEndTime}`,
+                service: booking.ServiceProcedure,
+            });
+            toast({
+                title: "Booking Cancelled & Notified",
+                description: "The booking was cancelled and notifications have been sent.",
+            });
+        } catch (emailError) {
+            console.error("Failed to send cancellation emails:", emailError);
+            toast({
+                title: "Booking Cancelled (Email Failed)",
+                description: "The booking was cancelled, but email notifications could not be sent.",
+                variant: "destructive"
+            });
+        }
+      } else {
+         toast({
+            title: "Booking Cancelled",
+            description: "The booking has been successfully cancelled. (No client email for notification).",
+        });
+      }
+
       fetchAndSetAllBookings();
     } catch (error: any) {
       console.error("Error cancelling booking:", error);
@@ -385,7 +418,7 @@ export default function AllBookingsPage() {
   };
 
   const handleUpdateBooking = async () => {
-    if (!currentUser?.uid || !bookingToEdit || !editFormState) {
+    if (!currentUser?.uid || !currentUser.email || !bookingToEdit || !editFormState) {
       toast({ title: "Error", description: "Cannot update booking. Missing information.", variant: "destructive" });
       return;
     }
@@ -436,7 +469,35 @@ export default function AllBookingsPage() {
     try {
       const bookingRefPath = `Appointments/${currentUser.uid}/${bookingToEdit.id}`;
       await update(ref(db, bookingRefPath), updates);
-      toast({ title: "Booking Updated", description: "The booking has been successfully updated." });
+
+      if (bookingToEdit.ClientEmail) {
+        const oldDetails = {
+            date: format(parseISO(bookingToEdit.AppointmentDate), "PPP"),
+            time: `${bookingToEdit.AppointmentStartTime} - ${bookingToEdit.AppointmentEndTime}`,
+            service: bookingToEdit.ServiceProcedure,
+        };
+        const newDetails = {
+            date: format(appointmentDate, "PPP"),
+            time: `${appointmentStartTime} - ${appointmentEndTime}`,
+            service: serviceProcedure,
+        };
+         try {
+            await emailService.sendUpdateNotice({
+                providerEmail: currentUser.email,
+                clientName: bookingToEdit.ClientName || 'Valued Client',
+                clientEmail: bookingToEdit.ClientEmail,
+                oldDetails: oldDetails,
+                newDetails: newDetails,
+            });
+            toast({ title: "Booking Updated & Notified", description: "The booking has been successfully updated and notifications sent." });
+        } catch (emailError) {
+            console.error("Failed to send update emails:", emailError);
+            toast({ title: "Booking Updated (Email Failed)", description: "The booking was updated, but email notifications failed.", variant: "destructive" });
+        }
+      } else {
+        toast({ title: "Booking Updated", description: "The booking has been successfully updated. (No client email for notification)." });
+      }
+
       fetchAndSetAllBookings();
       setBookingToEdit(null);
       setEditFormState(null);
@@ -966,7 +1027,7 @@ export default function AllBookingsPage() {
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel>Keep Booking</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleCancelBooking(booking.id)}>
+                                      <AlertDialogAction onClick={() => handleCancelBooking(booking)}>
                                         Confirm Cancellation
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
