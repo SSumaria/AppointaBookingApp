@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin',
+            value: 'same-origin-allow-popups',
           },
           {
             key: 'Cross-Origin-Embedder-Policy',
