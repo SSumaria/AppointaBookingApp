@@ -3,7 +3,7 @@
 
 import type { User as FirebaseUser, AuthError } from 'firebase/auth';
 import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebaseConfig'; // auth can be undefined if firebaseConfig fails
@@ -42,19 +42,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
   const { toast } = useToast();
 
   useEffect(() => {
-    // Apply theme on initial client-side load
-    if (typeof window !== 'undefined') {
-      const storedDarkMode = localStorage.getItem('darkMode');
-      if (storedDarkMode === 'true') {
-        document.documentElement.classList.add('dark');
-      } else {
+    // This effect now handles theme logic based on the current route.
+    if (pathname === '/') {
+      // On the landing page, always force light theme.
+      if (typeof window !== 'undefined') {
         document.documentElement.classList.remove('dark');
       }
+    } else {
+      // On all other pages (dashboard, login, etc.), respect the user's saved preference.
+      if (typeof window !== 'undefined') {
+        const storedDarkMode = localStorage.getItem('darkMode');
+        if (storedDarkMode === 'true') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }
     }
-  }, []); // Empty dependency array ensures this runs once on mount (client-side)
+  }, [pathname]); // Re-run this logic whenever the user navigates to a new page.
 
 
   useEffect(() => {
