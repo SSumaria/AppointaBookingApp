@@ -117,7 +117,7 @@ export default function LandingPage() {
         </section>
 
         {/* Features Section */}
-        <section className="py-20 bg-muted/40">
+        <section className="py-20 bg-muted">
           <div className="container mx-auto px-4">
             <AnimatedSection>
             <div className="text-center mb-12">
@@ -192,7 +192,7 @@ export default function LandingPage() {
         </section>
 
         {/* Image Feature Section 2 */}
-        <section className="py-20 bg-muted/40 overflow-x-hidden">
+        <section className="py-20 bg-muted overflow-x-hidden">
           <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
              <AnimatedSection initialClasses="opacity-0 translate-x-12" delay={200}>
              <div className="md:order-2">
