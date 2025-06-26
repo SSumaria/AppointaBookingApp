@@ -146,12 +146,11 @@ export default function LandingPage() {
              </div>
              <div className="md:order-1">
                <Image 
-                 src="https://placehold.co/600x400.png" 
-                 alt="Apointa dashboard calendar view" 
+                 src="/images/command-centre.png" 
+                 alt="Apointa dashboard and calendar view" 
                  width={600} 
                  height={400} 
                  className="rounded-lg shadow-2xl"
-                 data-ai-hint="dashboard calendar"
                 />
              </div>
           </div>
