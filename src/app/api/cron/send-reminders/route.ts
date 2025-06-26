@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebaseConfig';
 import { ref, get } from 'firebase/database';
@@ -15,7 +16,16 @@ interface User {
 
 export async function GET(request: Request) {
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    const { searchParams } = new URL(request.url);
+    const cronSecretFromQuery = searchParams.get('cron_secret');
+
+    const isAuthorized =
+      authHeader === `Bearer ${process.env.CRON_SECRET}` ||
+      (process.env.NODE_ENV === 'development' &&
+        cronSecretFromQuery === process.env.CRON_SECRET);
+
+
+    if (!isAuthorized) {
         return new Response('Unauthorized', { status: 401 });
     }
 
