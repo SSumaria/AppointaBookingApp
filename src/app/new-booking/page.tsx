@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format, addMinutes, parse } from "date-fns";
-import { Calendar as CalendarIcon, Clock, User, StickyNote } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, User, StickyNote, Mail, Phone, Briefcase } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,7 @@ import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { ref, set, get, query as rtQuery, orderByChild, equalTo, push, startAt, endAt, update } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
@@ -434,214 +435,237 @@ export default function NewBookingPage() {
             <Header />
             <main className="flex-grow py-10">
                 <div className="container max-w-2xl mx-auto">
-                    <h1 className="text-3xl font-bold mb-8 text-center text-primary">New Booking</h1>
-                    <form onSubmit={handleSubmit} className="space-y-6 bg-card p-8 rounded-lg shadow-xl">
-                        <div className="relative" ref={suggestionsRef}>
-                            <Label htmlFor="clientName" className="font-medium">Client Name *</Label>
-                            <Input
-                                type="text"
-                                id="clientName"
-                                value={clientName}
-                                onChange={handleClientNameChange}
-                                onFocus={() => clientName.trim().length > 0 && suggestions.length > 0 && setShowSuggestions(true)}
-                                required
-                                autoComplete="off"
-                                className="mt-1"
-                                placeholder="Start typing client's name..."
-                            />
-                            {showSuggestions && suggestions.length > 0 && (
-                                <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
-                                    {suggestions.map((suggestion) => (
-                                        <div
-                                            key={suggestion.id}
-                                            className="px-3 py-2 border-2 border-transparent hover:border-primary cursor-pointer text-sm"
-                                            onClick={() => handleSuggestionClick(suggestion)}
-                                        >
-                                            {suggestion.ClientName} 
-                                            {suggestion.ClientContact && <span className="text-xs text-muted-foreground ml-2">({suggestion.ClientContact})</span>}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        
-                        <div>
-                            <Label htmlFor="clientEmail" className="font-medium">Client Email *</Label>
-                            <Input
-                                type="email" 
-                                id="clientEmail"
-                                value={clientEmail}
-                                onChange={(e) => setClientEmail(e.target.value)}
-                                required
-                                className="mt-1"
-                                placeholder="Enter client's email address"
-                            />
-                        </div>
-
-                        
-                        <div>
-                            <Label htmlFor="clientPhone" className="font-medium">Client Phone Number *</Label>
-                            <Input
-                                type="tel" 
-                                id="clientPhone"
-                                value={clientPhone}
-                                onChange={(e) => setClientPhone(e.target.value)}
-                                required
-                                className="mt-1"
-                                placeholder="Enter client's phone number"
-                            />
-                        </div>
-
-                        <div>
-                            <Label htmlFor="serviceProcedure" className="font-medium">Service/Procedure *</Label>
-                            <Textarea
-                                id="serviceProcedure"
-                                value={serviceProcedure}
-                                onChange={(e) => setServiceProcedure(e.target.value)}
-                                required
-                                className="mt-1"
-                                placeholder="Describe the service or procedure"
-                            />
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-6">
-                            <div className="flex-1">
-                                <Label htmlFor="date" className="font-medium">Appointment Date *</Label>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant={"outline"}
-                                            className={cn(
-                                                "w-full justify-start text-left font-normal mt-1",
-                                                !date && "text-muted-foreground"
-                                            )}
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {date ? format(date, "PPP") : <span>Pick a date</span>}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                        <CalendarIconLucideShadcn
-                                            mode="single"
-                                            selected={date}
-                                            onSelect={(selectedDay) => {
-                                                setDate(selectedDay);
-                                                setStartTime('');
-                                                setEndTime('');
-                                            }}
-                                            disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
-                                            initialFocus
+                    <Card className="shadow-xl">
+                        <CardHeader className="text-center">
+                            <CardTitle className="text-3xl font-bold text-primary">New Booking</CardTitle>
+                            <CardDescription>Fill out the form below to create a new appointment for an existing or new client.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <form id="new-booking-form" onSubmit={handleSubmit} className="space-y-6">
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-medium text-muted-foreground">Client Details</h3>
+                                    <div className="relative" ref={suggestionsRef}>
+                                        <Label htmlFor="clientName" className="font-medium flex items-center">
+                                            <User className="mr-2 h-4 w-4" /> Client Name *
+                                        </Label>
+                                        <Input
+                                            type="text"
+                                            id="clientName"
+                                            value={clientName}
+                                            onChange={handleClientNameChange}
+                                            onFocus={() => clientName.trim().length > 0 && suggestions.length > 0 && setShowSuggestions(true)}
+                                            required
+                                            autoComplete="off"
+                                            className="mt-1"
+                                            placeholder="Start typing to search existing clients..."
                                         />
-                                    </PopoverContent>
-                                </Popover>
-                            </div>
-                             <div className="flex-1">
-                                <Label htmlFor="startTime" className="font-medium">Appointment Start Time *</Label>
-                                <Select
-                                    value={startTime}
-                                    onValueChange={setStartTime}
-                                    disabled={isLoadingBookedSlots || !date}
-                                >
-                                    <SelectTrigger className="w-full mt-1">
-                                        <SelectValue placeholder={isLoadingBookedSlots ? "Loading..." : "Select start time"} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {isLoadingBookedSlots && <SelectItem value="loading" disabled>Loading slots...</SelectItem>}
-                                        {!isLoadingBookedSlots && timeSlots.map(slot => (
-                                            <SelectItem
-                                                key={`start-${slot}`}
-                                                value={slot}
-                                                disabled={bookedTimeSlotsForDate.has(slot)}
+                                        {showSuggestions && suggestions.length > 0 && (
+                                            <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                                {suggestions.map((suggestion) => (
+                                                    <div
+                                                        key={suggestion.id}
+                                                        className="px-3 py-2 border-2 border-transparent hover:border-primary cursor-pointer text-sm"
+                                                        onClick={() => handleSuggestionClick(suggestion)}
+                                                    >
+                                                        {suggestion.ClientName} 
+                                                        {suggestion.ClientContact && <span className="text-xs text-muted-foreground ml-2">({suggestion.ClientContact})</span>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="clientEmail" className="font-medium flex items-center">
+                                            <Mail className="mr-2 h-4 w-4" /> Client Email *
+                                        </Label>
+                                        <Input
+                                            type="email" 
+                                            id="clientEmail"
+                                            value={clientEmail}
+                                            onChange={(e) => setClientEmail(e.target.value)}
+                                            required
+                                            className="mt-1"
+                                            placeholder="name@example.com"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="clientPhone" className="font-medium flex items-center">
+                                            <Phone className="mr-2 h-4 w-4" /> Client Phone Number *
+                                        </Label>
+                                        <Input
+                                            type="tel" 
+                                            id="clientPhone"
+                                            value={clientPhone}
+                                            onChange={(e) => setClientPhone(e.target.value)}
+                                            required
+                                            className="mt-1"
+                                            placeholder="(123) 456-7890"
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <Separator />
+
+                                <div className="space-y-4">
+                                     <h3 className="text-lg font-medium text-muted-foreground">Appointment Details</h3>
+                                    <div>
+                                        <Label htmlFor="serviceProcedure" className="font-medium flex items-center">
+                                            <Briefcase className="mr-2 h-4 w-4" /> Service/Procedure *
+                                        </Label>
+                                        <Textarea
+                                            id="serviceProcedure"
+                                            value={serviceProcedure}
+                                            onChange={(e) => setServiceProcedure(e.target.value)}
+                                            required
+                                            className="mt-1"
+                                            placeholder="Describe the service or procedure"
+                                        />
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row gap-6">
+                                        <div className="flex-1">
+                                            <Label htmlFor="date" className="font-medium">Appointment Date *</Label>
+                                            <Popover>
+                                                <PopoverTrigger asChild>
+                                                    <Button
+                                                        variant={"outline"}
+                                                        className={cn(
+                                                            "w-full justify-start text-left font-normal mt-1",
+                                                            !date && "text-muted-foreground"
+                                                        )}
+                                                    >
+                                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                                        {date ? format(date, "PPP") : <span>Pick a date</span>}
+                                                    </Button>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-auto p-0" align="start">
+                                                    <CalendarIconLucideShadcn
+                                                        mode="single"
+                                                        selected={date}
+                                                        onSelect={(selectedDay) => {
+                                                            setDate(selectedDay);
+                                                            setStartTime('');
+                                                            setEndTime('');
+                                                        }}
+                                                        disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
+                                                        initialFocus
+                                                    />
+                                                </PopoverContent>
+                                            </Popover>
+                                        </div>
+                                        <div className="flex-1">
+                                            <Label htmlFor="startTime" className="font-medium">Start Time *</Label>
+                                            <Select
+                                                value={startTime}
+                                                onValueChange={setStartTime}
+                                                disabled={isLoadingBookedSlots || !date}
                                             >
-                                                {slot} {bookedTimeSlotsForDate.has(slot) ? "(Booked)" : ""}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="flex-1">
-                                <Label htmlFor="endTime" className="font-medium">Appointment End Time *</Label>
-                                 <Select
-                                    value={endTime}
-                                    onValueChange={setEndTime}
-                                    disabled={isLoadingBookedSlots || !date || !startTime}
-                                 >
-                                    <SelectTrigger className="w-full mt-1">
-                                        <SelectValue placeholder={isLoadingBookedSlots ? "Loading..." : "Select end time"} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {isLoadingBookedSlots && <SelectItem value="loading" disabled>Loading slots...</SelectItem>}
-                                        {!isLoadingBookedSlots && timeSlots.filter(slot => {
-                                             if (!startTime) return true;
-                                             const baseDateForFilter = date ? new Date(date) : new Date();
-                                             baseDateForFilter.setHours(0,0,0,0);
-                                             const currentSlotTime = parse(slot, "HH:mm", baseDateForFilter);
-                                             const selectedStartTime = parse(startTime, "HH:mm", baseDateForFilter);
-                                             return currentSlotTime > selectedStartTime;
-                                        }).map(slot => {
-                                            let itemIsDisabled = false;
-                                            let itemLabelSuffix = "";
-                                            if (startTime && date) {
-                                                const baseDateForCheck = new Date(date);
-                                                baseDateForCheck.setHours(0,0,0,0);
-                                                const newBookingStartForCheck = parse(startTime, "HH:mm", baseDateForCheck);
-                                                const potentialEndTime = parse(slot, "HH:mm", baseDateForCheck);
-                                                let tempSlotCheck = newBookingStartForCheck;
-                                                while (tempSlotCheck < potentialEndTime) {
-                                                    if (bookedTimeSlotsForDate.has(format(tempSlotCheck, "HH:mm"))) {
-                                                        itemIsDisabled = true;
-                                                        itemLabelSuffix = "(Conflicts)";
-                                                        break;
-                                                    }
-                                                    tempSlotCheck = addMinutes(tempSlotCheck, 30);
-                                                }
-                                            } else if (!startTime){
-                                                itemIsDisabled = true;
-                                            }
-                                            return (
-                                                <SelectItem
-                                                    key={`end-${slot}`}
-                                                    value={slot}
-                                                    disabled={itemIsDisabled}
-                                                >
-                                                    {slot} {itemLabelSuffix}
-                                                </SelectItem>
-                                            );
-                                        })}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                         {isLoadingBookedSlots && date && (
-                            <div className="flex items-center text-sm text-muted-foreground">
-                                <Clock className="mr-2 h-4 w-4 animate-spin" />
-                                Checking available slots for {date ? format(date, "PPP") : 'selected date'}...
-                            </div>
-                        )}
-                        <div>
-                            <Label htmlFor="bookingNotes" className="font-medium flex items-center">
-                                <StickyNote className="mr-2 h-4 w-4" />
-                                Booking Notes
-                            </Label>
-                            <Textarea
-                                id="bookingNotes"
-                                value={notesInput}
-                                onChange={(e) => setNotesInput(e.target.value)}
-                                className="mt-1"
-                                placeholder="Add any relevant notes for this booking..."
-                                rows={3}
-                            />
-                        </div>
-                        <Separator className="my-4" />
-                        <Button type="submit" disabled={isSubmitting || isLoadingBookedSlots} className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-semibold py-3">
-                             {isSubmitting ? (
-                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                              ) : "Submit Booking"}
-                        </Button>
-                    </form>
+                                                <SelectTrigger className="w-full mt-1">
+                                                    <SelectValue placeholder={isLoadingBookedSlots ? "Loading..." : "Select time"} />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {isLoadingBookedSlots && <SelectItem value="loading" disabled>Loading...</SelectItem>}
+                                                    {!isLoadingBookedSlots && timeSlots.map(slot => (
+                                                        <SelectItem
+                                                            key={`start-${slot}`}
+                                                            value={slot}
+                                                            disabled={bookedTimeSlotsForDate.has(slot)}
+                                                        >
+                                                            {slot} {bookedTimeSlotsForDate.has(slot) ? "(Booked)" : ""}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="flex-1">
+                                            <Label htmlFor="endTime" className="font-medium">End Time *</Label>
+                                            <Select
+                                                value={endTime}
+                                                onValueChange={setEndTime}
+                                                disabled={isLoadingBookedSlots || !date || !startTime}
+                                            >
+                                                <SelectTrigger className="w-full mt-1">
+                                                    <SelectValue placeholder={isLoadingBookedSlots ? "Loading..." : "Select time"} />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {isLoadingBookedSlots && <SelectItem value="loading" disabled>Loading...</SelectItem>}
+                                                    {!isLoadingBookedSlots && timeSlots.filter(slot => {
+                                                        if (!startTime) return true;
+                                                        const baseDateForFilter = date ? new Date(date) : new Date();
+                                                        baseDateForFilter.setHours(0,0,0,0);
+                                                        const currentSlotTime = parse(slot, "HH:mm", baseDateForFilter);
+                                                        const selectedStartTime = parse(startTime, "HH:mm", baseDateForFilter);
+                                                        return currentSlotTime > selectedStartTime;
+                                                    }).map(slot => {
+                                                        let itemIsDisabled = false;
+                                                        let itemLabelSuffix = "";
+                                                        if (startTime && date) {
+                                                            const baseDateForCheck = new Date(date);
+                                                            baseDateForCheck.setHours(0,0,0,0);
+                                                            const newBookingStartForCheck = parse(startTime, "HH:mm", baseDateForCheck);
+                                                            const potentialEndTime = parse(slot, "HH:mm", baseDateForCheck);
+                                                            let tempSlotCheck = newBookingStartForCheck;
+                                                            while (tempSlotCheck < potentialEndTime) {
+                                                                if (bookedTimeSlotsForDate.has(format(tempSlotCheck, "HH:mm"))) {
+                                                                    itemIsDisabled = true;
+                                                                    itemLabelSuffix = "(Conflicts)";
+                                                                    break;
+                                                                }
+                                                                tempSlotCheck = addMinutes(tempSlotCheck, 30);
+                                                            }
+                                                        } else if (!startTime){
+                                                            itemIsDisabled = true;
+                                                        }
+                                                        return (
+                                                            <SelectItem
+                                                                key={`end-${slot}`}
+                                                                value={slot}
+                                                                disabled={itemIsDisabled}
+                                                            >
+                                                                {slot} {itemLabelSuffix}
+                                                            </SelectItem>
+                                                        );
+                                                    })}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                    {isLoadingBookedSlots && date && (
+                                        <div className="flex items-center text-sm text-muted-foreground">
+                                            <Clock className="mr-2 h-4 w-4 animate-spin" />
+                                            Checking available slots for {date ? format(date, "PPP") : 'selected date'}...
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                <Separator />
+
+                                <div>
+                                    <Label htmlFor="bookingNotes" className="font-medium flex items-center">
+                                        <StickyNote className="mr-2 h-4 w-4" />
+                                        Booking Notes
+                                    </Label>
+                                    <Textarea
+                                        id="bookingNotes"
+                                        value={notesInput}
+                                        onChange={(e) => setNotesInput(e.target.value)}
+                                        className="mt-1"
+                                        placeholder="Add any relevant notes for this booking (optional)"
+                                        rows={3}
+                                    />
+                                </div>
+                            </form>
+                        </CardContent>
+                        <CardFooter>
+                            <Button type="submit" form="new-booking-form" disabled={isSubmitting || isLoadingBookedSlots} className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-semibold py-3">
+                                {isSubmitting ? (
+                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                  ) : "Submit Booking"}
+                            </Button>
+                        </CardFooter>
+                    </Card>
                 </div>
             </main>
             <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">
@@ -650,5 +674,3 @@ export default function NewBookingPage() {
         </div>
     );
 }
-
-    
