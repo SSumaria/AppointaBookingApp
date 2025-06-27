@@ -196,7 +196,7 @@ export default function LandingPage() {
           <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
              <AnimatedSection initialClasses="opacity-0 -translate-x-12" delay={200}>
                <Image 
-                 src="/images/command-centre.png" 
+                 src="/images/command-centre1.png" 
                  alt="Appointa dashboard and calendar view" 
                  width={600} 
                  height={400} 
