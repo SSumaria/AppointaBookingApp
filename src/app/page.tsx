@@ -181,7 +181,7 @@ export default function LandingPage() {
             </AnimatedSection>
              <AnimatedSection initialClasses="opacity-0 translate-x-12">
                <Image 
-                 src="/images/bookings.png" 
+                 src="/images/bookings1.png" 
                  alt="A screenshot of the Appointa public booking page" 
                  width={600} 
                  height={400} 
