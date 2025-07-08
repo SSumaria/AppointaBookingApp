@@ -10,19 +10,19 @@ export async function GET(request: NextRequest) {
         return new NextResponse("State parameter is missing from the request.", { status: 400 });
     }
     
-    let browserOrigin: string;
+    let clientOrigin: string;
     try {
         const stateJSON = Buffer.from(encodedState, 'base64').toString('utf8');
         const state = JSON.parse(stateJSON);
         if (!state.origin) throw new Error('Invalid state object: missing origin.');
-        browserOrigin = state.origin;
+        clientOrigin = state.origin;
     } catch (e: any) {
         console.error("Failed to parse state parameter in /api/auth/google:", e.message);
         return new NextResponse("Invalid state parameter.", { status: 400 });
     }
 
-    // Use the browser's origin passed via state to construct the redirect URI
-    const redirectURI = `${browserOrigin}/api/auth/google/callback`;
+    // Use the client's origin passed via state to construct the redirect URI
+    const redirectURI = `${clientOrigin}/api/auth/google/callback`;
 
     const oAuth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
@@ -32,14 +32,14 @@ export async function GET(request: NextRequest) {
 
     const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 
-    // We pass the state we received from the client directly to Google.
-    // Google will then pass it back to our callback URI.
     const authUrl = oAuth2Client.generateAuthUrl({
-        access_type: 'offline', // Request a refresh token
-        prompt: 'consent',      // Force consent screen to ensure refresh token is issued
+        access_type: 'offline',
+        prompt: 'consent',
         scope: SCOPES,
         state: encodedState,
     });
 
     return NextResponse.redirect(authUrl);
 }
+
+    

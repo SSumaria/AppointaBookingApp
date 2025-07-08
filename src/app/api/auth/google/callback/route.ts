@@ -16,9 +16,8 @@ export async function GET(request: NextRequest) {
 
     console.log(`Received query params: code=${code ? 'PRESENT' : 'MISSING'}, state=${encodedState ? 'PRESENT' : 'MISSING'}, error=${error || 'NONE'}`);
     
-    // --- State Parsing and Redirect URL construction ---
     let userId: string;
-    let browserOrigin: string;
+    let clientOrigin: string; // The origin of the client browser
 
     const buildRedirectHtml = (targetUrl: string, message: string) => `
         <!DOCTYPE html>
@@ -32,15 +31,15 @@ export async function GET(request: NextRequest) {
         if (!state.userId) throw new Error('Invalid state object: missing userId.');
         if (!state.origin) throw new Error('Invalid state object: missing origin.');
         userId = state.userId;
-        browserOrigin = state.origin;
-        console.log(`Successfully parsed state: userId=${userId}, origin=${browserOrigin}`);
+        clientOrigin = state.origin;
+        console.log(`Successfully parsed state: userId=${userId}, clientOrigin=${clientOrigin}`);
     } catch (e: any) {
         console.error("FATAL: Failed to parse state parameter:", e.message);
         const htmlError = `<html><body>Authentication Error: Invalid or missing state parameter. Please try connecting again from the preferences page.</body></html>`;
         return new NextResponse(htmlError, { status: 400, headers: { 'Content-Type': 'text/html' } });
     }
     
-    const finalErrorRedirectUrl = (msg: string) => `${browserOrigin}/preferences?status=error&message=${encodeURIComponent(msg)}`;
+    const finalErrorRedirectUrl = (msg: string) => `${clientOrigin}/preferences?status=error&message=${encodeURIComponent(msg)}`;
 
     if (error) {
         console.error(`Google OAuth Error received: ${error} - ${errorDescription || 'No description'}`);
@@ -53,8 +52,9 @@ export async function GET(request: NextRequest) {
         return new NextResponse(buildRedirectHtml(finalErrorRedirectUrl(errorMessage), "Redirecting with error..."), { status: 200, headers: { 'Content-Type': 'text/html' }});
     }
 
-    // --- Token Exchange ---
-    const tokenExchangeRedirectUri = `${browserOrigin}/api/auth/google/callback`;
+    // IMPORTANT: The redirect URI used for token exchange MUST exactly match the one used to generate the auth URL.
+    // We reconstruct it here using the same logic.
+    const tokenExchangeRedirectUri = `${clientOrigin}/api/auth/google/callback`;
     console.log(`Using Redirect URI for token exchange: ${tokenExchangeRedirectUri}`);
     
     const oAuth2Client = new google.auth.OAuth2(
@@ -75,7 +75,6 @@ export async function GET(request: NextRequest) {
         return new NextResponse(buildRedirectHtml(finalErrorRedirectUrl(errorMessage), "Redirecting with error..."), { status: 200, headers: { 'Content-Type': 'text/html' } });
     }
 
-    // --- Database Write ---
     try {
         const userPreferencesRef = ref(db, `UserPreferences/${userId}/googleCalendar`);
         const payload = {
@@ -92,7 +91,7 @@ export async function GET(request: NextRequest) {
         console.log(`Successfully stored Google Calendar tokens for user ${userId}`);
         console.log("--- [GOOGLE CALLBACK SUCCESS] ---");
 
-        const finalSuccessRedirectUrl = `${browserOrigin}/preferences?status=success`;
+        const finalSuccessRedirectUrl = `${clientOrigin}/preferences?status=success`;
         return new NextResponse(buildRedirectHtml(finalSuccessRedirectUrl, "Connection successful! Redirecting..."), { status: 200, headers: { 'Content-Type': 'text/html' } });
 
     } catch (dbError: any) {
@@ -101,3 +100,5 @@ export async function GET(request: NextRequest) {
         return new NextResponse(buildRedirectHtml(finalErrorRedirectUrl(errorMessage), "Redirecting with error..."), { status: 200, headers: { 'Content-Type': 'text/html' } });
     }
 }
+
+    

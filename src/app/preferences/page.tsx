@@ -151,24 +151,21 @@ export default function PreferencesPage() {
       return;
     }
     
-    // This effect handles the initial data fetch and the post-OAuth-redirect flow.
     const status = searchParams.get('status');
     const message = searchParams.get('message');
     
     if (status === 'error') {
       toast({ title: "Connection Failed", description: message || "An unknown error occurred.", variant: "destructive" });
-      router.replace('/preferences', { scroll: false }); // Clean URL
-      checkCalendarConnection(currentUser.uid); // Check status anyway
+      router.replace('/preferences', { scroll: false }); 
+      checkCalendarConnection(currentUser.uid); 
     } else if (status === 'success') {
       toast({ title: "Success!", description: "Verifying calendar connection..." });
-      // Use a short delay before re-checking to allow the database to update.
       setTimeout(() => {
         checkCalendarConnection(currentUser.uid).then(() => {
-           router.replace('/preferences', { scroll: false }); // Clean URL
+           router.replace('/preferences', { scroll: false }); 
         });
       }, 1500); 
     } else {
-      // Normal page load, not a redirect
       checkCalendarConnection(currentUser.uid);
     }
     
@@ -181,9 +178,24 @@ export default function PreferencesPage() {
         toast({ title: "Not Logged In", description: "You must be logged in to connect your calendar.", variant: "destructive" });
         return;
     }
+    
+    let originToUse = window.location.origin;
+    // FIX: This logic correctly determines the origin for complex dev environments.
+    if (window.location.hostname.endsWith('cloudworkstations.dev')) {
+        const currentHostname = window.location.hostname;
+        const protocol = window.location.protocol;
+        const portPrefixRegex = /^(\d+)-/;
+        const portPrefixMatch = currentHostname.match(portPrefixRegex);
+        let baseHostname = currentHostname;
+        if (portPrefixMatch) {
+          baseHostname = currentHostname.substring(portPrefixMatch[0].length);
+        }
+        originToUse = `${protocol}//${baseHostname}`;
+    }
+
     const statePayload = {
       userId: currentUser.uid,
-      origin: window.location.origin,
+      origin: originToUse,
     };
     const state = btoa(JSON.stringify(statePayload));
     window.location.href = `/api/auth/google?state=${encodeURIComponent(state)}`;
@@ -373,7 +385,9 @@ export default function PreferencesPage() {
           </Card>
         </div>
       </main>
-      <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">© {new Date().getFullYear()} Appointa. All rights reserved.</footer>
+      <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">© {new Date().getFullYear()} Appointa.</footer>
     </div>
   );
 }
+
+    
