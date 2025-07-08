@@ -5,11 +5,21 @@ import { ref, set } from 'firebase/database';
 import { db } from '@/lib/firebaseConfig';
 
 export async function GET(request: NextRequest) {
-    const { searchParams, origin } = new URL(request.url);
+    const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
     const state = searchParams.get('state'); // This should be the userId
     const error = searchParams.get('error');
 
+    // Dynamically construct the base URL for redirection on success/error
+    const proto = request.headers.get("x-forwarded-proto") || "http";
+    const host = request.headers.get("host");
+    if (!host) {
+        // Fallback or handle error if host is not available.
+        // For this scenario, a hardcoded fallback might be acceptable, but ideally it should be derived.
+        // This response won't be user-facing in case of success, but it's good practice.
+        return new Response('Could not determine host from request headers', { status: 500 });
+    }
+    const origin = `${proto}://${host}`;
     const redirectBaseUrl = `${origin}/preferences`;
 
     if (error) {
@@ -25,9 +35,8 @@ export async function GET(request: NextRequest) {
 
     const userId = state;
     
-    // IMPORTANT: This URI MUST exactly match the one used in the initial auth request
-    // and one of the "Authorized redirect URIs" in your Google Cloud Console.
-    const redirectURI = `http://localhost:3000/api/auth/google/callback`;
+    // This URI MUST exactly match the one used in the initial auth request.
+    const redirectURI = `${origin}/api/auth/google/callback`;
 
     const oAuth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
@@ -45,7 +54,7 @@ export async function GET(request: NextRequest) {
         const userPreferencesRef = ref(db, `UserPreferences/${userId}/googleCalendar`);
         await set(userPreferencesRef, {
             integrated: true,
-            tokens: tokens, // Stores access_token, refresh_token, expiry_date, etc.
+            tokens: tokens,
         });
 
         console.log(`Successfully stored Google Calendar tokens for user ${userId}`);
