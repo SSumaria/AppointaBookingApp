@@ -5,7 +5,7 @@
         ".read": "auth != null && auth.uid === $uid",
         "workingHours": {
           ".write": "auth != null && auth.uid === $uid"
-        }
+        },
         "googleCalendar": {
           ".write": "newData.child('writtenBy').val() === $uid"
         }
