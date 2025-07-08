@@ -179,9 +179,10 @@ export default function PreferencesPage() {
         return;
     }
     
-    // The server will determine the redirect URI. We only need to pass the userId.
+    // The client knows its true origin. Pass this to the server via the state param.
     const statePayload = {
       userId: currentUser.uid,
+      clientOrigin: window.location.origin, // Pass the browser's origin
     };
     const state = btoa(JSON.stringify(statePayload));
     window.location.href = `/api/auth/google?state=${encodeURIComponent(state)}`;
@@ -376,3 +377,4 @@ export default function PreferencesPage() {
   );
 }
 
+    

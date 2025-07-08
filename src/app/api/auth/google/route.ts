@@ -10,12 +10,24 @@ export async function GET(request: NextRequest) {
         return new NextResponse("State parameter is missing from the request.", { status: 400 });
     }
     
-    // Determine redirect URI from server-side request headers for robustness.
-    const host = request.headers.get('host');
-    const protocol = request.headers.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https');
-    const redirectURI = `${protocol}://${host}/api/auth/google/callback`;
-
-    console.log(`[Google Auth Start] Determined redirect URI: ${redirectURI}`);
+    let redirectURI: string;
+    try {
+        const stateJSON = Buffer.from(encodedState, 'base64').toString('utf8');
+        const state = JSON.parse(stateJSON);
+        if (state.clientOrigin) {
+            console.log(`[Google Auth Start] Using clientOrigin from state: ${state.clientOrigin}`);
+            redirectURI = `${state.clientOrigin}/api/auth/google/callback`;
+        } else {
+            throw new Error("clientOrigin not found in state, falling back to headers.");
+        }
+    } catch (e: any) {
+        console.warn(`[Google Auth Start] Could not use clientOrigin from state. Error: ${e.message}. Using header-based logic instead.`);
+        const host = request.headers.get('host');
+        const protocol = request.headers.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https');
+        redirectURI = `${protocol}://${host}/api/auth/google/callback`;
+    }
+    
+    console.log(`[Google Auth Start] Determined final redirect URI: ${redirectURI}`);
 
     const oAuth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,

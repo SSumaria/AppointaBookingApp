@@ -17,27 +17,31 @@ export async function GET(request: NextRequest) {
     console.log(`Received query params: code=${code ? 'PRESENT' : 'MISSING'}, state=${encodedState ? 'PRESENT' : 'MISSING'}, error=${error || 'NONE'}`);
     
     let userId: string;
-
-    // Determine redirect information from server-side request headers for robustness.
-    const host = request.headers.get('host');
-    const protocol = request.headers.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https');
-    const clientOriginForRedirect = `${protocol}://${host}`;
+    let clientOriginForRedirect: string;
+    let tokenExchangeRedirectUri: string;
 
     const buildRedirectHtml = (targetUrl: string, message: string) => `
         <!DOCTYPE html>
         <html><head><title>Redirecting...</title><script>window.location.href = "${targetUrl}";</script></head>
         <body><p>${message} If you are not redirected automatically, <a href="${targetUrl}">click here</a>.</p></body></html>`;
 
+    // The state parameter is the single source of truth for the user ID and the original client origin.
+    // If it's missing or malformed, we cannot proceed securely.
     try {
         if (!encodedState) throw new Error('State parameter is missing from callback.');
         const stateJSON = Buffer.from(encodedState, 'base64').toString('utf8');
         const state = JSON.parse(stateJSON);
-        if (!state.userId) throw new Error('Invalid state object: missing userId.');
+        if (!state.userId) throw new Error('Invalid state: missing userId.');
+        if (!state.clientOrigin) throw new Error('Invalid state: missing clientOrigin.');
+        
         userId = state.userId;
-        console.log(`Successfully parsed state: userId=${userId}`);
+        clientOriginForRedirect = state.clientOrigin;
+        tokenExchangeRedirectUri = `${clientOriginForRedirect}/api/auth/google/callback`;
+
+        console.log(`Successfully parsed state: userId=${userId}, clientOrigin=${clientOriginForRedirect}`);
     } catch (e: any) {
         console.error("FATAL: Failed to parse state parameter:", e.message);
-        const htmlError = `<html><body>Authentication Error: Invalid or missing state parameter. Please try connecting again from the preferences page.</body></html>`;
+        const htmlError = `<html><body>Authentication Error: Invalid or missing state parameter. Please try connecting again from the preferences page. This is a critical security check.</body></html>`;
         return new NextResponse(htmlError, { status: 400, headers: { 'Content-Type': 'text/html' } });
     }
     
@@ -54,9 +58,6 @@ export async function GET(request: NextRequest) {
         return new NextResponse(buildRedirectHtml(finalErrorRedirectUrl(errorMessage), "Redirecting with error..."), { status: 200, headers: { 'Content-Type': 'text/html' }});
     }
 
-    // IMPORTANT: The redirect URI used for token exchange MUST exactly match the one used to generate the auth URL.
-    // We reconstruct it here using the same server-side logic.
-    const tokenExchangeRedirectUri = `${protocol}://${host}/api/auth/google/callback`;
     console.log(`Using Redirect URI for token exchange: ${tokenExchangeRedirectUri}`);
     
     const oAuth2Client = new google.auth.OAuth2(
@@ -105,3 +106,5 @@ export async function GET(request: NextRequest) {
         return new NextResponse(buildRedirectHtml(finalErrorRedirectUrl(errorMessage), "Redirecting with error..."), { status: 200, headers: { 'Content-Type': 'text/html' } });
     }
 }
+
+    
