@@ -1,50 +1,29 @@
-
 {
   "rules": {
-    "Users": {
+    "UserPreferences": {
       "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
+        ".read": true,
         ".write": "auth != null && auth.uid === $uid"
       }
     },
     "Appointments": {
-      "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid",
-        ".indexOn": [
-          "AppointmentDate",
-          "ClientID"
-        ],
+      "$serviceProviderId": {
+        ".read": true,
+        ".write": "auth != null && auth.uid == $serviceProviderId",
+        ".indexOn": ["AppointmentDate", "ClientID"],
         "$appointmentId": {
-          "validate": "newData.hasChildren(['AppointmentID', 'ClientID', 'ServiceProcedure', 'AppointmentDate', 'AppointmentStartTime', 'AppointmentEndTime', 'BookingStatus', 'BookedByUserID']) && newData.child('BookedByUserID').val() === auth.uid"
+          ".write": "(auth != null && auth.uid == $serviceProviderId) || (newData.exists() && !data.exists() && newData.child('BookedByUserID').val() == $serviceProviderId)"
         }
       }
     },
     "Clients": {
-      "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid",
-        ".indexOn": [
-          "ClientEmail",
-          "ClientName"
-        ],
+      "$serviceProviderId": {
+        ".read": true,
+        ".write": "auth != null && auth.uid == $serviceProviderId",
+        ".indexOn": ["ClientEmail","ClientName"],
         "$clientId": {
-           "validate": "newData.hasChildren(['ClientID', 'ClientName', 'ClientEmail', 'ClientContact', 'CreateDate', 'CreateTime', 'CreatedByUserID']) && newData.child('CreatedByUserID').val() === auth.uid"
+          ".write": "(auth != null && auth.uid == $serviceProviderId) || (newData.exists() && !data.exists() && newData.child('CreatedByUserID').val() == $serviceProviderId)"
         }
-      }
-    },
-    "UserPreferences": {
-      "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
-        "workingHours": {
-          ".write": "auth != null && auth.uid === $uid",
-          ".validate": "newData.hasChildren(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])"
-        },
-        "googleCalendar": {
-          ".write": "(auth != null && auth.uid === $uid) || newData.child('writtenBy').val() === $uid",
-          ".validate": "newData.hasChildren(['integrated', 'tokens', 'writtenBy']) && newData.child('writtenBy').val() === $uid"
-        },
-        "$other": { ".validate": false }
       }
     }
   }
