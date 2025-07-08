@@ -31,6 +31,7 @@
     "UserPreferences": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
+        ".write": "(auth != null && auth.uid === $uid) || (newData.hasChild('googleCalendar') && newData.child('googleCalendar/writtenBy').val() === $uid)",
         "workingHours": {
           ".read": true,
           ".write": "auth != null && auth.uid === $uid",
