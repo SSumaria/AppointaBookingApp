@@ -31,13 +31,16 @@
     "UserPreferences": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
+        // Allow writes to be checked against deeper validation rules.
+        ".write": true,
         "workingHours": {
           ".read": true,
-          ".write": "auth != null && auth.uid === $uid"
+          // Only the authenticated user can modify their working hours.
+          ".validate": "auth != null && auth.uid === $uid"
         },
         "googleCalendar": {
-          ".read": "auth != null && auth.uid === $uid",
-          ".write": true
+          ".read": "auth != null && auth.uid === $uid"
+          // No .validate rule, so the parent .write:true allows the server callback to save tokens.
         }
       }
     }
