@@ -187,7 +187,8 @@ export default function PreferencesPage() {
 
   const handleConnectCalendar = () => {
     if (!currentUser) return;
-    router.push(`/api/auth/google?userId=${currentUser.uid}`);
+    // Pass the client-side origin to the API route for a reliable redirect back.
+    router.push(`/api/auth/google?userId=${currentUser.uid}&origin=${window.location.origin}`);
   };
 
   const handleDisconnectCalendar = async () => {

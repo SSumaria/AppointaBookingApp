@@ -16,8 +16,7 @@ export async function GET(request: NextRequest) {
     if (!host) {
         return new Response('Could not determine host from request headers', { status: 500 });
     }
-    const callbackOrigin = `${proto}://${host}`;
-    const tokenExchangeRedirectUri = `${callbackOrigin}/api/auth/google/callback`;
+    const tokenExchangeRedirectUri = `${proto}://${host}/api/auth/google/callback`;
 
     let finalRedirectBaseUrl: string;
     let userId: string;
@@ -26,15 +25,17 @@ export async function GET(request: NextRequest) {
         if (!encodedState) throw new Error('State parameter is missing.');
         const stateJSON = Buffer.from(encodedState, 'base64').toString('utf8');
         const state = JSON.parse(stateJSON);
-        if (!state.userId || !state.origin) throw new Error('Invalid state object.');
+        if (!state.userId || !state.origin) throw new Error('Invalid state object: missing userId or origin.');
 
         userId = state.userId;
         finalRedirectBaseUrl = state.origin; // This is the origin we will redirect back to on success/error.
     } catch (e: any) {
-        // Fallback for safety, though it will likely fail auth state.
         console.error("Failed to parse state parameter:", e.message);
-        const safeRedirectBaseUrl = callbackOrigin.includes('cloudworkstations') ? callbackOrigin.replace(/^(9002-)/, '') : callbackOrigin;
-        return NextResponse.redirect(`${safeRedirectBaseUrl}/preferences?status=error&message=${encodeURIComponent('Invalid state received from Google.')}`);
+        // Fallback to a safe, generic error page if state is corrupted.
+        return new Response(`<html><body><h1>Authentication Error</h1><p>The authentication flow failed due to an invalid state parameter. Please try connecting your calendar again from the preferences page.</p><p>Error: ${e.message}</p></body></html>`, {
+            status: 400,
+            headers: { 'Content-Type': 'text/html' },
+        });
     }
     
     const finalSuccessRedirect = `${finalRedirectBaseUrl}/preferences?status=success`;
