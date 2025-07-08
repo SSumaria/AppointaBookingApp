@@ -2,8 +2,13 @@
   "rules": {
     "UserPreferences": {
       "$uid": {
-        ".read": true,
-        ".write": "auth != null && auth.uid === $uid"
+        ".read": "auth != null && auth.uid === $uid",
+        "workingHours": {
+          ".write": "auth != null && auth.uid === $uid"
+        },
+        "googleCalendar": {
+          ".write": "auth != null && auth.uid === $uid"
+        }
       }
     },
     "Appointments": {
