@@ -155,7 +155,7 @@ export default function PreferencesPage() {
     const message = searchParams.get('message');
     
     if (status === 'error') {
-      toast({ title: "Connection Failed", description: message || "An unknown error occurred.", variant: "destructive" });
+      toast({ title: "Connection Failed", description: message || "An unknown error occurred.", variant: "destructive", duration: 10000 });
       router.replace('/preferences', { scroll: false }); 
       checkCalendarConnection(currentUser.uid); 
     } else if (status === 'success') {
@@ -179,23 +179,9 @@ export default function PreferencesPage() {
         return;
     }
     
-    let originToUse = window.location.origin;
-    // FIX: This logic correctly determines the origin for complex dev environments.
-    if (window.location.hostname.endsWith('cloudworkstations.dev')) {
-        const currentHostname = window.location.hostname;
-        const protocol = window.location.protocol;
-        const portPrefixRegex = /^(\d+)-/;
-        const portPrefixMatch = currentHostname.match(portPrefixRegex);
-        let baseHostname = currentHostname;
-        if (portPrefixMatch) {
-          baseHostname = currentHostname.substring(portPrefixMatch[0].length);
-        }
-        originToUse = `${protocol}//${baseHostname}`;
-    }
-
+    // The server will determine the redirect URI. We only need to pass the userId.
     const statePayload = {
       userId: currentUser.uid,
-      origin: originToUse,
     };
     const state = btoa(JSON.stringify(statePayload));
     window.location.href = `/api/auth/google?state=${encodeURIComponent(state)}`;
@@ -390,4 +376,3 @@ export default function PreferencesPage() {
   );
 }
 
-    

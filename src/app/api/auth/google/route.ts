@@ -10,19 +10,12 @@ export async function GET(request: NextRequest) {
         return new NextResponse("State parameter is missing from the request.", { status: 400 });
     }
     
-    let clientOrigin: string;
-    try {
-        const stateJSON = Buffer.from(encodedState, 'base64').toString('utf8');
-        const state = JSON.parse(stateJSON);
-        if (!state.origin) throw new Error('Invalid state object: missing origin.');
-        clientOrigin = state.origin;
-    } catch (e: any) {
-        console.error("Failed to parse state parameter in /api/auth/google:", e.message);
-        return new NextResponse("Invalid state parameter.", { status: 400 });
-    }
+    // Determine redirect URI from server-side request headers for robustness.
+    const host = request.headers.get('host');
+    const protocol = request.headers.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https');
+    const redirectURI = `${protocol}://${host}/api/auth/google/callback`;
 
-    // Use the client's origin passed via state to construct the redirect URI
-    const redirectURI = `${clientOrigin}/api/auth/google/callback`;
+    console.log(`[Google Auth Start] Determined redirect URI: ${redirectURI}`);
 
     const oAuth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
@@ -36,7 +29,7 @@ export async function GET(request: NextRequest) {
         access_type: 'offline',
         prompt: 'consent',
         scope: SCOPES,
-        state: encodedState,
+        state: encodedState, // Pass the original state through
     });
 
     return NextResponse.redirect(authUrl);

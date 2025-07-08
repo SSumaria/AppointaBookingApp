@@ -17,7 +17,11 @@ export async function GET(request: NextRequest) {
     console.log(`Received query params: code=${code ? 'PRESENT' : 'MISSING'}, state=${encodedState ? 'PRESENT' : 'MISSING'}, error=${error || 'NONE'}`);
     
     let userId: string;
-    let clientOrigin: string; // The origin of the client browser
+
+    // Determine redirect information from server-side request headers for robustness.
+    const host = request.headers.get('host');
+    const protocol = request.headers.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https');
+    const clientOriginForRedirect = `${protocol}://${host}`;
 
     const buildRedirectHtml = (targetUrl: string, message: string) => `
         <!DOCTYPE html>
@@ -29,17 +33,15 @@ export async function GET(request: NextRequest) {
         const stateJSON = Buffer.from(encodedState, 'base64').toString('utf8');
         const state = JSON.parse(stateJSON);
         if (!state.userId) throw new Error('Invalid state object: missing userId.');
-        if (!state.origin) throw new Error('Invalid state object: missing origin.');
         userId = state.userId;
-        clientOrigin = state.origin;
-        console.log(`Successfully parsed state: userId=${userId}, clientOrigin=${clientOrigin}`);
+        console.log(`Successfully parsed state: userId=${userId}`);
     } catch (e: any) {
         console.error("FATAL: Failed to parse state parameter:", e.message);
         const htmlError = `<html><body>Authentication Error: Invalid or missing state parameter. Please try connecting again from the preferences page.</body></html>`;
         return new NextResponse(htmlError, { status: 400, headers: { 'Content-Type': 'text/html' } });
     }
     
-    const finalErrorRedirectUrl = (msg: string) => `${clientOrigin}/preferences?status=error&message=${encodeURIComponent(msg)}`;
+    const finalErrorRedirectUrl = (msg: string) => `${clientOriginForRedirect}/preferences?status=error&message=${encodeURIComponent(msg)}`;
 
     if (error) {
         console.error(`Google OAuth Error received: ${error} - ${errorDescription || 'No description'}`);
@@ -53,8 +55,8 @@ export async function GET(request: NextRequest) {
     }
 
     // IMPORTANT: The redirect URI used for token exchange MUST exactly match the one used to generate the auth URL.
-    // We reconstruct it here using the same logic.
-    const tokenExchangeRedirectUri = `${clientOrigin}/api/auth/google/callback`;
+    // We reconstruct it here using the same server-side logic.
+    const tokenExchangeRedirectUri = `${protocol}://${host}/api/auth/google/callback`;
     console.log(`Using Redirect URI for token exchange: ${tokenExchangeRedirectUri}`);
     
     const oAuth2Client = new google.auth.OAuth2(
@@ -71,7 +73,10 @@ export async function GET(request: NextRequest) {
         console.log("Successfully exchanged code for tokens. Refresh token was " + (tokens.refresh_token ? "received." : "NOT received."));
     } catch (err: any) {
         console.error('FATAL: Error during token exchange with Google:', err.response?.data || err.message);
-        const errorMessage = `Token exchange failed: ${err.response?.data?.error_description || err.message}`;
+        let errorMessage = `Token exchange failed: ${err.response?.data?.error_description || err.message}`;
+        if (err.response?.data?.error === 'redirect_uri_mismatch') {
+            errorMessage += ` The URI sent was '${tokenExchangeRedirectUri}'. Please ensure this EXACT URI is listed in your Google Cloud Console "Authorized redirect URIs".`;
+        }
         return new NextResponse(buildRedirectHtml(finalErrorRedirectUrl(errorMessage), "Redirecting with error..."), { status: 200, headers: { 'Content-Type': 'text/html' } });
     }
 
@@ -91,7 +96,7 @@ export async function GET(request: NextRequest) {
         console.log(`Successfully stored Google Calendar tokens for user ${userId}`);
         console.log("--- [GOOGLE CALLBACK SUCCESS] ---");
 
-        const finalSuccessRedirectUrl = `${clientOrigin}/preferences?status=success`;
+        const finalSuccessRedirectUrl = `${clientOriginForRedirect}/preferences?status=success`;
         return new NextResponse(buildRedirectHtml(finalSuccessRedirectUrl, "Connection successful! Redirecting..."), { status: 200, headers: { 'Content-Type': 'text/html' } });
 
     } catch (dbError: any) {
@@ -100,5 +105,3 @@ export async function GET(request: NextRequest) {
         return new NextResponse(buildRedirectHtml(finalErrorRedirectUrl(errorMessage), "Redirecting with error..."), { status: 200, headers: { 'Content-Type': 'text/html' } });
     }
 }
-
-    
