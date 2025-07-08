@@ -202,8 +202,13 @@ export default function PreferencesPage() {
         toast({ title: "Not Logged In", description: "You must be logged in to connect your calendar.", variant: "destructive" });
         return;
     }
-    // Use window.location.href for a full-page redirect to avoid CORS issues
-    window.location.href = `/api/auth/google?userId=${currentUser.uid}`;
+    // Construct state with origin and pass to the API route.
+    const statePayload = {
+      userId: currentUser.uid,
+      origin: window.location.origin, // The browser's origin (e.g. https://9000-...)
+    };
+    const state = btoa(JSON.stringify(statePayload)); // Base64 encode the JSON string
+    window.location.href = `/api/auth/google?state=${encodeURIComponent(state)}`;
   };
 
   const handleDisconnectCalendar = async () => {
@@ -504,3 +509,5 @@ export default function PreferencesPage() {
     </div>
   );
 }
+
+    

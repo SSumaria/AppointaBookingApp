@@ -8,37 +8,44 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const { searchParams } = url;
     const code = searchParams.get('code');
-    const encodedState = searchParams.get('state');
+    const encodedState = searchParams.get('state'); // The state we originally sent to Google
     const error = searchParams.get('error');
 
+    // This is the URI for the token exchange step. It must exactly match the one used
+    // in the initial `/api/auth/google` route. `url.origin` is the server's origin here.
     const tokenExchangeRedirectUri = `${url.origin}${url.pathname}`;
     
     let userId: string;
+    let browserOrigin: string; // To store the user's browser origin (e.g., https://9000-...)
 
     try {
         if (!encodedState) throw new Error('State parameter is missing.');
+        // Decode the state to get our original payload
         const stateJSON = Buffer.from(encodedState, 'base64').toString('utf8');
         const state = JSON.parse(stateJSON);
         if (!state.userId) throw new Error('Invalid state object: missing userId.');
+        if (!state.origin) throw new Error('Invalid state object: missing origin.');
         userId = state.userId;
+        browserOrigin = state.origin; // This is the key to the correct final redirect
     } catch (e: any) {
         console.error("Failed to parse state parameter:", e.message);
-        return new NextResponse(`Authentication Error: Invalid state parameter. Please try connecting again from the preferences page.`, { status: 400 });
+        // We don't have a safe origin to redirect to, so return a simple error response.
+        return new NextResponse(`Authentication Error: Invalid state parameter.`, { status: 400 });
     }
     
-    // Use a relative path for the final redirect. The browser will handle the origin.
-    const finalSuccessRedirect = `/preferences?status=success`;
-    const finalErrorRedirect = (msg: string) => `/preferences?status=error&message=${encodeURIComponent(msg)}`;
+    // Construct the final redirect URLs using the browser's origin.
+    const finalSuccessRedirect = `${browserOrigin}/preferences?status=success`;
+    const finalErrorRedirect = (msg: string) => `${browserOrigin}/preferences?status=error&message=${encodeURIComponent(msg)}`;
 
     if (error) {
         console.error('Google OAuth Error:', error);
-        return NextResponse.redirect(new URL(finalErrorRedirect(error), url.origin));
+        return NextResponse.redirect(finalErrorRedirect(error));
     }
 
     if (!code) {
         const errorMessage = 'Missing authorization code from Google. Cannot complete connection.';
         console.error(errorMessage);
-        return NextResponse.redirect(new URL(finalErrorRedirect(errorMessage), url.origin));
+        return NextResponse.redirect(finalErrorRedirect(errorMessage));
     }
 
     const oAuth2Client = new google.auth.OAuth2(
@@ -61,11 +68,13 @@ export async function GET(request: NextRequest) {
         });
 
         console.log(`Successfully stored Google Calendar tokens for user ${userId}`);
-        return NextResponse.redirect(new URL(finalSuccessRedirect, url.origin));
+        return NextResponse.redirect(finalSuccessRedirect);
 
     } catch (err: any) {
         console.error('Error exchanging token or saving to database:', err);
         const errorMessage = err.response?.data?.error_description || err.message || 'Token exchange failed.';
-        return NextResponse.redirect(new URL(finalErrorRedirect(errorMessage), url.origin));
+        return NextResponse.redirect(finalErrorRedirect(errorMessage));
     }
 }
+
+    
