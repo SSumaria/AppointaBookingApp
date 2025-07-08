@@ -1,0 +1,44 @@
+
+{
+  "rules": {
+    "Users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "Appointments": {
+      "$uid": {
+        ".read": true,
+        ".write": "auth != null && auth.uid === $uid",
+        "$appointmentId": {
+          ".write": "!data.exists() && newData.exists() && newData.child('BookedByUserID').val() === $uid"
+        }
+      }
+    },
+    "Clients": {
+      "$uid": {
+        ".read": true,
+        ".write": "auth != null && auth.uid === $uid",
+        ".indexOn": [
+          "ClientEmail"
+        ],
+        "$clientId": {
+          ".write": "!data.exists() && newData.exists() && newData.child('CreatedByUserID').val() === $uid"
+        }
+      }
+    },
+    "UserPreferences": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "workingHours": {
+          ".read": true
+        },
+        "googleCalendar": {
+          ".read": "auth != null && auth.uid === $uid"
+        }
+      }
+    }
+  }
+}
