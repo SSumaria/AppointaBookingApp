@@ -7,7 +7,7 @@
           ".write": "auth != null && auth.uid === $uid"
         },
         "googleCalendar": {
-          ".write": "auth != null && auth.uid === $uid"
+          ".write": "newData.child('writtenBy').val() === $uid"
         }
       }
     },
