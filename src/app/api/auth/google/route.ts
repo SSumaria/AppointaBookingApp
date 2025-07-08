@@ -38,8 +38,7 @@ export async function GET(request: NextRequest) {
     const authUrl = oAuth2Client.generateAuthUrl({
         access_type: 'offline',
         scope: SCOPES,
-        prompt: 'consent',
-        state: state, // Use the encoded state
+        state: state, // The prompt: 'consent' parameter has been removed.
     });
 
     return NextResponse.redirect(authUrl);
