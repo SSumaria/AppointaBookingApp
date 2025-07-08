@@ -32,6 +32,20 @@
            "validate": "newData.hasChildren(['ClientID', 'ClientName', 'ClientEmail', 'ClientContact', 'CreateDate', 'CreateTime', 'CreatedByUserID']) && newData.child('CreatedByUserID').val() === auth.uid"
         }
       }
+    },
+    "UserPreferences": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "workingHours": {
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.hasChildren(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])"
+        },
+        "googleCalendar": {
+          ".write": "(auth != null && auth.uid === $uid) || newData.child('writtenBy').val() === $uid",
+          ".validate": "newData.hasChildren(['integrated', 'tokens', 'writtenBy']) && newData.child('writtenBy').val() === $uid"
+        },
+        "$other": { ".validate": false }
+      }
     }
   }
 }
