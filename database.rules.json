@@ -1,4 +1,3 @@
-
 {
   "rules": {
     "Users": {
@@ -30,24 +29,24 @@
     },
     "UserPreferences": {
       "$uid": {
-        // Broadly allow write operations to a user's preference node.
-        // Specific permissions will be enforced by .validate rules on the children below.
+        // Allow write attempts to proceed to deeper validation.
         ".write": true,
         // Only the authenticated user can read their entire preference object.
         ".read": "auth != null && auth.uid === $uid",
 
         "workingHours": {
-          // Working hours are public for the booking page.
           ".read": true,
-          // IMPORTANT: This validation ensures ONLY the authenticated owner of these preferences can modify them.
-          ".validate": "auth != null && auth.uid === $uid"
+          // This rule is the key fix. It allows a write if:
+          // 1. The user is the authenticated owner (for when they change their hours on the preferences page).
+          // OR
+          // 2. The workingHours data is NOT being changed in this specific write operation (for when the unauthenticated server writes to the googleCalendar sibling node).
+          ".validate": "(auth != null && auth.uid === $uid) || (newData.val() === data.val())"
         },
         "googleCalendar": {
           // Only the owner can read their connection details.
           ".read": "auth != null && auth.uid === $uid",
-          // The parent ".write: true" allows the unauthenticated server to write here.
-          // This validate rule just ensures the data has the correct shape, and since it contains
-          // no auth check, the unauthenticated write is allowed.
+          // The parent ".write: true" allows the write attempt. This validation ensures the data has the correct shape.
+          // Since it has no auth check, the unauthenticated server write is allowed as long as the data is valid.
           ".validate": "newData.hasChildren(['integrated', 'tokens'])"
         }
       }
