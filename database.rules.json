@@ -11,6 +11,10 @@
       "$uid": {
         ".read": true,
         ".write": "auth != null && auth.uid === $uid",
+        ".indexOn": [
+          "AppointmentDate",
+          "ClientID"
+        ],
         "$appointmentId": {
           ".write": "!data.exists() && newData.exists() && newData.child('BookedByUserID').val() === $uid"
         }
@@ -21,7 +25,8 @@
         ".read": true,
         ".write": "auth != null && auth.uid === $uid",
         ".indexOn": [
-          "ClientEmail"
+          "ClientEmail",
+          "ClientName"
         ],
         "$clientId": {
           ".write": "!data.exists() && newData.exists() && newData.child('CreatedByUserID').val() === $uid"
@@ -42,5 +47,3 @@
     }
   }
 }
-
-    
