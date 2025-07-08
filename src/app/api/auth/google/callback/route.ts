@@ -1,15 +1,16 @@
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { google } from 'googleapis';
 import { ref, set } from 'firebase/database';
 import { db } from '@/lib/firebaseConfig';
 
 export async function GET(request: NextRequest) {
-    const { searchParams } = new URL(request.url);
+    const { searchParams, origin } = new URL(request.url);
     const code = searchParams.get('code');
     const state = searchParams.get('state'); // This should be the userId
     const error = searchParams.get('error');
 
-    const redirectBaseUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/preferences`;
+    const redirectBaseUrl = `${origin}/preferences`;
 
     if (error) {
         console.error('Google OAuth Error:', error);
@@ -23,7 +24,8 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = state;
-    const redirectURI = `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/google/callback`;
+    // Dynamically construct the redirectURI from the request's origin.
+    const redirectURI = `${origin}/api/auth/google/callback`;
 
     const oAuth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
