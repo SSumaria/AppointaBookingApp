@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { oAuth2Client } from '@/lib/googleCalendar';
+import { google } from 'googleapis';
 import { ref, set } from 'firebase/database';
 import { db } from '@/lib/firebaseConfig';
 
@@ -23,6 +23,13 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = state;
+    const redirectURI = `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/google/callback`;
+
+    const oAuth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      redirectURI
+    );
 
     try {
         const { tokens } = await oAuth2Client.getToken(code);

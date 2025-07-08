@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { oAuth2Client } from '@/lib/googleCalendar';
+import { google } from 'googleapis';
 
 export async function GET(request: NextRequest) {
     // This is INSECURE for production. In a real app, you would verify a session
@@ -11,6 +11,14 @@ export async function GET(request: NextRequest) {
     if (!userId) {
         return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
     }
+
+    const redirectURI = `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/google/callback`;
+
+    const oAuth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      redirectURI
+    );
 
     const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 

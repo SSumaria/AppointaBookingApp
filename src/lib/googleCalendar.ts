@@ -3,14 +3,6 @@ import { db } from './firebaseConfig';
 import { ref, get, set } from 'firebase/database';
 import type { Auth } from 'googleapis';
 
-const OAUTH2_CLIENT = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    // The redirect URI is set when generating the auth URL.
-    // This value is used for the token exchange.
-    `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/google/callback`
-);
-
 interface GoogleTokens {
     access_token: string;
     refresh_token?: string;
@@ -70,6 +62,3 @@ export async function getAuthenticatedClient(userId: string): Promise<Auth.OAuth
 
     return client;
 }
-
-// Export the pre-configured oAuth2Client for generating the initial auth URL
-export const oAuth2Client = OAUTH2_CLIENT;
