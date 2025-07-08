@@ -35,7 +35,7 @@
         "workingHours": {
           ".read": true,
           ".write": "(auth != null && auth.uid === $uid) || (newData.val() === data.val())",
-          ".validate": "newData.hasChildren(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])"
+          ".validate": "!newData.exists() || newData.hasChildren(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])"
         },
         "googleCalendar": {
           ".read": "auth != null && auth.uid === $uid",
