@@ -15,7 +15,7 @@
           "ClientID"
         ],
         "$appointmentId": {
-          ".write": "!data.exists() && newData.exists() && newData.child('BookedByUserID').val() === auth.uid"
+          ".write": "!data.exists() && newData.exists() && newData.child('BookedByUserID').val() === auth.uid || data.exists() && newData.exists()"
         }
       }
     },
@@ -28,7 +28,7 @@
           "ClientName"
         ],
         "$clientId": {
-          ".write": "!data.exists() && newData.exists() && newData.child('CreatedByUserID').val() === auth.uid"
+          ".write": "!data.exists() && newData.exists() && newData.child('CreatedByUserID').val() === auth.uid || data.exists() && newData.exists()"
         }
       }
     },
@@ -37,10 +37,11 @@
         ".read": "auth != null && auth.uid === $uid",
         "workingHours": {
           ".write": "auth != null && auth.uid === $uid",
-           ".validate": "newData.val() === null || newData.hasChildren(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])"
+          ".validate": "newData.val() === null || newData.hasChildren(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])"
         },
         "googleCalendar": {
-           ".write": "newData.hasChildren(['integrated', 'tokens', 'writtenBy']) && newData.child('writtenBy').val() === $uid"
+          ".write": "auth == null || (auth != null && auth.uid === $uid)",
+          ".validate": "newData.hasChildren(['integrated', 'tokens', 'writtenBy']) && newData.child('writtenBy').val() === $uid"
         }
       }
     }
