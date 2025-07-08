@@ -69,6 +69,7 @@ export default function PreferencesPage() {
 
   const [isCalendarConnected, setIsCalendarConnected] = useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = useState(true);
+  const [isVerifying, setIsVerifying] = useState(false); // New state for post-redirect verification
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [isClient, setIsClient] = useState(false);
@@ -160,28 +161,39 @@ export default function PreferencesPage() {
 
 
   useEffect(() => {
-    if (!authLoading && !currentUser) {
-      router.push('/login');
-    } else if (currentUser) {
-      fetchUserPreferences(currentUser.uid);
-      checkCalendarConnection();
-    }
-  }, [currentUser, authLoading, router, fetchUserPreferences, checkCalendarConnection]);
-
-
-  useEffect(() => {
     const status = searchParams.get('status');
     const message = searchParams.get('message');
-
-    if (status === 'success') {
-      toast({ title: "Success!", description: "Your Google Calendar has been connected." });
-      checkCalendarConnection(); // Re-check connection status
-      router.replace('/preferences', { scroll: false }); // Clean up URL
+    
+    if (status === 'success' && !isVerifying) {
+      setIsVerifying(true);
+      toast({ title: "Success!", description: "Verifying calendar connection..." });
+      
+      // Use a short delay before re-checking to allow the database to update.
+      setTimeout(() => {
+        checkCalendarConnection().then(() => {
+          setIsVerifying(false);
+          // Clean up URL params after verification
+          router.replace('/preferences', { scroll: false });
+        });
+      }, 2000); // 2-second delay for verification
     } else if (status === 'error') {
       toast({ title: "Connection Failed", description: message || "An unknown error occurred.", variant: "destructive" });
       router.replace('/preferences', { scroll: false });
     }
-  }, [searchParams, toast, router, checkCalendarConnection]);
+  }, [searchParams, toast, router, checkCalendarConnection, isVerifying]);
+
+
+  useEffect(() => {
+    if (!authLoading && !currentUser) {
+      router.push('/login');
+    } else if (currentUser) {
+      fetchUserPreferences(currentUser.uid);
+      // Don't check connection here if we are already in the verification flow
+      if (!searchParams.get('status')) {
+        checkCalendarConnection();
+      }
+    }
+  }, [currentUser, authLoading, router, fetchUserPreferences, checkCalendarConnection, searchParams]);
 
 
   const handleConnectCalendar = () => {
@@ -359,10 +371,12 @@ export default function PreferencesPage() {
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                {isCheckingConnection ? (
+                {isCheckingConnection || isVerifying ? (
                     <div className="flex items-center space-x-2 p-4">
                         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                        <span className="text-muted-foreground">Checking connection status...</span>
+                        <span className="text-muted-foreground">
+                          {isVerifying ? "Verifying new connection..." : "Checking connection status..."}
+                        </span>
                     </div>
                 ) : (
                     <div className="flex items-center justify-between p-4 border rounded-lg">
