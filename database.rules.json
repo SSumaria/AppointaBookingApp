@@ -31,13 +31,13 @@
     "UserPreferences": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid",
         "workingHours": {
-          ".read": true
+          ".read": true,
+          ".write": "auth != null && auth.uid === $uid"
         },
         "googleCalendar": {
           ".read": "auth != null && auth.uid === $uid",
-          ".write": "auth != null && auth.uid === $uid"
+          ".write": true
         }
       }
     }
