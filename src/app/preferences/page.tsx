@@ -70,6 +70,7 @@ export default function PreferencesPage() {
 
   const [isCalendarConnected, setIsCalendarConnected] = useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = useState(true);
+  const [isVerifyingPostRedirect, setIsVerifyingPostRedirect] = useState(false);
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [isClient, setIsClient] = useState(false);
@@ -163,25 +164,31 @@ export default function PreferencesPage() {
   useEffect(() => {
     if (!authLoading && !currentUser) {
       router.push('/login');
-    } else if (currentUser) {
+    } else if (currentUser && !isVerifyingPostRedirect) { // Prevent initial load check if we are about to verify
       fetchUserPreferences(currentUser.uid);
       checkCalendarConnection();
     }
-  }, [currentUser, authLoading, router, fetchUserPreferences, checkCalendarConnection]);
+  }, [currentUser, authLoading, router, fetchUserPreferences, checkCalendarConnection, isVerifyingPostRedirect]);
 
 
   useEffect(() => {
     const status = searchParams.get('status');
     const message = searchParams.get('message');
+
     if (status === 'success') {
-      toast({ title: "Success!", description: "Google Calendar connected successfully." });
-      // Re-check the connection from the database to ensure UI is accurate
-      checkCalendarConnection();
+      setIsVerifyingPostRedirect(true);
+      toast({ title: "Success!", description: "Finalizing calendar connection..." });
+
+      const timer = setTimeout(() => {
+        checkCalendarConnection().finally(() => {
+          setIsVerifyingPostRedirect(false);
+          router.replace('/preferences', { scroll: false });
+        });
+      }, 1500);
+
+      return () => clearTimeout(timer);
     } else if (status === 'error') {
       toast({ title: "Connection Failed", description: message || "An unknown error occurred.", variant: "destructive" });
-    }
-    // Clean up URL after showing toast to prevent re-triggering on refresh
-    if (status) {
       router.replace('/preferences', { scroll: false });
     }
   }, [searchParams, toast, router, checkCalendarConnection]);
@@ -197,7 +204,6 @@ export default function PreferencesPage() {
         const origin = window.location.origin;
         const redirectUrl = `/api/auth/google?userId=${currentUser.uid}&origin=${origin}`;
         
-        // Use window.location.href for a full page navigation to prevent CORS errors.
         window.location.href = redirectUrl;
 
     } catch (error: any) {
@@ -376,10 +382,12 @@ export default function PreferencesPage() {
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                {isCheckingConnection ? (
+                {isCheckingConnection || isVerifyingPostRedirect ? (
                     <div className="flex items-center space-x-2 p-4">
                         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                        <span className="text-muted-foreground">Checking connection status...</span>
+                        <span className="text-muted-foreground">
+                            {isVerifyingPostRedirect ? "Verifying connection..." : "Checking connection status..."}
+                        </span>
                     </div>
                 ) : (
                     <div className="flex items-center justify-between p-4 border rounded-lg">
