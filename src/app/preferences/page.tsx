@@ -188,8 +188,33 @@ export default function PreferencesPage() {
 
 
   const handleConnectCalendar = () => {
-    if (!currentUser) return;
-    router.push(`/api/auth/google?userId=${currentUser.uid}&origin=${window.location.origin}`);
+    if (!currentUser) {
+        toast({ title: "Not Logged In", description: "You must be logged in to connect your calendar.", variant: "destructive" });
+        return;
+    }
+    console.log("Preparing to redirect for Google Calendar connection...");
+    try {
+        const origin = window.location.origin;
+        const redirectUrl = `/api/auth/google?userId=${currentUser.uid}&origin=${origin}`;
+        console.log("Constructed redirect URL:", redirectUrl);
+
+        toast({
+          title: "Redirecting for Authentication...",
+          description: "You will be redirected to Google in 3 seconds. Please open your console to view any errors.",
+        });
+        
+        setTimeout(() => {
+            router.push(redirectUrl);
+        }, 3000); // 3-second delay
+
+    } catch (error: any) {
+        console.error("!!! ERROR within handleConnectCalendar !!!", error);
+        toast({
+            title: "Client-Side Error",
+            description: `An error occurred before redirecting: ${error.message}. Please check the browser console.`,
+            variant: "destructive"
+        });
+    }
   };
 
   const handleDisconnectCalendar = async () => {
