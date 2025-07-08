@@ -27,6 +27,7 @@ interface ExistingBooking {
   AppointmentEndTime: string;
   AppointmentDate: string;
   BookingStatus?: string;
+  googleEventId?: string;
 }
 
 const daysOfWeekConst = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
@@ -433,7 +434,9 @@ export default function PublicBookingPage() {
             AppointmentStartTime: startTime, 
             AppointmentEndTime: calculatedEndTime, 
             BookingStatus: "Booked", 
-            BookedByUserID: serviceProviderUserId // Mark who this appt "belongs" to
+            BookedByUserID: serviceProviderUserId, // Mark who this appt "belongs" to
+            _ClientNameSnapshot: clientName.trim(),
+            _ClientEmailSnapshot: clientEmail.trim().toLowerCase(),
         };
 
         const providerAppointmentsRefPath = `Appointments/${serviceProviderUserId}`;
@@ -442,6 +445,26 @@ export default function PublicBookingPage() {
         await set(newAppointmentRef, appointmentDataToSave);
 
         toast({ title: "Booking Confirmed!", description: `Your 1-hour appointment for ${serviceProcedure} has been booked.` });
+        
+        // Sync to Google Calendar (fire-and-forget)
+        fetch('/api/google-calendar-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'create',
+            bookingId: appointmentDataToSave.AppointmentID,
+            userId: serviceProviderUserId,
+          })
+        }).then(res => res.json()).then(data => {
+          if (data.success) {
+            console.log("Successfully synced new public booking to Google Calendar.");
+          } else {
+            console.warn("Failed to sync new public booking to Google Calendar:", data.message);
+          }
+        }).catch(err => {
+          console.error("Error calling calendar sync API:", err);
+        });
+
         if(date) fetchBookedSlots(date); 
         
         setClientName(''); 
@@ -629,5 +652,3 @@ export default function PublicBookingPage() {
     </div>
   );
 }
-
-    

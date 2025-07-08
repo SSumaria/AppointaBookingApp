@@ -80,6 +80,7 @@ interface Booking {
   BookingStatus?: string;
   Notes?: Note[];
   BookedByUserID?: string;
+  googleEventId?: string;
 }
 
 interface Client {
@@ -277,6 +278,21 @@ export default function AllBookingsPage() {
     try {
       const bookingRefPath = `Appointments/${currentUser.uid}/${booking.id}`;
       await update(ref(db, bookingRefPath), { BookingStatus: "Cancelled" });
+      
+      // Sync deletion to Google Calendar
+      fetch('/api/google-calendar-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete',
+          bookingId: booking.id,
+          userId: currentUser.uid,
+        })
+      }).then(res => res.json()).then(data => {
+        if(data.success) console.log(`Successfully synced cancellation for booking ${booking.id} to Google Calendar.`);
+        else console.warn(`Failed to sync cancellation for booking ${booking.id}:`, data.message);
+      }).catch(err => console.error("Error calling calendar sync for cancellation:", err));
+
 
       if (booking.ClientEmail) {
         try {
@@ -469,6 +485,21 @@ export default function AllBookingsPage() {
     try {
       const bookingRefPath = `Appointments/${currentUser.uid}/${bookingToEdit.id}`;
       await update(ref(db, bookingRefPath), updates);
+
+      // Sync update to Google Calendar
+      fetch('/api/google-calendar-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update',
+          bookingId: bookingToEdit.id,
+          userId: currentUser.uid,
+        })
+      }).then(res => res.json()).then(data => {
+        if(data.success) console.log(`Successfully synced update for booking ${bookingToEdit.id} to Google Calendar.`);
+        else console.warn(`Failed to sync update for booking ${bookingToEdit.id}:`, data.message);
+      }).catch(err => console.error("Error calling calendar sync for update:", err));
+
 
       if (bookingToEdit.ClientEmail) {
         const oldDetails = {
@@ -1059,5 +1090,3 @@ export default function AllBookingsPage() {
     </div>
   );
 }
-
-    

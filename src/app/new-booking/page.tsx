@@ -39,6 +39,7 @@ interface Booking {
   BookingStatus?: string;
   BookedByUserID?: string;
   Notes?: Note[];
+  googleEventId?: string;
 }
 
 interface ExistingBooking {
@@ -372,6 +373,7 @@ export default function NewBookingPage() {
             const appointmentsRefForUser = ref(db, userAppointmentsRefPath);
             const newAppointmentRef = push(appointmentsRefForUser);
             const appointmentId = newAppointmentRef.key;
+            if (!appointmentId) throw new Error("Could not generate appointment ID.");
 
             await set(newAppointmentRef, {
                 AppointmentID: appointmentId,
@@ -389,6 +391,28 @@ export default function NewBookingPage() {
             });
 
             toast({ title: "Success", description: `Booking Confirmed for ${finalClientNameForAppointment}!` });
+            
+            // Sync to Google Calendar (fire-and-forget)
+            fetch('/api/google-calendar-sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'create',
+                bookingId: appointmentId,
+                userId: currentUser.uid,
+              })
+            }).then(res => res.json()).then(data => {
+              if (data.success) {
+                console.log("Successfully synced new booking to Google Calendar.");
+              } else {
+                console.warn("Failed to sync new booking to Google Calendar:", data.message);
+                // Optionally show a non-intrusive toast that sync failed
+              }
+            }).catch(err => {
+              console.error("Error calling calendar sync API:", err);
+            });
+
+
             if(date) fetchBookedSlots(date);
 
             // Reset form fields

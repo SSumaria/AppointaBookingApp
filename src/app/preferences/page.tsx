@@ -4,9 +4,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Settings, Clock, Ban, Loader2, Moon, Sun } from "lucide-react";
+import { Settings, Clock, Ban, Loader2, Moon, Sun, CalendarDays, XCircle } from "lucide-react";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -61,10 +61,15 @@ const initialWorkingHours: WorkingHours = {
 export default function PreferencesPage() {
   const { currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
+  
   const [workingHours, setWorkingHours] = useState<WorkingHours>(initialWorkingHours);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(true);
+
+  const [isCalendarConnected, setIsCalendarConnected] = useState(false);
+  const [isCheckingConnection, setIsCheckingConnection] = useState(true);
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -130,7 +135,7 @@ export default function PreferencesPage() {
       console.error("Error fetching user preferences:", error);
       let description = error.message || "Could not load your saved working hours.";
       if (error.message && error.message.toLowerCase().includes("permission denied")) {
-        description = "Permission denied when fetching preferences. Ensure Firebase rules allow users to read their own 'UserPreferences/$uid/workingHours'. Example: { \"rules\": { \"UserPreferences\": { \"$uid\": { \".read\": \"auth != null && auth.uid === $uid\", \"workingHours\": { \".read\": true }, \".write\": \"auth != null && auth.uid === $uid\" } } } }";
+        description = "Permission denied when fetching preferences. Ensure Firebase rules allow users to read their own 'UserPreferences/$uid/workingHours'.";
       }
       toast({
         title: "Error Loading Preferences",
@@ -143,7 +148,6 @@ export default function PreferencesPage() {
     }
   }, [toast]);
 
-
   useEffect(() => {
     if (!authLoading && !currentUser) {
       router.push('/login');
@@ -152,6 +156,60 @@ export default function PreferencesPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, authLoading, router]);
+
+  useEffect(() => {
+    if (currentUser) {
+      const checkConnection = async () => {
+        setIsCheckingConnection(true);
+        const calendarPrefRef = ref(db, `UserPreferences/${currentUser.uid}/googleCalendar`);
+        const snapshot = await get(calendarPrefRef);
+        setIsCalendarConnected(snapshot.exists() && snapshot.val().integrated);
+        setIsCheckingConnection(false);
+      };
+      checkConnection();
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    const status = searchParams.get('status');
+    const message = searchParams.get('message');
+    if (status === 'success') {
+      toast({ title: "Success!", description: "Google Calendar connected successfully." });
+      setIsCalendarConnected(true);
+    } else if (status === 'error') {
+      toast({ title: "Connection Failed", description: message || "An unknown error occurred.", variant: "destructive" });
+    }
+    // Clean up URL after showing toast
+    if (status) {
+      router.replace('/preferences', { scroll: false });
+    }
+  }, [searchParams, toast, router]);
+
+  const handleConnectCalendar = () => {
+    if (!currentUser) return;
+    router.push(`/api/auth/google?userId=${currentUser.uid}`);
+  };
+
+  const handleDisconnectCalendar = async () => {
+    if (!currentUser) return;
+    setIsSaving(true);
+    try {
+      const response = await fetch('/api/auth/google/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser.uid })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to disconnect');
+      
+      toast({ title: "Success", description: "Google Calendar has been disconnected." });
+      setIsCalendarConnected(false);
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
 
   const handleTimeChange = (day: DayOfWeek, type: 'startTime' | 'endTime', value: string) => {
@@ -216,7 +274,7 @@ export default function PreferencesPage() {
       console.error("Error saving user preferences:", error);
       let description = error.message || "Could not save your working hours.";
       if (error.message && error.message.toLowerCase().includes("permission denied")) {
-        description = "Permission denied when saving preferences. Ensure Firebase rules allow users to write to 'UserPreferences/$uid/workingHours'. Example: { \"rules\": { \"UserPreferences\": { \"$uid\": { \".write\": \"auth != null && auth.uid === $uid\", \"workingHours\": { \".read\": true }, \".read\": \"auth != null && auth.uid === $uid\" } } } }";
+        description = "Permission denied when saving preferences. Ensure Firebase rules allow users to write to 'UserPreferences/$uid/workingHours'.";
       }
       toast({
         title: "Error Saving Preferences",
@@ -233,7 +291,7 @@ export default function PreferencesPage() {
     return string.charAt(0).toUpperCase() + string.slice(1);
   }
 
-  if (authLoading || (!currentUser && !authLoading) || isLoadingPreferences && !currentUser) {
+  if (authLoading || (!currentUser && !authLoading) || (isLoadingPreferences && !currentUser)) {
     return (
       <div className="min-h-screen flex flex-col">
         <Header />
@@ -264,7 +322,7 @@ export default function PreferencesPage() {
                 <Settings className="mr-2 h-6 w-6" /> Manage Preferences
               </CardTitle>
               <CardDescription>
-                Adjust your application settings and display options here.
+                Adjust your application settings, integrations, and display options here.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -285,6 +343,48 @@ export default function PreferencesPage() {
                   </span>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="shadow-xl">
+            <CardHeader>
+                <CardTitle className="text-xl font-bold flex items-center">
+                    <CalendarDays className="mr-2 h-5 w-5 text-primary" /> Integrations
+                </CardTitle>
+                <CardDescription>
+                    Connect your account to third-party services like Google Calendar.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                {isCheckingConnection ? (
+                    <div className="flex items-center space-x-2 p-4">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        <span className="text-muted-foreground">Checking connection status...</span>
+                    </div>
+                ) : (
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-muted rounded-full">
+                                <CalendarDays className="h-6 w-6 text-primary"/>
+                            </div>
+                            <div>
+                                <h3 className="font-semibold">Google Calendar</h3>
+                                <p className="text-sm text-muted-foreground">
+                                    {isCalendarConnected ? "Syncs appointments automatically." : "Connect to sync your bookings."}
+                                </p>
+                            </div>
+                        </div>
+                        {isCalendarConnected ? (
+                            <Button variant="destructive" onClick={handleDisconnectCalendar} disabled={isSaving}>
+                                <XCircle className="mr-2 h-4 w-4"/> Disconnect
+                            </Button>
+                        ) : (
+                            <Button onClick={handleConnectCalendar}>
+                                Connect
+                            </Button>
+                        )}
+                    </div>
+                )}
             </CardContent>
           </Card>
 
@@ -386,5 +486,3 @@ export default function PreferencesPage() {
     </div>
   );
 }
-
-    

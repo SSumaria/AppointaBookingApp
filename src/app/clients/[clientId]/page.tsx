@@ -45,6 +45,7 @@ interface Booking {
   BookingStatus?: string;
   Notes?: Note[];
   BookedByUserID?: string;
+  googleEventId?: string;
 }
 
 interface ProcessedNote {
@@ -385,5 +386,3 @@ export default function ClientDetailsPage() {
     </div>
   );
 }
-
-    
