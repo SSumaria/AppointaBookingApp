@@ -70,17 +70,23 @@ export async function GET(request: NextRequest) {
     try {
         const { tokens } = await oAuth2Client.getToken(code);
         
-        // We now request offline access again, so we should get a refresh token on first consent.
         if (!tokens.refresh_token) {
             console.warn("Refresh token was not received. This can happen on re-authentication if you already granted consent. To get a new one, you may need to revoke access in your Google account and reconnect the app.");
         }
 
         const userPreferencesRef = ref(db, `UserPreferences/${userId}/googleCalendar`);
-        await set(userPreferencesRef, {
+        const payload = {
             integrated: true,
             tokens: tokens,
-            writtenBy: userId, // Add the userId to the data payload for security rule validation
-        });
+            writtenBy: userId,
+        };
+        
+        // --- ADDED FOR DEBUGGING AS PER YOUR SUGGESTION ---
+        console.log(`Attempting to write to database for user ${userId}. Path: ${userPreferencesRef.toString()}`);
+        console.log("Payload being sent:", JSON.stringify(payload, null, 2));
+        // --- END OF DEBUGGING LOG ---
+
+        await set(userPreferencesRef, payload);
 
         console.log(`Successfully stored Google Calendar tokens for user ${userId}`);
         const finalSuccessRedirectUrl = `${browserOrigin}/preferences?status=success`;
