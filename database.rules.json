@@ -33,13 +33,9 @@
         ".read": "auth != null && auth.uid === $uid",
         ".write": "(auth != null && auth.uid === $uid) || (newData.hasChild('googleCalendar') && newData.child('googleCalendar/writtenBy').val() === $uid)",
         "workingHours": {
-          ".read": true,
-          ".write": "(auth != null && auth.uid === $uid) || (newData.val() === data.val())",
           ".validate": "!newData.exists() || newData.hasChildren(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])"
         },
         "googleCalendar": {
-          ".read": "auth != null && auth.uid === $uid",
-          ".write": "newData.child('writtenBy').val() === $uid",
           ".validate": "newData.hasChildren(['integrated', 'tokens', 'writtenBy'])"
         }
       }
