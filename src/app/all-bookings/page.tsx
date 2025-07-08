@@ -279,6 +279,7 @@ export default function AllBookingsPage() {
       const bookingRefPath = `Appointments/${currentUser.uid}/${booking.id}`;
       await update(ref(db, bookingRefPath), { BookingStatus: "Cancelled" });
       
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       // Sync deletion to Google Calendar
       fetch('/api/google-calendar-sync', {
         method: 'POST',
@@ -287,6 +288,7 @@ export default function AllBookingsPage() {
           action: 'delete',
           bookingId: booking.id,
           userId: currentUser.uid,
+          timeZone: timeZone,
         })
       }).then(res => res.json()).then(data => {
         if(data.success) console.log(`Successfully synced cancellation for booking ${booking.id} to Google Calendar.`);
@@ -486,6 +488,7 @@ export default function AllBookingsPage() {
       const bookingRefPath = `Appointments/${currentUser.uid}/${bookingToEdit.id}`;
       await update(ref(db, bookingRefPath), updates);
 
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       // Sync update to Google Calendar
       fetch('/api/google-calendar-sync', {
         method: 'POST',
@@ -494,6 +497,7 @@ export default function AllBookingsPage() {
           action: 'update',
           bookingId: bookingToEdit.id,
           userId: currentUser.uid,
+          timeZone: timeZone,
         })
       }).then(res => res.json()).then(data => {
         if(data.success) console.log(`Successfully synced update for booking ${bookingToEdit.id} to Google Calendar.`);

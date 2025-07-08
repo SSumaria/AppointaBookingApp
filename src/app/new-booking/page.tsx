@@ -393,6 +393,7 @@ export default function NewBookingPage() {
             toast({ title: "Success", description: `Booking Confirmed for ${finalClientNameForAppointment}!` });
             
             // Sync to Google Calendar (fire-and-forget)
+            const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             fetch('/api/google-calendar-sync', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -400,6 +401,7 @@ export default function NewBookingPage() {
                 action: 'create',
                 bookingId: appointmentId,
                 userId: currentUser.uid,
+                timeZone: timeZone,
               })
             }).then(res => res.json()).then(data => {
               if (data.success) {

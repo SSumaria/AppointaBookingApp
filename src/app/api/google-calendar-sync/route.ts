@@ -25,8 +25,8 @@ interface Client {
 
 export async function POST(request: Request) {
     console.log("\n--- [GCAL SYNC START] ---");
-    const { action, bookingId, userId } = await request.json();
-    console.log(`[GCAL SYNC] Received request: action=${action}, bookingId=${bookingId}, userId=${userId}`);
+    const { action, bookingId, userId, timeZone } = await request.json();
+    console.log(`[GCAL SYNC] Received request: action=${action}, bookingId=${bookingId}, userId=${userId}, timeZone=${timeZone}`);
 
     if (!action || !bookingId || !userId) {
         return NextResponse.json({ success: false, message: 'Missing required parameters: action, bookingId, or userId' }, { status: 400 });
@@ -80,17 +80,21 @@ export async function POST(request: Request) {
         }
         // --- End of Robust Client Data Retrieval ---
 
-        const serverTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const eventTimeZone = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (!timeZone) {
+            console.warn(`[GCAL SYNC] Timezone not provided by client. Falling back to server timezone: ${eventTimeZone}`);
+        }
+        
         const event = {
             summary: `Appointment: ${bookingData.ServiceProcedure}`,
             description: `Client: ${clientName || 'N/A'}\nService: ${bookingData.ServiceProcedure}`,
             start: {
                 dateTime: `${bookingData.AppointmentDate}T${bookingData.AppointmentStartTime}:00`,
-                timeZone: serverTimeZone,
+                timeZone: eventTimeZone,
             },
             end: {
                 dateTime: `${bookingData.AppointmentDate}T${bookingData.AppointmentEndTime}:00`,
-                timeZone: serverTimeZone,
+                timeZone: eventTimeZone,
             },
             attendees: clientEmail ? [{ email: clientEmail }] : [],
             reminders: {

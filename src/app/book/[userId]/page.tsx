@@ -446,6 +446,7 @@ export default function PublicBookingPage() {
 
         toast({ title: "Booking Confirmed!", description: `Your 1-hour appointment for ${serviceProcedure} has been booked.` });
         
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         // Sync to Google Calendar (fire-and-forget)
         fetch('/api/google-calendar-sync', {
           method: 'POST',
@@ -454,6 +455,7 @@ export default function PublicBookingPage() {
             action: 'create',
             bookingId: appointmentDataToSave.AppointmentID,
             userId: serviceProviderUserId,
+            timeZone: timeZone,
           })
         }).then(res => res.json()).then(data => {
           if (data.success) {
