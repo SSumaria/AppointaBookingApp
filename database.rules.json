@@ -31,7 +31,13 @@
     "UserPreferences": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        ".write": true
+        "workingHours": {
+          ".write": "auth != null && auth.uid === $uid",
+           ".validate": "!newData.exists() || newData.hasChildren(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])"
+        },
+        "googleCalendar": {
+           ".write": "newData.hasChildren(['integrated', 'tokens', 'writtenBy']) && newData.child('writtenBy').val() === $uid"
+        }
       }
     }
   }

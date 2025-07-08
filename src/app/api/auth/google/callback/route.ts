@@ -5,54 +5,46 @@ import { ref, set } from 'firebase/database';
 import { db } from '@/lib/firebaseConfig';
 
 export async function GET(request: NextRequest) {
+    console.log("\n--- [GOOGLE CALLBACK START] ---");
+    console.log(`Callback received at: ${new Date().toISOString()}`);
+
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
     const encodedState = searchParams.get('state');
     const error = searchParams.get('error');
+    const errorDescription = searchParams.get('error_description');
 
+    console.log(`Received query params: code=${code ? 'PRESENT' : 'MISSING'}, state=${encodedState ? 'PRESENT' : 'MISSING'}, error=${error || 'NONE'}`);
+    
+    // --- State Parsing and Redirect URL construction ---
     let userId: string;
     let browserOrigin: string;
 
     const buildRedirectHtml = (targetUrl: string, message: string) => `
         <!DOCTYPE html>
-        <html>
-            <head>
-                <title>Redirecting...</title>
-                <script>
-                    window.location.href = "${targetUrl}";
-                </script>
-            </head>
-            <body>
-                <p>${message} If you are not redirected automatically, <a href="${targetUrl}">click here</a>.</p>
-            </body>
-        </html>
-    `;
+        <html><head><title>Redirecting...</title><script>window.location.href = "${targetUrl}";</script></head>
+        <body><p>${message} If you are not redirected automatically, <a href="${targetUrl}">click here</a>.</p></body></html>`;
 
     try {
-        if (!encodedState) throw new Error('State parameter is missing.');
+        if (!encodedState) throw new Error('State parameter is missing from callback.');
         const stateJSON = Buffer.from(encodedState, 'base64').toString('utf8');
         const state = JSON.parse(stateJSON);
         if (!state.userId) throw new Error('Invalid state object: missing userId.');
         if (!state.origin) throw new Error('Invalid state object: missing origin.');
         userId = state.userId;
         browserOrigin = state.origin;
+        console.log(`Successfully parsed state: userId=${userId}, origin=${browserOrigin}`);
     } catch (e: any) {
-        console.error("Failed to parse state parameter:", e.message);
-        // We don't have browserOrigin here, so we can't redirect gracefully.
-        const htmlError = `<html><body>Authentication Error: Invalid state parameter. Please try connecting again.</body></html>`;
+        console.error("FATAL: Failed to parse state parameter:", e.message);
+        const htmlError = `<html><body>Authentication Error: Invalid or missing state parameter. Please try connecting again from the preferences page.</body></html>`;
         return new NextResponse(htmlError, { status: 400, headers: { 'Content-Type': 'text/html' } });
     }
-    
-    // This is the URI Google will redirect back to after authentication. It MUST
-    // match one of the URIs registered in your Google Cloud Console project.
-    // We derive it from the origin passed in the state to handle proxy/forwarding environments.
-    const tokenExchangeRedirectUri = `${browserOrigin}/api/auth/google/callback`;
     
     const finalErrorRedirectUrl = (msg: string) => `${browserOrigin}/preferences?status=error&message=${encodeURIComponent(msg)}`;
 
     if (error) {
-        console.error('Google OAuth Error:', error);
-        return new NextResponse(buildRedirectHtml(finalErrorRedirectUrl(error), "Redirecting with error..."), { status: 200, headers: { 'Content-Type': 'text/html' }});
+        console.error(`Google OAuth Error received: ${error} - ${errorDescription || 'No description'}`);
+        return new NextResponse(buildRedirectHtml(finalErrorRedirectUrl(errorDescription || error), `Redirecting with error: ${error}`), { status: 200, headers: { 'Content-Type': 'text/html' }});
     }
 
     if (!code) {
@@ -61,40 +53,51 @@ export async function GET(request: NextRequest) {
         return new NextResponse(buildRedirectHtml(finalErrorRedirectUrl(errorMessage), "Redirecting with error..."), { status: 200, headers: { 'Content-Type': 'text/html' }});
     }
 
+    // --- Token Exchange ---
+    const tokenExchangeRedirectUri = `${browserOrigin}/api/auth/google/callback`;
+    console.log(`Using Redirect URI for token exchange: ${tokenExchangeRedirectUri}`);
+    
     const oAuth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
       tokenExchangeRedirectUri
     );
 
+    let tokens;
     try {
-        const { tokens } = await oAuth2Client.getToken(code);
-        
-        if (!tokens.refresh_token) {
-            console.warn("Refresh token was not received. This can happen on re-authentication if you already granted consent. To get a new one, you may need to revoke access in your Google account and reconnect the app.");
-        }
+        console.log("Attempting to exchange authorization code for tokens with Google...");
+        const response = await oAuth2Client.getToken(code);
+        tokens = response.tokens;
+        console.log("Successfully exchanged code for tokens. Refresh token was " + (tokens.refresh_token ? "received." : "NOT received."));
+    } catch (err: any) {
+        console.error('FATAL: Error during token exchange with Google:', err.response?.data || err.message);
+        const errorMessage = `Token exchange failed: ${err.response?.data?.error_description || err.message}`;
+        return new NextResponse(buildRedirectHtml(finalErrorRedirectUrl(errorMessage), "Redirecting with error..."), { status: 200, headers: { 'Content-Type': 'text/html' } });
+    }
 
+    // --- Database Write ---
+    try {
         const userPreferencesRef = ref(db, `UserPreferences/${userId}/googleCalendar`);
         const payload = {
             integrated: true,
             tokens: tokens,
             writtenBy: userId,
         };
-        
-        // --- ADDED FOR DEBUGGING AS PER YOUR SUGGESTION ---
+
         console.log(`Attempting to write to database for user ${userId}. Path: ${userPreferencesRef.toString()}`);
-        console.log("Payload being sent:", JSON.stringify(payload, null, 2));
-        // --- END OF DEBUGGING LOG ---
+        console.log("Payload to be written:", JSON.stringify(payload, (key, value) => (key === 'access_token' || key === 'refresh_token') && value ? 'HIDDEN' : value, 2));
 
         await set(userPreferencesRef, payload);
 
         console.log(`Successfully stored Google Calendar tokens for user ${userId}`);
+        console.log("--- [GOOGLE CALLBACK SUCCESS] ---");
+
         const finalSuccessRedirectUrl = `${browserOrigin}/preferences?status=success`;
         return new NextResponse(buildRedirectHtml(finalSuccessRedirectUrl, "Connection successful! Redirecting..."), { status: 200, headers: { 'Content-Type': 'text/html' } });
 
-    } catch (err: any) {
-        console.error('Error exchanging token or saving to database:', err);
-        const errorMessage = err.response?.data?.error_description || err.message || 'Token exchange failed.';
+    } catch (dbError: any) {
+        console.error('FATAL: Error saving tokens to Firebase Realtime Database:', dbError.message);
+        const errorMessage = `Saving to database failed: ${dbError.message}. Check your database rules. The error you are seeing on the page is likely this one.`;
         return new NextResponse(buildRedirectHtml(finalErrorRedirectUrl(errorMessage), "Redirecting with error..."), { status: 200, headers: { 'Content-Type': 'text/html' } });
     }
 }
