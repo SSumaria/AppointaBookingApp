@@ -71,16 +71,13 @@ export default function PreferencesPage() {
   const [isCalendarConnected, setIsCalendarConnected] = useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = useState(true);
 
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('darkMode') === 'true';
-    }
-    return false;
-  });
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
+    // Initialize dark mode from localStorage only on the client
+    setIsDarkMode(localStorage.getItem('darkMode') === 'true');
   }, []);
 
   useEffect(() => {
@@ -128,8 +125,6 @@ export default function PreferencesPage() {
             console.warn("Loaded preferences from Firebase have an invalid structure. Using defaults.");
             setWorkingHours(initialWorkingHours); 
         }
-      } else {
-        // No preferences saved yet, use initial (already set)
       }
     } catch (error: any) {
       console.error("Error fetching user preferences:", error);
@@ -148,46 +143,52 @@ export default function PreferencesPage() {
     }
   }, [toast]);
 
+  const checkCalendarConnection = useCallback(async () => {
+    if (!currentUser?.uid) return;
+    setIsCheckingConnection(true);
+    try {
+        const calendarPrefRef = ref(db, `UserPreferences/${currentUser.uid}/googleCalendar`);
+        const snapshot = await get(calendarPrefRef);
+        const isConnected = snapshot.exists() && snapshot.val()?.integrated === true;
+        setIsCalendarConnected(isConnected);
+    } catch (error) {
+        console.error("Error checking calendar connection status:", error);
+        setIsCalendarConnected(false); // Default to not connected on error
+    } finally {
+        setIsCheckingConnection(false);
+    }
+  }, [currentUser?.uid]);
+
+
   useEffect(() => {
     if (!authLoading && !currentUser) {
       router.push('/login');
     } else if (currentUser) {
       fetchUserPreferences(currentUser.uid);
+      checkCalendarConnection();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, authLoading, router]);
+  }, [currentUser, authLoading, router, fetchUserPreferences, checkCalendarConnection]);
 
-  useEffect(() => {
-    if (currentUser) {
-      const checkConnection = async () => {
-        setIsCheckingConnection(true);
-        const calendarPrefRef = ref(db, `UserPreferences/${currentUser.uid}/googleCalendar`);
-        const snapshot = await get(calendarPrefRef);
-        setIsCalendarConnected(snapshot.exists() && snapshot.val().integrated);
-        setIsCheckingConnection(false);
-      };
-      checkConnection();
-    }
-  }, [currentUser]);
 
   useEffect(() => {
     const status = searchParams.get('status');
     const message = searchParams.get('message');
     if (status === 'success') {
       toast({ title: "Success!", description: "Google Calendar connected successfully." });
-      setIsCalendarConnected(true);
+      // Re-check the connection from the database to ensure UI is accurate
+      checkCalendarConnection();
     } else if (status === 'error') {
       toast({ title: "Connection Failed", description: message || "An unknown error occurred.", variant: "destructive" });
     }
-    // Clean up URL after showing toast
+    // Clean up URL after showing toast to prevent re-triggering on refresh
     if (status) {
       router.replace('/preferences', { scroll: false });
     }
-  }, [searchParams, toast, router]);
+  }, [searchParams, toast, router, checkCalendarConnection]);
+
 
   const handleConnectCalendar = () => {
     if (!currentUser) return;
-    // Pass the client-side origin to the API route for a reliable redirect back.
     router.push(`/api/auth/google?userId=${currentUser.uid}&origin=${window.location.origin}`);
   };
 
