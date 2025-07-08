@@ -2,7 +2,7 @@
   "rules": {
     "UserPreferences": {
       "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
+        ".read": true,
         "workingHours": {
           ".write": "auth != null && auth.uid === $uid"
         },
