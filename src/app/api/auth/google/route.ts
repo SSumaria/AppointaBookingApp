@@ -3,16 +3,15 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { google } from 'googleapis';
 
 export async function GET(request: NextRequest) {
-    const { searchParams, origin: requestOrigin } = new URL(request.url);
+    const { searchParams } = new URL(request.url);
     const state = searchParams.get('state');
 
     if (!state) {
         return new NextResponse("State parameter is missing from the request.", { status: 400 });
     }
     
-    // The redirectURI is where Google sends the user back to *our server*.
-    // This MUST be the API route's own URL. The `requestOrigin` here is the server's origin (e.g., https://9002-...).
-    const redirectURI = `${requestOrigin}/api/auth/google/callback`;
+    // This is the server-side API route that Google will call back to.
+    const redirectURI = `${new URL(request.url).origin}/api/auth/google/callback`;
 
     const oAuth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
@@ -25,13 +24,11 @@ export async function GET(request: NextRequest) {
     // We pass the state we received from the client directly to Google.
     // Google will then pass it back to our callback URI.
     const authUrl = oAuth2Client.generateAuthUrl({
-        access_type: 'offline', 
-        prompt: 'consent',      
+        access_type: 'offline', // Request a refresh token
+        prompt: 'consent',      // Force consent screen to ensure refresh token is issued
         scope: SCOPES,
         state: state,
     });
 
     return NextResponse.redirect(authUrl);
 }
-
-    
