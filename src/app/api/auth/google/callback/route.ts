@@ -5,18 +5,16 @@ import { ref, set } from 'firebase/database';
 import { db } from '@/lib/firebaseConfig';
 
 export async function GET(request: NextRequest) {
-    const { searchParams } = new URL(request.url);
+    const url = new URL(request.url);
+    const { searchParams } = url;
     const code = searchParams.get('code');
     const encodedState = searchParams.get('state'); // It's now base64 encoded
     const error = searchParams.get('error');
 
-    // This is the origin of the callback server itself. Used for token exchange.
-    const proto = request.headers.get("x-forwarded-proto") || "http";
-    const host = request.headers.get("host");
-    if (!host) {
-        return new Response('Could not determine host from request headers', { status: 500 });
-    }
-    const tokenExchangeRedirectUri = `${proto}://${host}/api/auth/google/callback`;
+    // This is the URI for the token exchange. It must exactly match the URI
+    // used in the initial authorization request. We derive it from the request's
+    // own URL to ensure it's always correct, even behind proxies.
+    const tokenExchangeRedirectUri = `${url.origin}${url.pathname}`;
 
     let finalRedirectBaseUrl: string;
     let userId: string;
@@ -56,7 +54,7 @@ export async function GET(request: NextRequest) {
     const oAuth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
-      tokenExchangeRedirectUri // Use the callback's own URI for the token exchange
+      tokenExchangeRedirectUri // Use the derived URI for the token exchange
     );
 
     try {
