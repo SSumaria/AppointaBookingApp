@@ -30,23 +30,16 @@
     },
     "UserPreferences": {
       "$uid": {
-        // Logged-in user can read all their own preferences
         ".read": "auth != null && auth.uid === $uid",
-
         "workingHours": {
-          // Logged-in user can read their working hours (public booking needs this)
           ".read": true,
-          // Only the owner can write their working hours
           ".write": "auth != null && auth.uid === $uid",
           ".validate": "newData.hasChildren(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])"
         },
         "googleCalendar": {
-          // Only the owner can read their connection details.
           ".read": "auth != null && auth.uid === $uid",
-          // The server (which is not authenticated as a user) needs to save tokens here.
-          // This is secure because the path is already under the specific $uid.
-          ".write": true,
-          ".validate": "newData.hasChildren(['integrated', 'tokens'])"
+          ".write": "newData.child('writtenBy').val() === $uid",
+          ".validate": "newData.hasChildren(['integrated', 'tokens', 'writtenBy'])"
         }
       }
     }

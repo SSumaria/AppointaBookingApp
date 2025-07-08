@@ -79,6 +79,7 @@ export async function GET(request: NextRequest) {
         await set(userPreferencesRef, {
             integrated: true,
             tokens: tokens,
+            writtenBy: userId, // Add the userId to the data payload for security rule validation
         });
 
         console.log(`Successfully stored Google Calendar tokens for user ${userId}`);
