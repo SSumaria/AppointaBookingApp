@@ -1,4 +1,3 @@
-
 {
   "rules": {
     "Users": {
@@ -9,27 +8,27 @@
     },
     "Appointments": {
       "$uid": {
-        ".read": true,
+        ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid",
         ".indexOn": [
           "AppointmentDate",
           "ClientID"
         ],
         "$appointmentId": {
-          ".write": "!data.exists() && newData.exists() && newData.child('BookedByUserID').val() === $uid"
+          ".write": "!data.exists() && newData.exists() && newData.child('BookedByUserID').val() === auth.uid"
         }
       }
     },
     "Clients": {
       "$uid": {
-        ".read": true,
+        ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid",
         ".indexOn": [
           "ClientEmail",
           "ClientName"
         ],
         "$clientId": {
-          ".write": "!data.exists() && newData.exists() && newData.child('CreatedByUserID').val() === $uid"
+          ".write": "!data.exists() && newData.exists() && newData.child('CreatedByUserID').val() === auth.uid"
         }
       }
     },
