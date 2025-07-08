@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebaseConfig';
 import { ref, get, update } from 'firebase/database';
@@ -105,6 +106,12 @@ export async function POST(request: Request) {
         console.log("[GCAL SYNC] Constructed event object for Google Calendar:", JSON.stringify(event, null, 2));
 
         const calendar = google.calendar({ version: 'v3', auth: calendarClient });
+        
+        // This object includes the user ID to authorize the write operation in Firebase Rules.
+        const serverUpdatePayload = (googleEventId: string | null) => ({
+            googleEventId: googleEventId,
+            _serverUpdatedBy: userId 
+        });
 
         switch (action) {
             case 'create': {
@@ -115,7 +122,7 @@ export async function POST(request: Request) {
                 });
                 const eventId = createdEvent.data.id;
                 if (eventId) {
-                    await update(bookingRef, { googleEventId: eventId });
+                    await update(bookingRef, serverUpdatePayload(eventId));
                     console.log(`[GCAL SYNC] SUCCESS: Created Google Calendar event ${eventId} for booking ${bookingId}`);
                 }
                 return NextResponse.json({ success: true, eventId: eventId });
@@ -130,7 +137,7 @@ export async function POST(request: Request) {
                     });
                     const eventId = createdEvent.data.id;
                     if (eventId) {
-                        await update(bookingRef, { googleEventId: eventId });
+                        await update(bookingRef, serverUpdatePayload(eventId));
                          console.log(`[GCAL SYNC] SUCCESS: Created Google Calendar event ${eventId} for updated booking ${bookingId}`);
                     }
                     return NextResponse.json({ success: true, eventId: eventId });
@@ -156,14 +163,14 @@ export async function POST(request: Request) {
                         calendarId: 'primary',
                         eventId: bookingData.googleEventId,
                     });
-                    await update(bookingRef, { googleEventId: null });
+                    await update(bookingRef, serverUpdatePayload(null));
                     console.log(`[GCAL SYNC] SUCCESS: Deleted Google Calendar event ${bookingData.googleEventId} for booking ${bookingId}`);
                 } catch (deleteError: any) {
                     // If the event is already deleted on Google's side, it will throw an error (404 or 410).
                     // We can safely ignore this and proceed with cleaning up our DB.
                     if (deleteError.code === 404 || deleteError.code === 410) {
                         console.log(`[GCAL SYNC] Event ${bookingData.googleEventId} not found on Google Calendar. It was likely already deleted. Cleaning up local record.`);
-                        await update(bookingRef, { googleEventId: null });
+                        await update(bookingRef, serverUpdatePayload(null));
                     } else {
                         throw deleteError; // Re-throw other errors
                     }
