@@ -7,41 +7,55 @@ import { db } from '@/lib/firebaseConfig';
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
-    const state = searchParams.get('state'); // This should be the userId
+    const encodedState = searchParams.get('state'); // It's now base64 encoded
     const error = searchParams.get('error');
 
-    // Dynamically construct the base URL for redirection on success/error
+    // This is the origin of the callback server itself. Used for token exchange.
     const proto = request.headers.get("x-forwarded-proto") || "http";
     const host = request.headers.get("host");
     if (!host) {
-        // Fallback or handle error if host is not available.
-        // For this scenario, a hardcoded fallback might be acceptable, but ideally it should be derived.
-        // This response won't be user-facing in case of success, but it's good practice.
         return new Response('Could not determine host from request headers', { status: 500 });
     }
-    const origin = `${proto}://${host}`;
-    const redirectBaseUrl = `${origin}/preferences`;
+    const callbackOrigin = `${proto}://${host}`;
+    const tokenExchangeRedirectUri = `${callbackOrigin}/api/auth/google/callback`;
+
+    let finalRedirectBaseUrl: string;
+    let userId: string;
+
+    try {
+        if (!encodedState) throw new Error('State parameter is missing.');
+        const stateJSON = Buffer.from(encodedState, 'base64').toString('utf8');
+        const state = JSON.parse(stateJSON);
+        if (!state.userId || !state.origin) throw new Error('Invalid state object.');
+
+        userId = state.userId;
+        finalRedirectBaseUrl = state.origin; // This is the origin we will redirect back to on success/error.
+    } catch (e: any) {
+        // Fallback for safety, though it will likely fail auth state.
+        console.error("Failed to parse state parameter:", e.message);
+        const safeRedirectBaseUrl = callbackOrigin.includes('cloudworkstations') ? callbackOrigin.replace(/^(9002-)/, '') : callbackOrigin;
+        return NextResponse.redirect(`${safeRedirectBaseUrl}/preferences?status=error&message=${encodeURIComponent('Invalid state received from Google.')}`);
+    }
+    
+    const finalSuccessRedirect = `${finalRedirectBaseUrl}/preferences?status=success`;
+    const finalErrorRedirect = (msg: string) => `${finalRedirectBaseUrl}/preferences?status=error&message=${encodeURIComponent(msg)}`;
+
 
     if (error) {
         console.error('Google OAuth Error:', error);
-        return NextResponse.redirect(`${redirectBaseUrl}?status=error&message=${encodeURIComponent(error)}`);
+        return NextResponse.redirect(finalErrorRedirect(error));
     }
 
-    if (!code || !state) {
-        const errorMessage = 'Missing authorization code or state from Google. Cannot complete connection.';
+    if (!code) {
+        const errorMessage = 'Missing authorization code from Google. Cannot complete connection.';
         console.error(errorMessage);
-        return NextResponse.redirect(`${redirectBaseUrl}?status=error&message=${encodeURIComponent(errorMessage)}`);
+        return NextResponse.redirect(finalErrorRedirect(errorMessage));
     }
-
-    const userId = state;
-    
-    // This URI MUST exactly match the one used in the initial auth request.
-    const redirectURI = `${origin}/api/auth/google/callback`;
 
     const oAuth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
-      redirectURI
+      tokenExchangeRedirectUri // Use the callback's own URI for the token exchange
     );
 
     try {
@@ -58,11 +72,11 @@ export async function GET(request: NextRequest) {
         });
 
         console.log(`Successfully stored Google Calendar tokens for user ${userId}`);
-        return NextResponse.redirect(`${redirectBaseUrl}?status=success`);
+        return NextResponse.redirect(finalSuccessRedirect);
 
     } catch (err: any) {
         console.error('Error exchanging token or saving to database:', err);
         const errorMessage = err.response?.data?.error_description || err.message || 'Token exchange failed.';
-        return NextResponse.redirect(`${redirectBaseUrl}?status=error&message=${encodeURIComponent(errorMessage)}`);
+        return NextResponse.redirect(finalErrorRedirect(errorMessage));
     }
 }

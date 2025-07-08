@@ -17,6 +17,10 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Could not determine host from request headers' }, { status: 500 });
     }
     const redirectURI = `${proto}://${host}/api/auth/google/callback`;
+    const origin = `${proto}://${host}`; // The origin we want to return to.
+
+    // Encode both userId and the original origin into the state parameter
+    const state = Buffer.from(JSON.stringify({ userId, origin })).toString('base64');
 
     const oAuth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
@@ -30,7 +34,7 @@ export async function GET(request: NextRequest) {
         access_type: 'offline',
         scope: SCOPES,
         prompt: 'consent',
-        state: userId,
+        state: state, // Use the encoded state
     });
 
     return NextResponse.redirect(authUrl);
