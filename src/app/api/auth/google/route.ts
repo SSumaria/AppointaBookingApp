@@ -4,14 +4,25 @@ import { google } from 'googleapis';
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
-    const state = searchParams.get('state');
+    const encodedState = searchParams.get('state');
 
-    if (!state) {
+    if (!encodedState) {
         return new NextResponse("State parameter is missing from the request.", { status: 400 });
     }
     
-    // This is the server-side API route that Google will call back to.
-    const redirectURI = `${new URL(request.url).origin}/api/auth/google/callback`;
+    let browserOrigin: string;
+    try {
+        const stateJSON = Buffer.from(encodedState, 'base64').toString('utf8');
+        const state = JSON.parse(stateJSON);
+        if (!state.origin) throw new Error('Invalid state object: missing origin.');
+        browserOrigin = state.origin;
+    } catch (e: any) {
+        console.error("Failed to parse state parameter in /api/auth/google:", e.message);
+        return new NextResponse("Invalid state parameter.", { status: 400 });
+    }
+
+    // Use the browser's origin passed via state to construct the redirect URI
+    const redirectURI = `${browserOrigin}/api/auth/google/callback`;
 
     const oAuth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
@@ -27,7 +38,7 @@ export async function GET(request: NextRequest) {
         access_type: 'offline', // Request a refresh token
         prompt: 'consent',      // Force consent screen to ensure refresh token is issued
         scope: SCOPES,
-        state: state,
+        state: encodedState,
     });
 
     return NextResponse.redirect(authUrl);
