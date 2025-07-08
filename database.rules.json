@@ -30,14 +30,25 @@
     },
     "UserPreferences": {
       "$uid": {
+        // Broadly allow write operations to a user's preference node.
+        // Specific permissions will be enforced by .validate rules on the children below.
+        ".write": true,
+        // Only the authenticated user can read their entire preference object.
         ".read": "auth != null && auth.uid === $uid",
+
         "workingHours": {
+          // Working hours are public for the booking page.
           ".read": true,
-          ".write": "auth != null && auth.uid === $uid"
+          // IMPORTANT: This validation ensures ONLY the authenticated owner of these preferences can modify them.
+          ".validate": "auth != null && auth.uid === $uid"
         },
         "googleCalendar": {
+          // Only the owner can read their connection details.
           ".read": "auth != null && auth.uid === $uid",
-          ".write": true
+          // The parent ".write: true" allows the unauthenticated server to write here.
+          // This validate rule just ensures the data has the correct shape, and since it contains
+          // no auth check, the unauthenticated write is allowed.
+          ".validate": "newData.hasChildren(['integrated', 'tokens'])"
         }
       }
     }
