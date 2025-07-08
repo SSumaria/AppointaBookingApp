@@ -24,8 +24,10 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = state;
-    // Dynamically construct the redirectURI from the request's origin.
-    const redirectURI = `${origin}/api/auth/google/callback`;
+    
+    // IMPORTANT: This URI MUST exactly match the one used in the initial auth request
+    // and one of the "Authorized redirect URIs" in your Google Cloud Console.
+    const redirectURI = `http://localhost:3000/api/auth/google/callback`;
 
     const oAuth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
