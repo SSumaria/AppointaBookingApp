@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 
     const authUrl = oAuth2Client.generateAuthUrl({
-        access_type: 'offline',
+        // access_type: 'offline', // REMOVED: Requesting offline access can be blocked by policy for unverified apps.
         scope: SCOPES,
         state: state,
     });
