@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -69,7 +70,7 @@ export default function PreferencesPage() {
 
   const [isCalendarConnected, setIsCalendarConnected] = useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = useState(true);
-  const [isVerifying, setIsVerifying] = useState(false); // New state for post-redirect verification
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [isClient, setIsClient] = useState(false);
@@ -201,7 +202,7 @@ export default function PreferencesPage() {
         toast({ title: "Not Logged In", description: "You must be logged in to connect your calendar.", variant: "destructive" });
         return;
     }
-    // Simplified request for diagnostic purposes
+    // Use window.location.href for a full-page redirect to avoid CORS issues
     window.location.href = `/api/auth/google?userId=${currentUser.uid}`;
   };
 

@@ -1,3 +1,4 @@
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { google } from 'googleapis';
 
@@ -11,8 +12,8 @@ export async function GET(request: NextRequest) {
     
     const redirectURI = `${requestOrigin}/api/auth/google/callback`;
 
-    // State will carry the userId and the origin for the final redirect
-    const state = Buffer.from(JSON.stringify({ userId, origin: requestOrigin })).toString('base64');
+    // State will carry ONLY the userId. The origin will be handled by a relative redirect.
+    const state = Buffer.from(JSON.stringify({ userId })).toString('base64');
 
     const oAuth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
