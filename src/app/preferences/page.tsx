@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -190,9 +189,8 @@ export default function PreferencesPage() {
         toast({ title: "Not Logged In", description: "You must be logged in to connect your calendar.", variant: "destructive" });
         return;
     }
-    
-    const origin = window.location.origin;
-    window.location.href = `/api/auth/google?userId=${currentUser.uid}&origin=${encodeURIComponent(origin)}`;
+    // Simplified request for diagnostic purposes
+    window.location.href = `/api/auth/google?userId=${currentUser.uid}`;
   };
 
   const handleDisconnectCalendar = async () => {
