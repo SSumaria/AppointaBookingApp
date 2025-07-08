@@ -1,3 +1,4 @@
+
 {
   "rules": {
     "Users": {
@@ -29,19 +30,6 @@
         ],
         "$clientId": {
           ".write": "!data.exists() && newData.exists() && newData.child('CreatedByUserID').val() === auth.uid || data.exists() && newData.exists()"
-        }
-      }
-    },
-    "UserPreferences": {
-      "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
-        "workingHours": {
-          ".write": "auth != null && auth.uid === $uid",
-          ".validate": "newData.val() === null || newData.hasChildren(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])"
-        },
-        "googleCalendar": {
-          ".write": "auth == null || (auth != null && auth.uid === $uid)",
-          ".validate": "newData.hasChildren(['integrated', 'tokens', 'writtenBy']) && newData.child('writtenBy').val() === $uid"
         }
       }
     }
