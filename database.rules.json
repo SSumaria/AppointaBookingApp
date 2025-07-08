@@ -31,10 +31,7 @@
     "UserPreferences": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        ".write": "(auth != null && auth.uid === $uid) || (newData.hasChild('googleCalendar') && newData.child('googleCalendar/writtenBy').val() === $uid)",
-        "googleCalendar": {
-          ".validate": "newData.hasChildren(['integrated', 'tokens', 'writtenBy'])"
-        }
+        ".write": true
       }
     }
   }
