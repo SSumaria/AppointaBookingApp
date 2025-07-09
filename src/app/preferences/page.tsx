@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -320,7 +319,7 @@ export default function PreferencesPage() {
                             </div>
                             <div>
                                 <h3 className="font-semibold">Google Calendar</h3>
-                                <p className="text-sm text-muted-foreground">{isCalendarConnected ? "Your appointments are synced with Google Calendar." : "Connect to sync your appointments with Google Calendar"}</p>
+                                <p className="text-sm text-muted-foreground">Connect to sync your appointments with Google Calendar</p>
                             </div>
                         </div>
                         {isCalendarConnected ? (
