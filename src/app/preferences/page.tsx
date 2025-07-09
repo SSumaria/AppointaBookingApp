@@ -308,10 +308,14 @@ export default function PreferencesPage() {
                 ) : (
                     <div className="flex items-center justify-between p-4 border rounded-lg">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-muted rounded-full"><CalendarDays className="h-6 w-6 text-primary"/></div>
+                            <div className="p-2 bg-muted rounded-full">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M19,4H18V2H16V4H8V2H6V4H5A2,2 0 0,0 3,6V20A2,2 0 0,0 5,22H19A2,2 0 0,0 21,20V6A2,2 0 0,0 19,4M19,20H5V9H19V20M19,7H5V6H19V7M12,11H17V16H12V11Z" />
+                                </svg>
+                            </div>
                             <div>
                                 <h3 className="font-semibold">Google Calendar</h3>
-                                <p className="text-sm text-muted-foreground">{isCalendarConnected ? "Syncs appointments automatically." : "Connect to sync your bookings."}</p>
+                                <p className="text-sm text-muted-foreground">{isCalendarConnected ? "Your appointments are synced with Google Calendar." : "Connect to sync your appointments with Google Calendar"}</p>
                             </div>
                         </div>
                         {isCalendarConnected ? (
@@ -376,5 +380,3 @@ export default function PreferencesPage() {
     </div>
   );
 }
-
-    
