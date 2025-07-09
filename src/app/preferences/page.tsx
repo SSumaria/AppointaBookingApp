@@ -308,9 +308,14 @@ export default function PreferencesPage() {
                 ) : (
                     <div className="flex items-center justify-between p-4 border rounded-lg">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-muted rounded-full">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary" viewBox="0 0 24 24" fill="currentColor">
-                                  <path d="M19,4H18V2H16V4H8V2H6V4H5A2,2 0 0,0 3,6V20A2,2 0 0,0 5,22H19A2,2 0 0,0 21,20V6A2,2 0 0,0 19,4M19,20H5V9H19V20M19,7H5V6H19V7M12,11H17V16H12V11Z" />
+                            <div>
+                                <svg className="h-6 w-6" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M8 0H92C96.4183 0 100 3.58172 100 8V92C100 96.4183 96.4183 100 92 100H8C3.58172 100 0 96.4183 0 92V8C0 3.58172 3.58172 0 8 0Z" fill="#4285F4"/>
+                                    <path d="M100 8C100 3.58172 96.4183 0 92 0H50V50H100V8Z" fill="#FBBC05"/>
+                                    <path d="M0 92C0 96.4183 3.58172 100 8 100H50V50H0V92Z" fill="#34A853"/>
+                                    <path d="M50 50H100V80L80 100H50V50Z" fill="#EA4335"/>
+                                    <rect x="25" y="25" width="50" height="50" rx="4" fill="white"/>
+                                    <text x="50" y="68" fontFamily="Arial, sans-serif" fontSize="36" fill="#4285F4" textAnchor="middle" fontWeight="bold">31</text>
                                 </svg>
                             </div>
                             <div>
