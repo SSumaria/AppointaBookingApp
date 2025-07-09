@@ -54,8 +54,12 @@ env:
       - BUILD
       - RUNTIME
 
-  # API Keys for external services. These are available on the server at runtime.
-  - variable: PEXELS_API_KEY
-    value: "YOUR_PEXELS_API_KEY_HERE" # <-- Replace with your actual key
-    availability:
-      - RUNTIME
+  # Securely load GOOGLE_CLIENT_ID from Secret Manager
+  # If this is for a *client-side* Next.js component, you'll need NEXT_PUBLIC_
+  - variable: NEXT_PUBLIC_GOOGLE_CLIENT_ID # Or just GOOGLE_CLIENT_ID if server-side only
+    secret: projects/588854791090/secrets/google-oauth-client-id-appointa-google-calendar # Or a specific version number
+
+  # Securely load GOOGLE_CLIENT_SECRET from Secret Manager
+  # This MUST NOT be NEXT_PUBLIC_ as it's a server-side secret
+  - variable: GOOGLE_CLIENT_SECRET
+    secret: projects/588854791090/secrets/google-oauth-client-secret-appointa-google-calendar # Or a specific version number

@@ -6,7 +6,7 @@ import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Settings, Clock, Ban, Loader2, Moon, Sun, CalendarDays, XCircle } from "lucide-react";
+import { Settings, Clock, Ban, Loader2, Moon, Sun, CalendarDays, XCircle, MousePointer2 } from "lucide-react";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -299,7 +299,7 @@ export default function PreferencesPage() {
           
           <Card className="shadow-xl">
             <CardHeader>
-                <CardTitle className="text-xl font-bold flex items-center"><CalendarDays className="mr-2 h-5 w-5 text-primary" /> Integrations</CardTitle>
+                <CardTitle className="text-xl font-bold flex items-center"><MousePointer2 className="mr-2 h-5 w-5 text-primary" /> Integrations</CardTitle>
                 <CardDescription>Connect your account to third-party services like Google Calendar.</CardDescription>
             </CardHeader>
             <CardContent>
@@ -376,5 +376,3 @@ export default function PreferencesPage() {
     </div>
   );
 }
-
-    
