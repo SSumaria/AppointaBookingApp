@@ -308,7 +308,7 @@ export default function PreferencesPage() {
                 ) : (
                     <div className="flex items-center justify-between p-4 border rounded-lg">
                         <div className="flex items-center gap-3">
-                            <CalendarDays className="h-8 w-8 text-muted-foreground" />
+                            <CalendarDays className="h-8 w-8 text-primary" />
                             <div>
                                 <h3 className="font-semibold">Google Calendar</h3>
                                 <p className="text-sm text-muted-foreground">Connect to sync your appointments with Google Calendar</p>
@@ -376,3 +376,5 @@ export default function PreferencesPage() {
     </div>
   );
 }
+
+    
