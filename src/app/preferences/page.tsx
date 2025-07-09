@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -307,16 +308,7 @@ export default function PreferencesPage() {
                 ) : (
                     <div className="flex items-center justify-between p-4 border rounded-lg">
                         <div className="flex items-center gap-3">
-                            <div>
-                                <svg className="h-6 w-6" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M8 0H92C96.4183 0 100 3.58172 100 8V92C100 96.4183 96.4183 100 92 100H8C3.58172 100 0 96.4183 0 92V8C0 3.58172 3.58172 0 8 0Z" fill="#4285F4"/>
-                                    <path d="M100 8C100 3.58172 96.4183 0 92 0H50V50H100V8Z" fill="#FBBC05"/>
-                                    <path d="M0 92C0 96.4183 3.58172 100 8 100H50V50H0V92Z" fill="#34A853"/>
-                                    <path d="M50 50H100V80L80 100H50V50Z" fill="#EA4335"/>
-                                    <rect x="25" y="25" width="50" height="50" rx="4" fill="white"/>
-                                    <text x="50" y="68" fontFamily="Arial, sans-serif" fontSize="36" fill="#4285F4" textAnchor="middle" fontWeight="bold">31</text>
-                                </svg>
-                            </div>
+                            <CalendarDays className="h-8 w-8 text-muted-foreground" />
                             <div>
                                 <h3 className="font-semibold">Google Calendar</h3>
                                 <p className="text-sm text-muted-foreground">Connect to sync your appointments with Google Calendar</p>
