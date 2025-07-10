@@ -36,7 +36,7 @@ export async function getAuthenticatedClient(userId: string): Promise<Auth.OAuth
     }
 
     const client = new google.auth.OAuth2(
-        process.env.GOOGLE_CLIENT_ID,
+        process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET
     );
     client.setCredentials(tokens);
