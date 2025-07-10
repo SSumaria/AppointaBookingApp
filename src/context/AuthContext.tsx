@@ -2,7 +2,7 @@
 "use client";
 
 import type { User as FirebaseUser, AuthError } from 'firebase/auth';
-import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from 'firebase/auth';
 import { useRouter, usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
@@ -17,7 +17,7 @@ console.log("--- AuthContext.tsx --- MODULE EXECUTING. Imported 'auth' from fire
 interface AuthContextType {
   currentUser: FirebaseUser | null;
   loading: boolean;
-  signUpWithEmail: (email: string, pass: string) => Promise<FirebaseUser | null>;
+  signUpWithEmail: (email: string, pass: string, name: string) => Promise<FirebaseUser | null>;
   signInWithEmail: (email: string, pass: string) => Promise<FirebaseUser | null>;
   signInWithGoogle: () => Promise<FirebaseUser | null>;
   logout: () => Promise<void>;
@@ -111,6 +111,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         await set(userRef, {
           email: user.email,
+          name: user.displayName,
           createdAt: new Date().toISOString(),
         });
       } catch (dbError) {
@@ -174,7 +175,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return null;
   }
 
-  const signUpWithEmail = async (email: string, pass: string): Promise<FirebaseUser | null> => {
+  const signUpWithEmail = async (email: string, pass: string, name: string): Promise<FirebaseUser | null> => {
     if (!auth) {
       toast({ title: 'Error', description: 'Firebase authentication is not initialized. Cannot sign up.', variant: 'destructive' });
       return null;
@@ -182,6 +183,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+      await updateProfile(userCredential.user, { displayName: name });
       await ensureUserRecordInDB(userCredential.user);
       toast({ title: 'Registration Successful', description: 'Welcome!' });
       router.push('/dashboard');

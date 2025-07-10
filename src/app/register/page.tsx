@@ -9,11 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mail, Lock, UserPlus, Chrome } from 'lucide-react'; // Added Chrome for Google icon placeholder
+import { Mail, Lock, User, UserPlus, Chrome } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Header from '@/components/layout/Header';
 
 export default function RegisterPage() {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -37,11 +38,11 @@ export default function RegisterPage() {
       });
       return;
     }
-    if (!email || !password) {
+    if (!email || !password || !name) {
         // Toast handled by AuthContext for specific auth errors
         return;
     }
-    await signUpWithEmail(email, password);
+    await signUpWithEmail(email, password, name);
   };
 
   const handleGoogleRegister = async () => {
@@ -61,6 +62,21 @@ export default function RegisterPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <form onSubmit={handleEmailRegister} className="space-y-4">
+              <div>
+                <Label htmlFor="name">Your Name</Label>
+                <div className="relative mt-1">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    placeholder="e.g. Jane Doe"
+                    className="pl-10"
+                  />
+                </div>
+              </div>
               <div>
                 <Label htmlFor="email">Email</Label>
                 <div className="relative mt-1">
@@ -149,5 +165,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-
-    

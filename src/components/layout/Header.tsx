@@ -56,10 +56,10 @@ export default function Header() {
     <>
       {currentUser ? (
         <>
-          {currentUser.email && (
+          {currentUser.displayName && (
             <div className="px-4 py-2 text-sm text-muted-foreground border-b">
               <UserCircle className="mr-2 h-4 w-4 inline"/>
-              {currentUser.email}
+              {currentUser.displayName}
             </div>
           )}
           <Button variant="ghost" className="justify-start w-full" onClick={() => handleNavigation('/preferences')}>
@@ -104,7 +104,7 @@ export default function Header() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="text-xs sm:text-sm ml-2">
                   <UserCircle className="mr-1 h-4 w-4"/>
-                  {currentUser.email}
+                  {currentUser.displayName || currentUser.email}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">

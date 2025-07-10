@@ -97,7 +97,6 @@ export default function DashboardPage() {
           </h1>
           <p className="text-lg text-muted-foreground mb-8">
             The easiest way to manage appointments and keep track of your clients.
-            {currentUser?.email && <span className="block mt-2 text-sm">Logged in as: {currentUser.email}</span>}
           </p>
           <Link href="/new-booking">
             <Button className="bg-accent text-accent-foreground hover:bg-accent/80 font-bold py-3 px-6 rounded-md">
@@ -160,5 +159,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
