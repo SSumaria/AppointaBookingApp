@@ -236,12 +236,13 @@ export default function LandingPage() {
         </section>
       </main>
       <footer className="bg-background py-6 border-t">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} Appointa. All rights reserved.
+        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground space-x-4">
+          <span>© {new Date().getFullYear()} Appointa. All rights reserved.</span>
+          <Link href="/privacy-policy" className="hover:text-primary hover:underline">
+            Privacy Policy
+          </Link>
         </div>
       </footer>
     </div>
   );
 }
-
-    
