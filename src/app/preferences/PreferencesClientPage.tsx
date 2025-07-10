@@ -6,7 +6,7 @@ import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Settings, Clock, Ban, Loader2, Moon, Sun, MousePointer2, XCircle } from "lucide-react";
+import { Settings, Clock, Ban, Loader2, Moon, Sun, MousePointer2, XCircle, CalendarDays } from "lucide-react";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -308,10 +308,7 @@ export default function PreferencesClientPage() {
                 ) : (
                     <div className="flex items-center justify-between p-4 border rounded-lg">
                         <div className="flex items-center gap-3">
-                           <svg className="h-8 w-8 text-primary" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
-                              <path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-                            </svg>
+                           <CalendarDays className="h-8 w-8 text-primary" />
                             <div>
                                 <h3 className="font-semibold">Google Calendar</h3>
                                 <p className="text-sm text-muted-foreground">Connect to sync your appointments with Google Calendar</p>
