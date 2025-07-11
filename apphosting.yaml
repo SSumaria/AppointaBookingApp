@@ -1,3 +1,4 @@
+
 # Settings to manage and configure a Firebase App Hosting backend.
 # https://firebase.google.com/docs/app-hosting/configure
 
@@ -18,7 +19,7 @@ env:
       - RUNTIME # Needed for both build (prerendering) and runtime
 
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: appointa.pro # <--- GET THIS FROM FIREBASE CONSOLE!
+    value: appointa.pro # <--- THIS IS NOW YOUR CUSTOM DOMAIN
     availability:
       - BUILD
       - RUNTIME
@@ -63,3 +64,4 @@ env:
   # This MUST NOT be NEXT_PUBLIC_ as it's a server-side secret
   - variable: GOOGLE_CLIENT_SECRET
     secret: projects/588854791090/secrets/google-oauth-client-secret-appointa-google-calendar # Or a specific version number
+

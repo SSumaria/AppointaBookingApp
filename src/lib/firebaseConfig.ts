@@ -1,7 +1,7 @@
 
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getDatabase, type Database } from "firebase/database";
-import { getAuth, type Auth } from "firebase/auth";
+import { getAuth, type Auth, setPersistence, browserLocalPersistence } from "firebase/auth";
 
 // --- Start of Diagnostic Logging ---
 console.log("--- Firebase Config START (firebaseConfig.ts) --- MODULE EXECUTING ---");
@@ -40,14 +40,9 @@ if (!firebaseConfig.apiKey) {
   const errorMessage = "CRITICAL FIREBASE CONFIG ERROR (firebaseConfig.ts): NEXT_PUBLIC_FIREBASE_API_KEY is missing, undefined, or empty. Firebase cannot initialize. Application will not function. Please check your .env.local file and ensure the Next.js development server was restarted after any changes.";
   console.error(errorMessage);
   
-  // For public pages like /book/[userId], if the API key is missing, we MUST stop execution.
-  // Throwing an error here should halt the script and prevent redirects.
   if (typeof window !== 'undefined' && window.location.pathname.startsWith('/book/')) {
-    // Alert the user directly on the page for public booking if possible.
-    // document.body.innerHTML = `<div style="color: red; font-size: 20px; padding: 20px;">${errorMessage}</div>`;
     throw new Error(errorMessage + " (This error is thrown for /book/ routes specifically)");
   }
-  // For other pages, the app might attempt to continue, but auth/db will inevitably fail.
 }
 
 let app: FirebaseApp;
@@ -65,20 +60,27 @@ try {
   }
 
   console.log("Attempting to get Database and Auth services (firebaseConfig.ts)...");
-  db = getDatabase(app);
   authInstance = getAuth(app);
+  
+  // This is the key change: explicitly link auth operations to your custom domain.
+  if (authDomain === 'appointa.pro') {
+    authInstance.tenantId = projectId as string;
+    console.log(`Firebase Auth tenantId explicitly set to '${projectId}' for custom domain '${authDomain}'.`);
+  }
+  
+  // Set persistence to local to maintain login state across browser sessions.
+  setPersistence(authInstance, browserLocalPersistence);
+
+  db = getDatabase(app);
   console.log("Firebase Database and Auth services OBTAINED successfully (firebaseConfig.ts).");
 
 } catch (error: any) {
   console.error("FATAL ERROR during Firebase initialization or service retrieval (firebaseConfig.ts):", error.message, error.stack);
   const initErrorMessage = `Firebase initialization failed: ${error.message}. The public booking page cannot operate. Check API key and other Firebase config values.`;
-  // If initialization fails, it's critical, especially for public pages.
+  
   if (typeof window !== 'undefined' && window.location.pathname.startsWith('/book/')) {
-    // document.body.innerHTML = `<div style="color: red; font-size: 20px; padding: 20px;">${initErrorMessage}</div>`;
     throw new Error(initErrorMessage + " (This error is thrown for /book/ routes specifically after init attempt)");
   }
-  // Assign undefined to app, db, authInstance if they fail to initialize to prevent further errors if code attempts to use them
-  // This helps in gracefully degrading or showing errors in other parts of the app.
   // @ts-ignore
   app = undefined;
   // @ts-ignore
@@ -89,5 +91,4 @@ try {
 
 console.log("--- Firebase Config END (firebaseConfig.ts) --- Exporting app, db, authInstance:", { appExists: !!app, dbExists: !!db, authInstanceExists: !!authInstance });
 
-// Export the potentially undefined services. Consumer modules (like AuthContext) should handle this.
 export { app, db, authInstance as auth, firebaseConfig };
