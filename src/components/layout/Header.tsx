@@ -93,7 +93,7 @@ export default function Header() {
       <div className="container max-w-5xl mx-auto flex items-center justify-between px-4">
         <Link href={currentUser ? '/dashboard' : '/'} onClick={() => setIsSheetOpen(false)} className="flex items-center">
           <Image 
-            src="/logo.svg" 
+            src="/appointa_logo.png" 
             alt="Appointa Logo" 
             width={120} 
             height={30}
@@ -155,7 +155,7 @@ export default function Header() {
               <div className="p-4 mb-2 border-b">
                 <Link href={currentUser ? '/dashboard' : '/'} onClick={() => setIsSheetOpen(false)} className="flex items-center">
                    <Image 
-                    src="/logo.svg" 
+                    src="/appointa_logo.png" 
                     alt="Appointa Logo" 
                     width={120} 
                     height={30}
