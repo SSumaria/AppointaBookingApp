@@ -9,8 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mail, Lock, LogIn, Chrome } from 'lucide-react'; // Added Chrome for Google icon placeholder
+import { Mail, Lock, LogIn } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import Image from 'next/image';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -102,10 +103,19 @@ export default function LoginPage() {
                 </span>
               </div>
             </div>
-            <Button variant="outline" className="w-full" onClick={handleGoogleLogin} disabled={loading}>
-              <Chrome className="mr-2 h-5 w-5" /> {/* Using Chrome as a placeholder for Google logo */}
-              Sign in with Google
-            </Button>
+            <button
+              onClick={handleGoogleLogin}
+              disabled={loading}
+              className="w-full rounded-md ring-offset-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            >
+              <Image
+                src="/sign-in-with-google.png"
+                width={380}
+                height={40}
+                alt="Sign in with Google"
+                className="w-full h-auto"
+              />
+            </button>
           </CardContent>
           <CardFooter className="text-center text-sm">
             <p className="w-full">
@@ -123,5 +133,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-    
