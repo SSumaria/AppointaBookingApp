@@ -60,7 +60,7 @@ export default function PrivacyPolicyPage() {
               </p>
               <h4>a. For Service Providers (You)</h4>
                 <p>
-                    When you create an account, we collect personal information such as your name and email address. If you choose to connect your Google Calendar, we also store the necessary authentication tokens from Google to allow us to create and manage calendar events on your behalf.
+                    When you create an account, we collect personal information such as your name and email address. If you choose to connect your Google account for authentication or calendar integration, we will also handle your Google user data as described below.
                 </p>
 
               <h4>b. For Your Clients</h4>
@@ -77,25 +77,44 @@ export default function PrivacyPolicyPage() {
                 <li>Allowing clients to book appointments with you.</li>
                 <li>Enabling you to manage your client list and view appointment history.</li>
                 <li>Syncing appointments with your Google Calendar, if you have connected it.</li>
-                <li>Sending transactional emails, such as booking confirmations or cancellations (functionality simulated).</li>
+                <li>Sending transactional emails, such as booking confirmations or cancellations.</li>
               </ul>
 
-              <h2>3. Data Sharing</h2>
+              <h2>3. Google Calendar Integration</h2>
                 <p>
-                    We do not sell, rent, or share your personal data with third-party marketers. Your client information is under your control as the service provider. We will not contact your clients for any reason other than transactional notifications related to their bookings with you.
+                  If you choose to connect your Google Calendar, our application will access your calendar to provide its core functionality. The use of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy#limited-use-policy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Google API Services User Data Policy</a>, including the Limited Use requirements.
+                </p>
+                <ul>
+                    <li>
+                        <strong>Access:</strong> We request read and write access to your primary Google Calendar. We do not access any other calendars you may have.
+                    </li>
+                    <li>
+                        <strong>Use:</strong> We use this access exclusively to create, update, and delete calendar events that correspond to the appointments made within the Appointa application. This ensures your Google Calendar stays in sync with your Appointa schedule.
+                    </li>
+                    <li>
+                        <strong>Storage:</strong> To maintain this connection without requiring you to log in repeatedly, we securely store authentication tokens (access and refresh tokens) provided by Google. These tokens are stored in our secure Firebase Realtime Database and are only associated with your user account. We also store the Google Calendar event ID for each synced appointment to manage updates and cancellations.
+                    </li>
+                    <li>
+                        <strong>Sharing:</strong> We do not share your Google user data, including your tokens or calendar event information, with any third parties. The data is used solely for the purpose of the calendar synchronization feature within Appointa.
+                    </li>
+                </ul>
+
+              <h2>4. Data Sharing</h2>
+                <p>
+                    Other than the specific use for Google Calendar integration described above, we do not sell, rent, or share your personal data with third-party marketers. Your client information is under your control as the service provider. We will not contact your clients for any reason other than transactional notifications related to their bookings with you.
                 </p>
 
-              <h2>4. Data Security</h2>
+              <h2>5. Data Security</h2>
               <p>
                 We take the security of your data seriously. We rely on secure, industry-standard services like Firebase Authentication and Realtime Database, which have built-in security features and rules to help protect user data from unauthorized access.
               </p>
               
-              <h2>5. Contact Us</h2>
+              <h2>6. Contact Us</h2>
                 <p>
                     If you have any questions or concerns about this Privacy Policy or your data, please contact us at <a href="mailto:shyamsumaria96@gmail.com" className="text-primary hover:underline">shyamsumaria96@gmail.com</a>.
                 </p>
 
-              <h2>6. Changes to This Policy</h2>
+              <h2>7. Changes to This Policy</h2>
               <p>
                 We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page. You are advised to review this Privacy Policy periodically for any changes.
               </p>
