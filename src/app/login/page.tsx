@@ -111,7 +111,7 @@ export default function LoginPage() {
               <Image
                 src="/Sign in with google.png"
                 width={380}
-                height={40}
+                height={15}
                 alt="Sign in with Google"
                 className="w-full h-auto"
               />
