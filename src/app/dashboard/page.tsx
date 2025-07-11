@@ -92,7 +92,7 @@ export default function DashboardPage() {
       <Header /> 
       <main className="flex-grow py-12">
         <div className="container max-w-5xl mx-auto text-center">
-          <h1 className="text-4xl font-extrabold text-primary mb-4">
+          <h1 className="text-4xl font-bold text-primary mb-4">
             Welcome to Appointa
           </h1>
           <p className="text-lg text-muted-foreground mb-8">
@@ -131,21 +131,21 @@ export default function DashboardPage() {
         <div className="container max-w-5xl mx-auto mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="p-6 bg-card rounded-lg shadow-lg hover:shadow-xl transition-shadow">
             <Calendar className="h-10 w-10 text-primary mb-4" />
-            <h2 className="text-xl font-extrabold mb-2">Easy Scheduling</h2>
+            <h2 className="text-xl font-bold mb-2">Easy Scheduling</h2>
             <p className="text-sm text-muted-foreground">
               Quickly book appointments with an intuitive scheduling interface.
             </p>
           </div>
           <div className="p-6 bg-card rounded-lg shadow-lg hover:shadow-xl transition-shadow">
             <Clock className="h-10 w-10 text-primary mb-4" />
-            <h2 className="text-xl font-extrabold mb-2">Time Management</h2>
+            <h2 className="text-xl font-bold mb-2">Time Management</h2>
             <p className="text-sm text-muted-foreground">
               Organize your day efficiently with our booking system.
             </p>
           </div>
           <div className="p-6 bg-card rounded-lg shadow-lg hover:shadow-xl transition-shadow">
             <Users className="h-10 w-10 text-primary mb-4" />
-            <h2 className="text-xl font-extrabold mb-2">Client Database</h2>
+            <h2 className="text-xl font-bold mb-2">Client Database</h2>
             <p className="text-sm text-muted-foreground">
               Keep track of all your clients and their appointment history.
             </p>
