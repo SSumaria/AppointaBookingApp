@@ -47,8 +47,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     // This effect now handles theme logic based on the current route.
-    if (pathname === '/') {
-      // On the landing page, always force light theme.
+    const publicLightModeRoutes = ['/', '/privacy-policy'];
+    if (publicLightModeRoutes.includes(pathname)) {
+      // On public-facing pages like landing and privacy, always force light theme.
       if (typeof window !== 'undefined') {
         document.documentElement.classList.remove('dark');
       }
