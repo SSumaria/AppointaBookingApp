@@ -62,12 +62,6 @@ try {
   console.log("Attempting to get Database and Auth services (firebaseConfig.ts)...");
   authInstance = getAuth(app);
   
-  // This is the key change: explicitly link auth operations to your custom domain.
-  if (authDomain === 'appointa.pro') {
-    authInstance.tenantId = projectId as string;
-    console.log(`Firebase Auth tenantId explicitly set to '${projectId}' for custom domain '${authDomain}'.`);
-  }
-  
   // Set persistence to local to maintain login state across browser sessions.
   setPersistence(authInstance, browserLocalPersistence);
 

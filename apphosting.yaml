@@ -19,7 +19,7 @@ env:
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: appointa.pro
+    value: servicebooker-pro.firebaseapp.com
     availability:
       - BUILD
       - RUNTIME
@@ -68,3 +68,4 @@ env:
     availability:
       - BUILD
       - RUNTIME
+
