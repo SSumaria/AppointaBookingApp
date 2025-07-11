@@ -6,62 +6,65 @@
 runConfig:
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
-  maxInstances: 10 # You can keep this at 1 for now if testing, but remember my previous advice for production!
+  maxInstances: 10
 
 # Environment variables for your Next.js app
 env:
   # These variables are crucial for your Next.js app to build and run.
   # Make sure the values exactly match what you find in your Firebase Project Settings.
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyBKWQTfBvkVcMZxfD6s-cDv-3Pl6ZRR8Mw # <--- GET THIS FROM FIREBASE CONSOLE!
+    value: AIzaSyBKWQTfBvkVcMZxfD6s-cDv-3Pl6ZRR8Mw
     availability:
       - BUILD
-      - RUNTIME # Needed for both build (prerendering) and runtime
+      - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: appointa.pro # <--- THIS IS NOW YOUR CUSTOM DOMAIN
+    value: appointa.pro
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: servicebooker-pro # <--- GET THIS FROM FIREBASE CONSOLE!
+    value: servicebooker-pro
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: servicebooker-pro.firebasestorage.app # <--- GET THIS FROM FIREBASE CONSOLE!
+    value: servicebooker-pro.appspot.com
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: 588854791090 # <--- GET THIS FROM FIREBASE CONSOLE!
+    value: 588854791090
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: 1:588854791090:web:b12e6332a8869ced36b2ab # <--- GET THIS FROM FIREBASE CONSOLE!
+    value: 1:588854791090:web:b12e6332a8869ced36b2ab
     availability:
       - BUILD
       - RUNTIME
 
   # Optional: If you use analytics
   - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
-    value: G-5KBY9FHKED # <--- If applicable
+    value: G-5KBY9FHKED
     availability:
       - BUILD
       - RUNTIME
 
   # Securely load GOOGLE_CLIENT_ID from Secret Manager
-  # If this is for a *client-side* Next.js component, you'll need NEXT_PUBLIC_
-  - variable: NEXT_PUBLIC_GOOGLE_CLIENT_ID # Or just GOOGLE_CLIENT_ID if server-side only
-    secret: projects/588854791090/secrets/google-oauth-client-id-appointa-google-calendar # Or a specific version number
+  - variable: NEXT_PUBLIC_GOOGLE_CLIENT_ID
+    secret: projects/588854791090/secrets/google-oauth-client-id-appointa-google-calendar
+    availability:
+      - BUILD
+      - RUNTIME
 
   # Securely load GOOGLE_CLIENT_SECRET from Secret Manager
-  # This MUST NOT be NEXT_PUBLIC_ as it's a server-side secret
   - variable: GOOGLE_CLIENT_SECRET
-    secret: projects/588854791090/secrets/google-oauth-client-secret-appointa-google-calendar # Or a specific version number
-
+    secret: projects/588854791090/secrets/google-oauth-client-secret-appointa-google-calendar
+    availability:
+      - BUILD
+      - RUNTIME
