@@ -134,7 +134,7 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Intuitive Booking</h3>
-                <p className="text-muted-foreground">A powerful and clear calendar to quickly create, view, and manage all appointments. Color-coded views and multiple layouts (month, week) help you see your schedule at a glance.</p>
+                <p className="text-muted-foreground">A powerful calendar to manage all appointments. Connect your Google Calendar to automatically sync bookings and see them alongside your personal events, all in one place.</p>
               </div>
               </AnimatedSection>
               <AnimatedSection delay={200}>
