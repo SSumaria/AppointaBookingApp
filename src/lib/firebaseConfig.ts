@@ -19,7 +19,7 @@ console.log("RAW NEXT_PUBLIC_FIREBASE_API_KEY (firebaseConfig.ts):", process.env
 console.log("Processed apiKey variable (firebaseConfig.ts):", apiKey ? "EXISTS" : "MISSING_OR_EMPTY");
 console.log("typeof window (firebaseConfig.ts):", typeof window);
 if (typeof window !== 'undefined') {
-  console.log("window.location.pathname (firebaseConfig.ts):", window.location.pathname);
+  console.log("window.location.hostname (firebaseConfig.ts):", window.location.hostname);
 }
 
 
