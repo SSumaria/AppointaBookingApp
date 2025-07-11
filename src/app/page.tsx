@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -236,10 +235,13 @@ export default function LandingPage() {
         </section>
       </main>
       <footer className="bg-background py-6 border-t">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground space-x-4">
+        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground flex justify-center items-center gap-4">
           <span>© {new Date().getFullYear()} Appointa. All rights reserved.</span>
           <Link href="/privacy-policy" className="hover:text-primary hover:underline">
             Privacy Policy
+          </Link>
+          <Link href="/terms-of-service" className="hover:text-primary hover:underline">
+            Terms of Service
           </Link>
         </div>
       </footer>
