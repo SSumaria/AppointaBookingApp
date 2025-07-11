@@ -109,7 +109,7 @@ export default function LoginPage() {
               className="w-full rounded-md ring-offset-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
             >
               <Image
-                src="/sign-in-with-google.png"
+                src="/Sign in with google.png"
                 width={380}
                 height={40}
                 alt="Sign in with Google"
