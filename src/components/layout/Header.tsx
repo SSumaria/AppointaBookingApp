@@ -92,7 +92,7 @@ export default function Header() {
     <header className="bg-background py-3 shadow-sm sticky top-0 z-50">
       <div className="container max-w-5xl mx-auto flex items-center justify-between px-4">
         <Link href={currentUser ? '/dashboard' : '/'} onClick={() => setIsSheetOpen(false)} className="flex items-center gap-2">
-           <Image src="/appointa_logo.png" alt="Appointa Logo" width={40} height={40} className="h-8 w-auto" />
+           <Image src="/appointa_logo3.png" alt="Appointa Logo" width={40} height={40} className="h-8 w-auto" />
            <h1 className="text-3xl font-bold text-primary">Appointa</h1>
         </Link>
 
