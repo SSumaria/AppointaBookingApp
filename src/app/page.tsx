@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -120,7 +121,7 @@ export default function LandingPage() {
           <div className="container mx-auto px-4">
             <AnimatedSection>
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold">A Better Way to Run Your Business</h2>
+              <h2 className="text-3xl md:text-4xl font-extrabold">A Better Way to Run Your Business</h2>
               <p className="text-lg text-muted-foreground mt-2">Powerful, intuitive features to streamline your operations.</p>
             </div>
             </AnimatedSection>
@@ -167,7 +168,7 @@ export default function LandingPage() {
           <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
             <AnimatedSection initialClasses="opacity-0 -translate-x-12">
             <div className="prose lg:prose-lg dark:prose-invert max-w-none">
-                <h2 className="text-3xl font-bold text-primary">Your Business, Your Schedule</h2>
+                <h2 className="text-3xl font-extrabold text-primary">Your Business, Your Schedule</h2>
                 <p className="text-muted-foreground">
                     Stop the back-and-forth emails. Appointa provides a clean, professional booking page you can share anywhere. Clients see your real-time availability and can book a slot in seconds, making scheduling painless for everyone.
                 </p>
@@ -204,7 +205,7 @@ export default function LandingPage() {
              </AnimatedSection>
              <AnimatedSection initialClasses="opacity-0 translate-x-12" delay={200}>
                 <div className="prose lg:prose-lg dark:prose-invert max-w-none">
-                    <h2 className="text-3xl font-bold text-primary">Your Command Center</h2>
+                    <h2 className="text-3xl font-extrabold text-primary">Your Command Center</h2>
                     <p className="text-muted-foreground">
                         Manage your entire business from one place. The Appointa dashboard gives you a complete overview of your appointments, with powerful views and tools to keep you organized and in control.
                     </p>
@@ -223,7 +224,7 @@ export default function LandingPage() {
         <section className="py-20">
           <div className="container mx-auto px-4 text-center">
             <AnimatedSection>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Simplify Your Business?</h2>
+              <h2 className="text-3xl md:text-4xl font-extrabold mb-4">Ready to Simplify Your Business?</h2>
               <p className="text-lg text-muted-foreground mb-8">Join today and take control of your appointments. It's free to get started.</p>
               <Link href="/register">
                 <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
