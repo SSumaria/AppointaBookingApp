@@ -96,9 +96,9 @@ export default function Header() {
             src="/appointa_logo.png" 
             alt="Appointa Logo" 
             width={120} 
-            height={30}
+            height={120}
             data-ai-hint="logo"
-            className="h-auto"
+            className="h-8 w-auto"
             priority
            />
         </Link>
@@ -158,8 +158,8 @@ export default function Header() {
                     src="/appointa_logo.png" 
                     alt="Appointa Logo" 
                     width={120} 
-                    height={30}
-                    className="h-auto"
+                    height={120}
+                    className="h-8 w-auto"
                    />
                 </Link>
               </div>
