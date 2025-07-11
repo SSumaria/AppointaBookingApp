@@ -91,7 +91,7 @@ export default function Header() {
     <header className="bg-background py-3 shadow-sm sticky top-0 z-50">
       <div className="container max-w-5xl mx-auto flex items-center justify-between px-4">
         <Link href={currentUser ? '/dashboard' : '/'} onClick={() => setIsSheetOpen(false)} className="flex items-center">
-           <h1 className="text-2xl font-extrabold text-primary">Appointa</h1>
+           <h1 className="text-3xl font-extrabold text-primary">Appointa</h1>
         </Link>
 
         {/* Desktop Navigation */}
