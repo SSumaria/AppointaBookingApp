@@ -92,7 +92,7 @@ export default function PrivacyPolicyPage() {
               
               <h2>5. Contact Us</h2>
                 <p>
-                    If you have any questions or concerns about this Privacy Policy or your data, please contact the administrator of this application.
+                    If you have any questions or concerns about this Privacy Policy or your data, please contact us at <a href="mailto:shyamsumaria96@gmail.com" className="text-primary hover:underline">shyamsumaria96@gmail.com</a>.
                 </p>
 
               <h2>6. Changes to This Policy</h2>

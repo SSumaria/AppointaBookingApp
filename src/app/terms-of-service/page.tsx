@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -93,7 +94,7 @@ export default function TermsOfServicePage() {
 
               <h2>9. Contact Us</h2>
                 <p>
-                    If you have any questions about these Terms, please contact the administrator of this application.
+                    If you have any questions about these Terms, please contact us at <a href="mailto:shyamsumaria96@gmail.com" className="text-primary hover:underline">shyamsumaria96@gmail.com</a>.
                 </p>
 
             </CardContent>
