@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { User as FirebaseUser, AuthError } from 'firebase/auth';
@@ -46,14 +47,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     // This effect now handles theme logic based on the current route.
-    const publicLightModeRoutes = ['/', '/privacy-policy', '/terms-of-service'];
+    const publicLightModeRoutes = ['/', '/login', '/register', '/privacy-policy', '/terms-of-service'];
     if (publicLightModeRoutes.includes(pathname)) {
       // On public-facing pages like landing and privacy, always force light theme.
       if (typeof window !== 'undefined') {
         document.documentElement.classList.remove('dark');
       }
     } else {
-      // On all other pages (dashboard, login, etc.), respect the user's saved preference.
+      // On all other pages (dashboard, etc.), respect the user's saved preference.
       if (typeof window !== 'undefined') {
         const storedDarkMode = localStorage.getItem('darkMode');
         if (storedDarkMode === 'true') {
