@@ -106,14 +106,14 @@ export default function LoginPage() {
             <button
               onClick={handleGoogleLogin}
               disabled={loading}
-              className="w-full rounded-md ring-offset-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+              className="w-full flex justify-center items-center rounded-md ring-offset-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
             >
               <Image
                 src="/Sign in with google.png"
-                width={380}
-                height={15}
+                width={191} 
+                height={46}  
                 alt="Sign in with Google"
-                className="w-full h-auto"
+                className="h-auto" 
               />
             </button>
           </CardContent>
