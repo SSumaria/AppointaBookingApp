@@ -9,9 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mail, Lock, User, UserPlus, Chrome } from 'lucide-react';
+import { Mail, Lock, User, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Header from '@/components/layout/Header';
+import Image from 'next/image';
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
@@ -144,10 +145,19 @@ export default function RegisterPage() {
                 </span>
               </div>
             </div>
-            <Button variant="outline" className="w-full" onClick={handleGoogleRegister} disabled={loading}>
-              <Chrome className="mr-2 h-5 w-5" /> {/* Using Chrome as a placeholder for Google logo */}
-              Sign up with Google
-            </Button>
+             <button
+              onClick={handleGoogleRegister}
+              disabled={loading}
+              className="w-full flex justify-center items-center rounded-md ring-offset-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            >
+              <Image
+                src="/Sign up with google.png"
+                width={191} 
+                height={46}  
+                alt="Sign up with Google"
+                className="h-auto" 
+              />
+            </button>
           </CardContent>
           <CardFooter className="text-center text-sm">
              <p className="w-full">
