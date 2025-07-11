@@ -15,6 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import Image from 'next/image';
 
 export default function Header() {
   const { currentUser, logout, loading } = useAuth();
@@ -90,8 +91,16 @@ export default function Header() {
   return (
     <header className="bg-background py-3 shadow-sm sticky top-0 z-50">
       <div className="container max-w-5xl mx-auto flex items-center justify-between px-4">
-        <Link href={currentUser ? '/dashboard' : '/'} onClick={() => setIsSheetOpen(false)} className="text-xl sm:text-2xl font-bold text-primary">
-          Appointa
+        <Link href={currentUser ? '/dashboard' : '/'} onClick={() => setIsSheetOpen(false)} className="flex items-center">
+          <Image 
+            src="/logo.svg" 
+            alt="Appointa Logo" 
+            width={120} 
+            height={30}
+            data-ai-hint="logo"
+            className="h-auto"
+            priority
+           />
         </Link>
 
         {/* Desktop Navigation */}
@@ -144,8 +153,14 @@ export default function Header() {
             </SheetTrigger>
             <SheetContent side="right" className="w-[280px] p-0 flex flex-col">
               <div className="p-4 mb-2 border-b">
-                <Link href={currentUser ? '/dashboard' : '/'} onClick={() => setIsSheetOpen(false)} className="text-lg font-bold text-primary">
-                  Appointa
+                <Link href={currentUser ? '/dashboard' : '/'} onClick={() => setIsSheetOpen(false)} className="flex items-center">
+                   <Image 
+                    src="/logo.svg" 
+                    alt="Appointa Logo" 
+                    width={120} 
+                    height={30}
+                    className="h-auto"
+                   />
                 </Link>
               </div>
               <nav className="flex flex-col space-y-1 px-2 flex-grow">
