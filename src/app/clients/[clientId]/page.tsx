@@ -9,13 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import { User, Calendar as CalendarIconLucide, Briefcase, Mail, Phone, Clock, FileText } from "lucide-react";
+import { User, Calendar as CalendarIconLucide, Briefcase, Mail, Phone, Clock, FileText, Trash2, AlertTriangle } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from '@/components/ui/scroll-area';
-
-import { ref, get, query as rtQuery, orderByChild, equalTo } from "firebase/database";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { ref, get, query as rtQuery, orderByChild, equalTo, remove, update } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
 
 interface Note {
@@ -69,6 +69,8 @@ export default function ClientDetailsPage() {
   const [isLoadingClient, setIsLoadingClient] = useState(true);
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
   const [allClientNotes, setAllClientNotes] = useState<ProcessedNote[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+
 
   const fetchClientDetails = useCallback(async () => {
     if (!currentUser?.uid || !clientId) return;
@@ -143,6 +145,67 @@ export default function ClientDetailsPage() {
       setIsLoadingBookings(false);
     }
   }, [currentUser?.uid, clientId, toast]);
+  
+  const handleDeleteClient = async () => {
+    if (!currentUser?.uid || !client) {
+      toast({ title: "Error", description: "Cannot delete client. User or client data missing.", variant: "destructive" });
+      return;
+    }
+    setIsDeleting(true);
+
+    try {
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const appointmentDeletionPromises: Promise<any>[] = [];
+
+        // 1. Delete all associated appointments and their Google Calendar events
+        for (const booking of bookings) {
+            // If there's a Google Calendar event, trigger its deletion.
+            if (booking.googleEventId) {
+                const gcalSyncPromise = fetch('/api/google-calendar-sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'delete',
+                        bookingId: booking.id,
+                        userId: currentUser.uid,
+                        timeZone: timeZone,
+                    })
+                }).catch(err => console.error(`Failed to sync calendar deletion for booking ${booking.id}:`, err));
+                appointmentDeletionPromises.push(gcalSyncPromise);
+            }
+            
+            // Add the database deletion for the appointment to the list.
+            const appointmentRef = ref(db, `Appointments/${currentUser.uid}/${booking.id}`);
+            appointmentDeletionPromises.push(remove(appointmentRef));
+        }
+        
+        // Execute all appointment-related deletions.
+        await Promise.all(appointmentDeletionPromises);
+
+        // 2. Delete the client record itself
+        const clientRef = ref(db, `Clients/${currentUser.uid}/${client.id}`);
+        await remove(clientRef);
+
+        toast({
+            title: "Client Deleted",
+            description: `${client.ClientName} and all their associated bookings have been permanently deleted.`,
+        });
+
+        // 3. Redirect to the client search page
+        router.push('/client-search');
+
+    } catch (error: any) {
+        console.error("Error deleting client:", error);
+        toast({
+            title: "Deletion Failed",
+            description: error.message || "An unexpected error occurred while deleting the client.",
+            variant: "destructive",
+        });
+    } finally {
+        setIsDeleting(false);
+    }
+};
+
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
@@ -252,6 +315,35 @@ export default function ClientDetailsPage() {
                 <p className="flex items-center"><CalendarIconLucide className="mr-2 h-5 w-5 text-primary/80" /> <span className="font-medium">Date Created:</span> {format(parseISO(client.CreateDate), "PPP")}</p>
                 <p className="flex items-center"><Clock className="mr-2 h-5 w-5 text-primary/80" /> <span className="font-medium">Time Created:</span> {client.CreateTime}</p>
               </div>
+                <div className="space-y-3 self-start md:justify-self-end">
+                    <h3 className="text-lg font-semibold text-destructive">Danger Zone</h3>
+                     <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                         <Button variant="destructive" disabled={isDeleting}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete Client
+                         </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                          <AlertDialogHeader>
+                              <AlertDialogTitle className="flex items-center"><AlertTriangle className="mr-2 h-5 w-5 text-destructive" /> Are you absolutely sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                  This action cannot be undone. This will permanently delete <strong>{client.ClientName}</strong> and all of their associated bookings and notes.
+                              </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={handleDeleteClient} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                {isDeleting ? (
+                                    <>
+                                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                      Deleting...
+                                    </>
+                                 ) : "Yes, delete client"}
+                              </AlertDialogAction>
+                          </AlertDialogFooter>
+                      </AlertDialogContent>
+                  </AlertDialog>
+                </div>
             </CardContent>
           </Card>
 
