@@ -5,7 +5,7 @@ import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Settings, Clock, Ban, Loader2, Moon, Sun, MousePointer2, XCircle, CalendarDays } from "lucide-react";
+import { Settings, Clock, Ban, Loader2, Moon, Sun, MousePointer2, XCircle, CalendarDays, Trash2, AlertTriangle } from "lucide-react";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { format, addMinutes, parse } from 'date-fns';
 import { Switch } from "@/components/ui/switch";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 // Firebase imports
 import { ref, set, get } from "firebase/database";
@@ -58,7 +59,7 @@ const initialWorkingHours: WorkingHours = {
 };
 
 export default function PreferencesClientPage() {
-  const { currentUser, loading: authLoading } = useAuth();
+  const { currentUser, loading: authLoading, deleteCurrentUserAccount } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -73,6 +74,7 @@ export default function PreferencesClientPage() {
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [isClient, setIsClient] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -256,6 +258,13 @@ export default function PreferencesClientPage() {
     }
   };
   
+  const handleDeleteAccountConfirm = async () => {
+    setIsDeleting(true);
+    await deleteCurrentUserAccount();
+    // The auth context will handle redirection on successful deletion.
+    setIsDeleting(false); 
+  };
+  
   const capitalizeFirstLetter = (string: string) => string.charAt(0).toUpperCase() + string.slice(1);
 
   if (authLoading || (!currentUser && !authLoading) || (isLoadingPreferences && !currentUser)) {
@@ -369,6 +378,42 @@ export default function PreferencesClientPage() {
               )}
             </CardContent>
           </Card>
+          
+          <Card className="shadow-xl border-destructive/50">
+            <CardHeader>
+                <CardTitle className="text-xl font-bold flex items-center text-destructive"><AlertTriangle className="mr-2 h-5 w-5" /> Danger Zone</CardTitle>
+                <CardDescription>This action is irreversible. Please proceed with caution.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-center justify-between p-4 border-t border-destructive/20">
+                <div>
+                  <h3 className="font-semibold">Delete Account</h3>
+                  <p className="text-sm text-muted-foreground mt-1">Permanently delete your account and all associated data.</p>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" disabled={isDeleting}>
+                      {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                      Delete Account
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete your account, including all of your preferences, clients, and appointments.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteAccountConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        Yes, delete my account
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+            </CardContent>
+          </Card>
+
         </div>
       </main>
       <footer className="bg-background py-4 text-center text-sm text-muted-foreground mt-auto">© {new Date().getFullYear()} Appointa.</footer>

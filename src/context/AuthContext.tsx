@@ -2,13 +2,13 @@
 "use client";
 
 import type { User as FirebaseUser, AuthError } from 'firebase/auth';
-import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, deleteUser } from 'firebase/auth';
 import { useRouter, usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebaseConfig'; // auth can be undefined if firebaseConfig fails
 import { useToast } from '@/hooks/use-toast';
-import { ref, set, get } from "firebase/database";
+import { ref, set, get, remove } from "firebase/database";
 
 
 // Log the imported auth object immediately
@@ -21,6 +21,7 @@ interface AuthContextType {
   signInWithEmail: (email: string, pass: string) => Promise<FirebaseUser | null>;
   signInWithGoogle: () => Promise<FirebaseUser | null>;
   logout: () => Promise<void>;
+  deleteCurrentUserAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -164,6 +165,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             case 'auth/invalid-credential':
                  message = 'Invalid credential provided. For Google Sign-In, this can indicate a problem with the OAuth configuration or the token received from Google.';
                  break;
+             case 'auth/requires-recent-login':
+                message = 'This is a sensitive action and requires a recent login. Please sign out and sign back in to delete your account.';
+                break;
             default:
                 message = `(${error.code}) ${error.message || defaultMessage}`;
         }
@@ -254,6 +258,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
        setLoading(false); // Ensure loading is set to false even on logout error
     }
   };
+  
+  const deleteCurrentUserAccount = async (): Promise<void> => {
+    if (!auth || !currentUser || !db) {
+      toast({ title: 'Error', description: 'Not logged in or services unavailable.', variant: 'destructive' });
+      return;
+    }
+
+    const userId = currentUser.uid;
+    
+    // An array of promises for all the database deletion operations
+    const deleteDbPromises = [
+        remove(ref(db, `Users/${userId}`)),
+        remove(ref(db, `UserPreferences/${userId}`)),
+        remove(ref(db, `Appointments/${userId}`)),
+        remove(ref(db, `Clients/${userId}`))
+    ];
+
+    try {
+        console.log(`Starting account deletion for user ${userId}.`);
+        
+        // 1. Delete all database records concurrently
+        await Promise.all(deleteDbPromises);
+        console.log(`Successfully deleted all database records for user ${userId}.`);
+
+        // 2. Delete the user from Firebase Authentication
+        await deleteUser(currentUser);
+        console.log(`Successfully deleted auth user ${userId}.`);
+
+        toast({ title: "Account Deleted", description: "Your account and all associated data have been permanently deleted." });
+        // The onAuthStateChanged listener will automatically handle the redirect to /login
+    } catch (error: any) {
+        console.error(`Error deleting account for user ${userId}:`, error);
+        handleAuthError(error, 'Failed to delete your account.');
+    }
+  };
 
   const value = {
     currentUser,
@@ -262,6 +301,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signInWithEmail,
     signInWithGoogle,
     logout,
+    deleteCurrentUserAccount,
   };
   
   console.log("--- AuthProvider (AuthContext.tsx) --- Rendering with value:", { currentUser: currentUser?.uid || null, loading, appName: auth?.name || "N/A" });
