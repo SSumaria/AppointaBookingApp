@@ -60,11 +60,11 @@ const initialWorkingHours: WorkingHours = {
 };
 
 interface BookingSettings {
-    slotDuration: 15 | 30 | 60;
+    timeInterval: 15 | 30 | 60;
 }
 
 const initialBookingSettings: BookingSettings = {
-    slotDuration: 60,
+    timeInterval: 30,
 };
 
 export default function PreferencesClientPage() {
@@ -136,7 +136,7 @@ export default function PreferencesClientPage() {
       const bookingSettingsSnapshot = await get(bookingSettingsRef);
       if(bookingSettingsSnapshot.exists()){
           const loadedSettings = bookingSettingsSnapshot.val() as BookingSettings;
-          if (loadedSettings.slotDuration && [15, 30, 60].includes(loadedSettings.slotDuration)) {
+          if (loadedSettings.timeInterval && [15, 30, 60].includes(loadedSettings.timeInterval)) {
               setBookingSettings(loadedSettings);
           } else {
               setBookingSettings(initialBookingSettings);
@@ -202,10 +202,9 @@ export default function PreferencesClientPage() {
         return;
     }
     
-    // The client knows its true origin. Pass this to the server via the state param.
     const statePayload = {
       userId: currentUser.uid,
-      clientOrigin: window.location.origin, // Pass the browser's origin
+      clientOrigin: window.location.origin,
     };
     const state = btoa(JSON.stringify(statePayload));
     window.location.href = `/api/auth/google?state=${encodeURIComponent(state)}`;
@@ -291,7 +290,6 @@ export default function PreferencesClientPage() {
   const handleDeleteAccountConfirm = async () => {
     setIsDeleting(true);
     await deleteCurrentUserAccount();
-    // The auth context will handle redirection on successful deletion.
     setIsDeleting(false); 
   };
   
@@ -370,16 +368,16 @@ export default function PreferencesClientPage() {
             <CardContent>
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
                     <div>
-                        <Label htmlFor="bookingSlotDuration">Booking Slot Duration</Label>
-                        <p className="text-xs text-muted-foreground mt-1">Set the default appointment length for new bookings created internally.</p>
+                        <Label htmlFor="timeInterval">Time Interval Precision</Label>
+                        <p className="text-xs text-muted-foreground mt-1">Set the time selection interval for the internal booking form's start and end times.</p>
                     </div>
                     <Select
-                        value={String(bookingSettings.slotDuration)}
-                        onValueChange={(value) => handleBookingSettingsChange('slotDuration', Number(value))}
+                        value={String(bookingSettings.timeInterval)}
+                        onValueChange={(value) => handleBookingSettingsChange('timeInterval', Number(value))}
                         disabled={isSaving || isLoadingPreferences}
                     >
-                        <SelectTrigger id="bookingSlotDuration" className="w-full sm:w-[180px]">
-                            <SelectValue placeholder="Select duration" />
+                        <SelectTrigger id="timeInterval" className="w-full sm:w-[180px]">
+                            <SelectValue placeholder="Select interval" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="15">15 minutes</SelectItem>

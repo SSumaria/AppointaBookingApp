@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format, addMinutes, parse } from "date-fns";
@@ -28,20 +28,6 @@ interface Note {
   timestamp: number;
 }
 
-interface Booking {
-  id: string;
-  AppointmentID: string;
-  ClientID: string;
-  ServiceProcedure: string;
-  AppointmentDate: string;
-  AppointmentStartTime: string;
-  AppointmentEndTime: string;
-  BookingStatus?: string;
-  BookedByUserID?: string;
-  Notes?: Note[];
-  googleEventId?: string;
-}
-
 interface ExistingBooking {
   AppointmentStartTime: string;
   AppointmentEndTime: string;
@@ -60,22 +46,20 @@ interface ClientSuggestion extends ClientData {
   id: string; // Firebase key
 }
 
-
-const generateTimeSlots = () => {
+const generateTimeSlots = (interval: 15 | 30 | 60) => {
   const slots = [];
   let currentTime = new Date();
-  currentTime.setHours(6, 0, 0, 0); // Start at 6:00 AM
+  currentTime.setHours(6, 0, 0, 0);
 
   const endTimeLimit = new Date();
-  endTimeLimit.setHours(21, 0, 0, 0); // Slots up to 21:00 (9 PM)
+  endTimeLimit.setHours(21, 0, 0, 0);
 
   while (currentTime <= endTimeLimit) {
     slots.push(format(currentTime, "HH:mm"));
-    currentTime = addMinutes(currentTime, 30);
+    currentTime = addMinutes(currentTime, interval);
   }
   return slots;
 };
-const timeSlots = generateTimeSlots();
 
 const generateNoteId = () => {
   return Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9);
@@ -87,6 +71,7 @@ export default function NewBookingPage() {
     const [serviceProcedure, setServiceProcedure] = useState('');
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [startTime, setStartTime] = useState('');
+    const [endTime, setEndTime] = useState('');
     const [notesInput, setNotesInput] = useState('');
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -104,8 +89,10 @@ export default function NewBookingPage() {
     const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
 
-    const [bookingSlotDuration, setBookingSlotDuration] = useState<number>(60);
+    const [timeInterval, setTimeInterval] = useState<15 | 30 | 60>(30);
     const [isLoadingPreferences, setIsLoadingPreferences] = useState(true);
+
+    const timeSlots = useMemo(() => generateTimeSlots(timeInterval), [timeInterval]);
 
     const fetchBookingPreferences = useCallback(async (userId: string) => {
         if (!db) return;
@@ -115,8 +102,8 @@ export default function NewBookingPage() {
             const snapshot = await get(settingsRef);
             if (snapshot.exists()) {
                 const settings = snapshot.val();
-                if (settings.slotDuration && [15, 30, 60].includes(settings.slotDuration)) {
-                    setBookingSlotDuration(settings.slotDuration);
+                if (settings.timeInterval && [15, 30, 60].includes(settings.timeInterval)) {
+                    setTimeInterval(settings.timeInterval);
                 }
             }
         } catch (error) {
@@ -207,7 +194,6 @@ export default function NewBookingPage() {
          setClientPhone(''); 
         }
 
-
         if (debounceTimeoutRef.current) {
             clearTimeout(debounceTimeoutRef.current);
         }
@@ -280,7 +266,7 @@ export default function NewBookingPage() {
             return;
         }
 
-        if (!clientName.trim() || !clientEmail.trim() || !clientPhone.trim() || !serviceProcedure || !date || !startTime) {
+        if (!clientName.trim() || !clientEmail.trim() || !clientPhone.trim() || !serviceProcedure || !date || !startTime || !endTime) {
             toast({ title: "Error", description: "All fields except Notes are required.", variant: "destructive" });
             setIsSubmitting(false);
             return;
@@ -289,12 +275,18 @@ export default function NewBookingPage() {
         const selectedFormattedDate = format(date, "yyyy-MM-dd");
         const baseDateForSubmitParse = new Date(selectedFormattedDate + "T00:00:00");
         const startDateTime = parse(startTime, 'HH:mm', baseDateForSubmitParse);
-        const endDateTime = addMinutes(startDateTime, bookingSlotDuration);
-        const calculatedEndTime = format(endDateTime, "HH:mm");
+        const endDateTime = parse(endTime, 'HH:mm', baseDateForSubmitParse);
+
+        if (endDateTime <= startDateTime) {
+            toast({ title: "Invalid Time", description: "End time must be after start time.", variant: "destructive" });
+            setIsSubmitting(false);
+            return;
+        }
 
         let tempSlot = startDateTime;
         let hasOverlap = false;
         while(tempSlot < endDateTime) {
+            // Check conflicts at 30min intervals regardless of chosen precision to catch all overlaps
             if(bookedTimeSlotsForDate.has(format(tempSlot, "HH:mm"))) {
                 hasOverlap = true;
                 break;
@@ -406,7 +398,7 @@ export default function NewBookingPage() {
                 ServiceProcedure: serviceProcedure,
                 AppointmentDate: selectedFormattedDate,
                 AppointmentStartTime: startTime,
-                AppointmentEndTime: calculatedEndTime,
+                AppointmentEndTime: endTime,
                 BookingStatus: "Booked",
                 Notes: finalNotes,
                 BookedByUserID: currentUser.uid,
@@ -433,7 +425,6 @@ export default function NewBookingPage() {
                 console.log("Successfully synced new booking to Google Calendar.");
               } else {
                 console.warn("Failed to sync new booking to Google Calendar:", data.message);
-                // Optionally show a non-intrusive toast that sync failed
               }
             }).catch(err => {
               console.error("Error calling calendar sync API:", err);
@@ -449,6 +440,7 @@ export default function NewBookingPage() {
             setServiceProcedure('');
             setNotesInput('');
             setStartTime('');
+            setEndTime('');
             setSelectedClientFirebaseKey(null); 
             setShowSuggestions(false); 
 
@@ -573,7 +565,7 @@ export default function NewBookingPage() {
                                     </div>
                                     <div className="flex flex-col sm:flex-row gap-6">
                                         <div className="flex-1">
-                                            <Label htmlFor="date" className="font-medium">Appointment Date *</Label>
+                                            <Label htmlFor="date">Appointment Date *</Label>
                                             <Popover>
                                                 <PopoverTrigger asChild>
                                                     <Button
@@ -594,6 +586,7 @@ export default function NewBookingPage() {
                                                         onSelect={(selectedDay) => {
                                                             setDate(selectedDay);
                                                             setStartTime('');
+                                                            setEndTime('');
                                                         }}
                                                         disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
                                                         initialFocus
@@ -602,45 +595,71 @@ export default function NewBookingPage() {
                                             </Popover>
                                         </div>
                                         <div className="flex-1">
-                                            <Label htmlFor="startTime" className="font-medium">Start Time *</Label>
+                                            <Label htmlFor="startTime">Start Time *</Label>
                                             <Select
                                                 value={startTime}
-                                                onValueChange={setStartTime}
+                                                onValueChange={(value) => {
+                                                  setStartTime(value);
+                                                  setEndTime('');
+                                                }}
                                                 disabled={isLoadingBookedSlots || !date}
                                             >
                                                 <SelectTrigger className="w-full mt-1">
-                                                    <SelectValue placeholder={isLoadingBookedSlots ? "Loading..." : "Select time"} />
+                                                    <SelectValue placeholder={isLoadingBookedSlots || isLoadingPreferences ? "Loading..." : "Select time"} />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    {isLoadingBookedSlots && <SelectItem value="loading" disabled>Loading...</SelectItem>}
-                                                    {!isLoadingBookedSlots && timeSlots.map(slot => {
+                                                    {(isLoadingBookedSlots || isLoadingPreferences) && <SelectItem value="loading" disabled>Loading...</SelectItem>}
+                                                    {!isLoadingBookedSlots && !isLoadingPreferences && timeSlots.map(slot => (
+                                                        <SelectItem
+                                                            key={`start-${slot}`}
+                                                            value={slot}
+                                                            disabled={bookedTimeSlotsForDate.has(slot)}
+                                                        >
+                                                            {slot}{bookedTimeSlotsForDate.has(slot) ? " (Booked)" : ""}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="flex-1">
+                                            <Label htmlFor="endTime">End Time *</Label>
+                                            <Select
+                                                value={endTime}
+                                                onValueChange={setEndTime}
+                                                disabled={isLoadingBookedSlots || !date || !startTime}
+                                            >
+                                                <SelectTrigger className="w-full mt-1">
+                                                    <SelectValue placeholder={isLoadingBookedSlots || isLoadingPreferences ? "Loading..." : "Select time"} />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                   {(isLoadingBookedSlots || isLoadingPreferences) && <SelectItem value="loading" disabled>Loading...</SelectItem>}
+                                                   {!isLoadingBookedSlots && !isLoadingPreferences && timeSlots.filter(slot => {
+                                                       if (!startTime || !date) return true;
+                                                       const baseDate = new Date(date); baseDate.setHours(0,0,0,0);
+                                                       return parse(slot, "HH:mm", baseDate) > parse(startTime, "HH:mm", baseDate);
+                                                   }).map(slot => {
                                                         let itemIsDisabled = false;
                                                         let itemLabelSuffix = "";
-                                                        if (date) {
-                                                            const baseDateForCheck = new Date(date);
-                                                            baseDateForCheck.setHours(0,0,0,0);
-                                                            const startCheckTime = parse(slot, "HH:mm", baseDateForCheck);
-                                                            const endCheckTime = addMinutes(startCheckTime, bookingSlotDuration);
-                                                            
-                                                            let tempSlotCheck = startCheckTime;
-                                                            while (tempSlotCheck < endCheckTime) {
-                                                                if(bookedTimeSlotsForDate.has(format(tempSlotCheck, "HH:mm"))) {
+                                                        if (startTime && date) {
+                                                            const baseDate = new Date(date); baseDate.setHours(0,0,0,0);
+                                                            const newBookingStart = parse(startTime, "HH:mm", baseDate);
+                                                            const potentialEnd = parse(slot, "HH:mm", baseDate);
+                                                            let tempCheck = addMinutes(newBookingStart, 30); // Start checking from the next 30min slot
+                                                            while (tempCheck < potentialEnd) {
+                                                                if (bookedTimeSlotsForDate.has(format(tempCheck, "HH:mm"))) {
                                                                     itemIsDisabled = true;
-                                                                    itemLabelSuffix = "(Conflicts)";
+                                                                    itemLabelSuffix = " (Conflicts)";
                                                                     break;
                                                                 }
-                                                                tempSlotCheck = addMinutes(tempSlotCheck, 30);
+                                                                tempCheck = addMinutes(tempCheck, 30);
                                                             }
+                                                        } else {
+                                                          itemIsDisabled = true;
                                                         }
-                                                        
                                                         return (
-                                                            <SelectItem
-                                                                key={`start-${slot}`}
-                                                                value={slot}
-                                                                disabled={itemIsDisabled}
-                                                            >
-                                                                {slot} {itemLabelSuffix}
-                                                            </SelectItem>
+                                                          <SelectItem key={`end-${slot}`} value={slot} disabled={itemIsDisabled}>
+                                                            {slot}{itemLabelSuffix}
+                                                          </SelectItem>
                                                         );
                                                     })}
                                                 </SelectContent>
