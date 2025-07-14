@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Settings, Clock, Ban, Loader2, Moon, Sun, MousePointer2, XCircle, CalendarDays, Trash2, AlertTriangle, Timer } from "lucide-react";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
