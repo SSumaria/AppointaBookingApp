@@ -7,6 +7,9 @@ import { AuthProvider } from '@/context/AuthContext'; // Added
 export const metadata: Metadata = {
   title: 'Appointa', // Updated title
   description: 'Manage your appointments efficiently.', // Updated description
+  icons: {
+    icon: '/appointa_logo3.png',
+  },
 };
 
 export default function RootLayout({
