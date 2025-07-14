@@ -113,7 +113,7 @@ export default function PrivacyPolicyPage() {
                 <ul>
                     <li><strong>Service Provider Account Data:</strong> We retain your account information (name, email, Google Calendar tokens) for as long as your account is active.</li>
                     <li><strong>Client Booking Data:</strong> We retain the client information associated with a booking for as long as the service provider's account is active, to enable them to manage their client list and appointment history.</li>
-                    <li><strong>Inactive Accounts:</strong> We may delete accounts that have been inactive for a period of 24 months.</li>
+                    <li><strong>Inactive Accounts:</strong> We may delete accounts that have been inactive for a period of 12 months.</li>
                 </ul>
               
                 <h4>b. Data Deletion</h4>
