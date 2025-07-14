@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebaseConfig'; // auth can be undefined if firebaseConfig fails
 import { useToast } from '@/hooks/use-toast';
-import { ref, set, get, remove } from "firebase/database";
+import { ref, set, get, remove, update } from "firebase/database";
 
 
 // Log the imported auth object immediately
@@ -104,24 +104,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []); 
 
-  const ensureUserRecordInDB = async (user: FirebaseUser) => {
+  const ensureUserRecordInDB = async (user: FirebaseUser, isNewUser: boolean = false) => {
     if (!db || !user || !user.email) return;
+
     const userRef = ref(db, `Users/${user.uid}`);
-    const snapshot = await get(userRef);
-    if (!snapshot.exists()) {
-      console.log(`Creating database record for new user: ${user.uid}`);
-      try {
-        await set(userRef, {
-          email: user.email,
-          name: user.displayName,
-          createdAt: new Date().toISOString(),
-        });
-      } catch (dbError) {
-        console.error("Failed to create user record in RTDB:", dbError);
-        // This is a background task. We don't toast here to avoid interrupting the user flow.
-      }
+    const nowISO = new Date().toISOString();
+    
+    try {
+        if (isNewUser) {
+            console.log(`Creating database record for new user: ${user.uid}`);
+            await set(userRef, {
+                email: user.email,
+                name: user.displayName,
+                createdAt: nowISO,
+                lastLogInTime: nowISO, // Set last login time on creation
+            });
+        } else {
+            console.log(`Updating lastLogInTime for existing user: ${user.uid}`);
+            await update(userRef, {
+                lastLogInTime: nowISO,
+            });
+        }
+    } catch (dbError) {
+      console.error("Failed to create/update user record in RTDB:", dbError);
+      // This is a background task. We don't toast here to avoid interrupting the user flow.
     }
   };
+
 
   const handleAuthError = (error: AuthError, defaultMessage: string, operation?: 'googleSignIn') => {
     console.error(`Authentication error during ${operation || 'operation'} (AuthContext.tsx for app: ${auth?.name || 'N/A'}):`, error.code, error.message);
@@ -189,7 +198,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       await updateProfile(userCredential.user, { displayName: name });
-      await ensureUserRecordInDB(userCredential.user);
+      await ensureUserRecordInDB(userCredential.user, true); // Pass true for new user
       toast({ title: 'Registration Successful', description: 'Welcome!' });
       router.push('/dashboard');
       return userCredential.user;
@@ -208,7 +217,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
-      await ensureUserRecordInDB(userCredential.user);
+      await ensureUserRecordInDB(userCredential.user); // Existing user
       toast({ title: 'Login Successful', description: 'Welcome back!' });
       router.push('/dashboard');
       return userCredential.user;
@@ -229,7 +238,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      await ensureUserRecordInDB(result.user);
+      
+      const userRef = ref(db, `Users/${result.user.uid}`);
+      const snapshot = await get(userRef);
+      const isNewUser = !snapshot.exists();
+
+      await ensureUserRecordInDB(result.user, isNewUser);
+      
       toast({ title: 'Google Sign-In Successful', description: 'Welcome!' });
       router.push('/dashboard');
       return result.user;
@@ -307,3 +322,5 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   console.log("--- AuthProvider (AuthContext.tsx) --- Rendering with value:", { currentUser: currentUser?.uid || null, loading, appName: auth?.name || "N/A" });
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
+    
