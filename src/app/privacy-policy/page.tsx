@@ -65,7 +65,7 @@ export default function PrivacyPolicyPage() {
 
               <h4>b. For Your Clients</h4>
                 <p>
-                    When your clients book an appointment using your public booking link, we collect the information they provide, including their name, email address, and phone number. This information is stored and associated with your account.
+                    When your clients book an appointment using your public booking link, we collect the information they voluntarily provide, including their name, email address, and phone number. This information is stored and associated with your account.
                 </p>
 
               <h2>2. How We Use Your Information</h2>
@@ -77,7 +77,7 @@ export default function PrivacyPolicyPage() {
                 <li>Allowing clients to book appointments with you.</li>
                 <li>Enabling you to manage your client list and view appointment history.</li>
                 <li>Syncing appointments with your Google Calendar, if you have connected it.</li>
-                <li>Sending transactional emails, such as booking confirmations or cancellations.</li>
+                <li>Sending transactional emails, such as booking confirmations and cancellations.</li>
               </ul>
 
               <h2>3. Google Calendar Integration</h2>
@@ -99,16 +99,35 @@ export default function PrivacyPolicyPage() {
                     </li>
                 </ul>
 
-              <h2>4. Data Sharing</h2>
+              <h2>4. Data Security</h2>
                 <p>
-                    Other than the specific use for Google Calendar integration described above, we do not sell, rent, or share your personal data with third-party marketers. Your client information is under your control as the service provider. We will not contact your clients for any reason other than transactional notifications related to their bookings with you.
+                    We are committed to protecting your data. We implement and maintain reasonable administrative, physical, and technical security safeguards to help protect your information from loss, theft, misuse, and unauthorized access, disclosure, alteration, and destruction. We use services like Firebase Authentication and have configured security rules within our Firebase Realtime Database to help protect user data.
+                </p>
+              
+              <h2>5. Data Retention and Deletion</h2>
+
+                <h4>a. Data Retention</h4>
+                <p>
+                    We retain the personal information we collect for as long as it is necessary to provide our services to you and our users, or for other essential purposes such as complying with our legal obligations, resolving disputes, and enforcing our agreements.
+                </p>
+                <ul>
+                    <li><strong>Service Provider Account Data:</strong> We retain your account information (name, email, Google Calendar tokens) for as long as your account is active.</li>
+                    <li><strong>Client Booking Data:</strong> We retain the client information associated with a booking for as long as the service provider's account is active, to enable them to manage their client list and appointment history.</li>
+                    <li><strong>Inactive Accounts:</strong> We may delete accounts that have been inactive for a period of 24 months.</li>
+                </ul>
+              
+                <h4>b. Data Deletion</h4>
+                <p>You have the right to request the deletion of your personal data.</p>
+                <ul>
+                    <li><strong>Service Providers:</strong> You can delete your account at any time through the 'Preferences' page. Upon account deletion, we will permanently delete your personal information and all associated client data from our production servers. This action is irreversible.</li>
+                    <li><strong>Clients:</strong> If you are a client who has booked an appointment with a service provider using our platform, you can request the deletion of your personal information by contacting the service provider directly. If you wish for us to delete your data from our system, you can contact us at <a href="mailto:shyamsumaria96@gmail.com" className="text-primary hover:underline">shyamsumaria96@gmail.com</a>, and we will process your request after verifying your identity.</li>
+                </ul>
+
+                <h4>c. Data Access and Correction</h4>
+                <p>
+                    You have the right to access and update your personal information. Service providers can review and update their account information directly within their account settings. Clients can contact the service provider they booked with to have their information corrected.
                 </p>
 
-              <h2>5. Data Security</h2>
-              <p>
-                We take the security of your data seriously. We rely on secure, industry-standard services like Firebase Authentication and Realtime Database, which have built-in security features and rules to help protect user data from unauthorized access.
-              </p>
-              
               <h2>6. Contact Us</h2>
                 <p>
                     If you have any questions or concerns about this Privacy Policy or your data, please contact us at <a href="mailto:shyamsumaria96@gmail.com" className="text-primary hover:underline">shyamsumaria96@gmail.com</a>.
