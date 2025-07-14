@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -5,7 +6,7 @@ import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Settings, Clock, Ban, Loader2, Moon, Sun, MousePointer2, XCircle, CalendarDays, Trash2, AlertTriangle } from "lucide-react";
+import { Settings, Clock, Ban, Loader2, Moon, Sun, MousePointer2, XCircle, CalendarDays, Trash2, AlertTriangle, Timer } from "lucide-react";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -58,6 +59,14 @@ const initialWorkingHours: WorkingHours = {
   sunday:    { startTime: "09:00", endTime: "17:00", isUnavailable: true },
 };
 
+interface BookingSettings {
+    slotDuration: 15 | 30 | 60;
+}
+
+const initialBookingSettings: BookingSettings = {
+    slotDuration: 60,
+};
+
 export default function PreferencesClientPage() {
   const { currentUser, loading: authLoading, deleteCurrentUserAccount } = useAuth();
   const router = useRouter();
@@ -65,6 +74,7 @@ export default function PreferencesClientPage() {
   const { toast } = useToast();
   
   const [workingHours, setWorkingHours] = useState<WorkingHours>(initialWorkingHours);
+  const [bookingSettings, setBookingSettings] = useState<BookingSettings>(initialBookingSettings);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(true);
 
@@ -105,10 +115,10 @@ export default function PreferencesClientPage() {
     }
     setIsLoadingPreferences(true);
     try {
-      const preferencesRef = ref(db, `UserPreferences/${userId}/workingHours`);
-      const snapshot = await get(preferencesRef);
-      if (snapshot.exists()) {
-        const loadedPreferences = snapshot.val() as WorkingHours;
+      const workingHoursRef = ref(db, `UserPreferences/${userId}/workingHours`);
+      const workingHoursSnapshot = await get(workingHoursRef);
+      if (workingHoursSnapshot.exists()) {
+        const loadedPreferences = workingHoursSnapshot.val() as WorkingHours;
         let isValid = true;
         daysOfWeek.forEach(day => {
             if (!loadedPreferences[day] || typeof loadedPreferences[day].startTime !== 'string' || typeof loadedPreferences[day].endTime !== 'string' || typeof loadedPreferences[day].isUnavailable !== 'boolean') {
@@ -121,6 +131,18 @@ export default function PreferencesClientPage() {
             setWorkingHours(initialWorkingHours); 
         }
       }
+
+      const bookingSettingsRef = ref(db, `UserPreferences/${userId}/bookingSettings`);
+      const bookingSettingsSnapshot = await get(bookingSettingsRef);
+      if(bookingSettingsSnapshot.exists()){
+          const loadedSettings = bookingSettingsSnapshot.val() as BookingSettings;
+          if (loadedSettings.slotDuration && [15, 30, 60].includes(loadedSettings.slotDuration)) {
+              setBookingSettings(loadedSettings);
+          } else {
+              setBookingSettings(initialBookingSettings);
+          }
+      }
+
     } catch (error: any) {
       console.error("Error fetching user preferences:", error);
       toast({ title: "Error Loading Preferences", description: error.message || "Could not load your saved working hours.", variant: "destructive" });
@@ -229,6 +251,10 @@ export default function PreferencesClientPage() {
       [day]: { ...prev[day], isUnavailable: checked },
     }));
   };
+  
+  const handleBookingSettingsChange = (field: keyof BookingSettings, value: any) => {
+    setBookingSettings(prev => ({ ...prev, [field]: value }));
+  };
 
   const handleSaveChanges = async () => {
     if (!currentUser?.uid) return;
@@ -247,12 +273,16 @@ export default function PreferencesClientPage() {
 
     setIsSaving(true);
     try {
-      const preferencesRef = ref(db, `UserPreferences/${currentUser.uid}/workingHours`);
-      await set(preferencesRef, workingHours);
-      toast({ title: "Preferences Saved", description: "Your working hours have been successfully saved." });
+      const workingHoursRef = ref(db, `UserPreferences/${currentUser.uid}/workingHours`);
+      await set(workingHoursRef, workingHours);
+      
+      const bookingSettingsRef = ref(db, `UserPreferences/${currentUser.uid}/bookingSettings`);
+      await set(bookingSettingsRef, bookingSettings);
+
+      toast({ title: "Preferences Saved", description: "Your settings have been successfully saved." });
     } catch (error: any) {
       console.error("Error saving user preferences:", error);
-      toast({ title: "Error Saving Preferences", description: error.message || "Could not save your working hours.", variant: "destructive" });
+      toast({ title: "Error Saving Preferences", description: error.message || "Could not save your settings.", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -331,6 +361,35 @@ export default function PreferencesClientPage() {
                 )}
             </CardContent>
           </Card>
+          
+          <Card className="shadow-xl">
+            <CardHeader>
+                <CardTitle className="text-xl font-bold flex items-center"><Timer className="mr-2 h-5 w-5 text-primary" /> Booking Settings</CardTitle>
+                <CardDescription>Configure the default settings for your internal booking form.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                    <div>
+                        <Label htmlFor="bookingSlotDuration">Booking Slot Duration</Label>
+                        <p className="text-xs text-muted-foreground mt-1">Set the default appointment length for new bookings created internally.</p>
+                    </div>
+                    <Select
+                        value={String(bookingSettings.slotDuration)}
+                        onValueChange={(value) => handleBookingSettingsChange('slotDuration', Number(value))}
+                        disabled={isSaving || isLoadingPreferences}
+                    >
+                        <SelectTrigger id="bookingSlotDuration" className="w-full sm:w-[180px]">
+                            <SelectValue placeholder="Select duration" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="15">15 minutes</SelectItem>
+                            <SelectItem value="30">30 minutes</SelectItem>
+                            <SelectItem value="60">1 hour</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </CardContent>
+          </Card>
 
           <Card className="shadow-xl">
             <CardHeader>
@@ -371,12 +430,13 @@ export default function PreferencesClientPage() {
                       </div>
                     </div>
                   ))}
-                  <div className="flex justify-end mt-6">
-                    <Button onClick={handleSaveChanges} disabled={isSaving || isLoadingPreferences}>{isSaving ? <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5" /> : "Save Changes"}</Button>
-                  </div>
+                  
                 </>
               )}
             </CardContent>
+             <CardFooter className="flex justify-end pt-0 p-6">
+                <Button onClick={handleSaveChanges} disabled={isSaving || isLoadingPreferences}>{isSaving ? <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5" /> : "Save All Settings"}</Button>
+            </CardFooter>
           </Card>
           
           <Card className="shadow-xl border-destructive/50">
