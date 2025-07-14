@@ -322,5 +322,3 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   console.log("--- AuthProvider (AuthContext.tsx) --- Rendering with value:", { currentUser: currentUser?.uid || null, loading, appName: auth?.name || "N/A" });
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
-    
