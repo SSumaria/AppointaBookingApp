@@ -148,15 +148,6 @@ export default function PublicBookingPage() {
     }
   }, [toast]);
 
-  useEffect(() => {
-    if (serviceProviderUserId && initialCheckDone && serviceProviderExists === true) { 
-        fetchUserPreferences(serviceProviderUserId);
-    } else if (initialCheckDone && serviceProviderExists === false) {
-        setWorkingHoursPreferences(initialWorkingHoursDefaults);
-        setIsLoadingPreferences(false);
-    }
-  }, [serviceProviderUserId, initialCheckDone, serviceProviderExists, fetchUserPreferences]);
-
 
   const checkServiceProvider = useCallback(async () => {
     console.log(`PublicBookingPage: checkServiceProvider called for User ID: '${serviceProviderUserId}'.`);
@@ -167,36 +158,20 @@ export default function PublicBookingPage() {
       return;
     }
 
-    let providerDataFound = false;
     try {
       // Fetch provider name first by accessing the 'name' child directly
       const userNameRef = ref(db, `Users/${serviceProviderUserId}/name`);
       const userNameSnapshot = await get(userNameRef);
       if (userNameSnapshot.exists()) {
           setServiceProviderName(userNameSnapshot.val() || '');
-          providerDataFound = true; // Finding a name is sufficient to confirm existence
-      }
-        
-      // The rest of the checks can confirm if they have started using the app
-      if (!providerDataFound) {
-        const apptRef = ref(db, `Appointments/${serviceProviderUserId}`);
-        const apptSnapshot = await get(apptRef);
-        if (apptSnapshot.exists() && Object.keys(apptSnapshot.val()).length > 0) providerDataFound = true;
-
-        if (!providerDataFound) {
-            const clientRef = ref(db, `Clients/${serviceProviderUserId}`);
-            const clientSnapshot = await get(clientRef);
-            if (clientSnapshot.exists() && Object.keys(clientSnapshot.val()).length > 0) providerDataFound = true;
-        }
-        if (!providerDataFound) {
-            const prefsRef = ref(db, `UserPreferences/${serviceProviderUserId}`);
-            const prefsSnapshot = await get(prefsRef);
-            if (prefsSnapshot.exists()) providerDataFound = true;
-        }
+          setServiceProviderExists(true); // Finding a name is sufficient to confirm existence
+      } else {
+        // If name doesn't exist, we assume the provider is not valid or new.
+        // For simplicity, we'll treat them as non-existent for the public page.
+        setServiceProviderExists(false);
       }
       
-      setServiceProviderExists(providerDataFound);
-      console.log(`PublicBookingPage: Provider ${providerDataFound ? 'VERIFIED' : 'NOT VERIFIED/NEW'}.`);
+      console.log(`PublicBookingPage: Provider ${userNameSnapshot.exists() ? 'VERIFIED' : 'NOT VERIFIED/NEW'}.`);
     } catch (error: any) {
       console.error(`PublicBookingPage: Error during database check for ID '${serviceProviderUserId}':`, error);
       toast({ title: "Error Verifying Provider", description: `Could not verify provider status. ${error.message}`, variant: "destructive" });
@@ -215,6 +190,17 @@ export default function PublicBookingPage() {
         setIsLoadingPreferences(false);
     }
   }, [serviceProviderUserId, checkServiceProvider]);
+
+  
+  useEffect(() => {
+    if (serviceProviderUserId && initialCheckDone && serviceProviderExists === true) { 
+        fetchUserPreferences(serviceProviderUserId);
+    } else if (initialCheckDone && serviceProviderExists !== true) {
+        // Don't fetch if provider doesn't exist or check is not done
+        setWorkingHoursPreferences(initialWorkingHoursDefaults);
+        setIsLoadingPreferences(false);
+    }
+  }, [serviceProviderUserId, initialCheckDone, serviceProviderExists, fetchUserPreferences]);
 
 
   const fetchBookedSlots = useCallback(async (selectedDate: Date) => {
@@ -261,10 +247,10 @@ export default function PublicBookingPage() {
   }, [serviceProviderUserId, toast]);
 
   useEffect(() => {
-    if (date && serviceProviderUserId && initialCheckDone) { 
+    if (date && serviceProviderUserId && initialCheckDone && serviceProviderExists === true) { 
       fetchBookedSlots(date);
     }
-  }, [date, serviceProviderUserId, initialCheckDone, fetchBookedSlots]);
+  }, [date, serviceProviderUserId, initialCheckDone, serviceProviderExists, fetchBookedSlots]);
 
   const displayableTimeSlots = useMemo(() => {
     if (!date || isLoadingPreferences || !workingHoursPreferences) return [];

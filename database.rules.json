@@ -12,7 +12,7 @@
     },
     "UserPreferences": {
       "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
+        ".read": true,
         ".write": "auth != null && auth.uid === $uid && (!data.exists() || newData.exists())",
         "googleCalendar": {
           ".write": "newData.child('writtenBy').val() === $uid"
@@ -21,7 +21,7 @@
     },
     "Appointments": {
       "$serviceProviderId": {
-        ".read": "auth != null && auth.uid === $serviceProviderId",
+        ".read": true,
         ".write": "auth != null && auth.uid == $serviceProviderId && (!data.exists() || newData.exists())",
         ".indexOn": ["AppointmentDate", "ClientID"],
         "$appointmentId": {
