@@ -169,13 +169,12 @@ export default function PublicBookingPage() {
 
     let providerDataFound = false;
     try {
-      // Fetch provider name first
-      const userRef = ref(db, `Users/${serviceProviderUserId}`);
-      const userSnapshot = await get(userRef);
-      if (userSnapshot.exists()) {
-          const userData = userSnapshot.val();
-          setServiceProviderName(userData.name || '');
-          providerDataFound = true; // Finding a user record is sufficient to confirm existence
+      // Fetch provider name first by accessing the 'name' child directly
+      const userNameRef = ref(db, `Users/${serviceProviderUserId}/name`);
+      const userNameSnapshot = await get(userNameRef);
+      if (userNameSnapshot.exists()) {
+          setServiceProviderName(userNameSnapshot.val() || '');
+          providerDataFound = true; // Finding a name is sufficient to confirm existence
       }
         
       // The rest of the checks can confirm if they have started using the app
@@ -669,7 +668,3 @@ export default function PublicBookingPage() {
     </div>
   );
 }
-
-    
-
-    
