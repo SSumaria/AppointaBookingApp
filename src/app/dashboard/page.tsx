@@ -5,15 +5,18 @@
 console.log("--- DashboardPage (/src/app/dashboard/page.tsx) --- MODULE SCRIPT EXECUTING (SERVER-SIDE LOG)");
 
 import Link from 'next/link';
-import { Calendar, Clock, Users, ExternalLink } from "lucide-react"; 
+import { Calendar, Clock, Users, ExternalLink, Loader2 } from "lucide-react"; 
 import { Button } from "@/components/ui/button";
 import Header from '@/components/layout/Header'; 
 import { useAuth } from '@/context/AuthContext'; 
 import { useRouter } from 'next/navigation'; 
-import React, { useState, useEffect } from 'react'; 
+import React, { useState, useEffect, useCallback } from 'react'; 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import WelcomeTour from '@/components/feature/WelcomeTour';
+import { ref, get, update } from 'firebase/database';
+import { db } from '@/lib/firebaseConfig';
 
 
 export default function DashboardPage() {
@@ -21,6 +24,50 @@ export default function DashboardPage() {
   const router = useRouter(); 
   const [publicBookingLink, setPublicBookingLink] = useState('');
   const { toast } = useToast();
+
+  const [showWelcomeTour, setShowWelcomeTour] = useState(false);
+  const [isCheckingTourStatus, setIsCheckingTourStatus] = useState(true);
+
+  const checkWelcomeTourStatus = useCallback(async () => {
+    if (!currentUser) {
+      setIsCheckingTourStatus(false);
+      return;
+    }
+    try {
+      const userRef = ref(db, `Users/${currentUser.uid}`);
+      const snapshot = await get(userRef);
+      if (snapshot.exists()) {
+        const userData = snapshot.val();
+        // Show tour if hasSeenWelcomeTour is explicitly false
+        setShowWelcomeTour(userData.hasSeenWelcomeTour === false);
+      }
+    } catch (error) {
+      console.error("Error checking welcome tour status:", error);
+      // Don't show the tour if there's an error
+      setShowWelcomeTour(false);
+    } finally {
+      setIsCheckingTourStatus(false);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!loading) {
+      checkWelcomeTourStatus();
+    }
+  }, [loading, checkWelcomeTourStatus]);
+
+  const handleTourFinish = async () => {
+    setShowWelcomeTour(false);
+    if (!currentUser) return;
+    try {
+      const userRef = ref(db, `Users/${currentUser.uid}`);
+      await update(userRef, { hasSeenWelcomeTour: true });
+    } catch (error) {
+      console.error("Failed to update welcome tour status:", error);
+      // This is not critical, so we don't show a toast to the user
+    }
+  };
+
 
   useEffect(() => {
     if (!loading && !currentUser) {
@@ -66,16 +113,13 @@ export default function DashboardPage() {
     });
   };
 
-  if (loading || !currentUser) {
+  if (loading || !currentUser || isCheckingTourStatus) {
     return (
         <div className="min-h-screen flex flex-col">
             <Header />
             <main className="flex-grow flex items-center justify-center">
                 <div className="text-center">
-                    <svg className="animate-spin mx-auto h-12 w-12 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
+                    <Loader2 className="animate-spin mx-auto h-12 w-12 text-primary" />
                     <p className="mt-4 text-muted-foreground">Loading dashboard...</p>
                 </div>
             </main>
@@ -90,6 +134,15 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header /> 
+      {showWelcomeTour && (
+          <WelcomeTour
+              onFinish={handleTourFinish}
+              isOpen={showWelcomeTour}
+              onOpenChange={(isOpen) => {
+                  if (!isOpen) handleTourFinish();
+              }}
+          />
+      )}
       <main className="flex-grow py-12">
         <div className="container max-w-5xl mx-auto text-center">
           <h1 className="text-4xl font-bold text-primary mb-4">
@@ -159,3 +212,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
