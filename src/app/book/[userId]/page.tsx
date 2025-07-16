@@ -88,6 +88,7 @@ export default function PublicBookingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [serviceProviderExists, setServiceProviderExists] = useState<boolean | null>(null);
+  const [serviceProviderName, setServiceProviderName] = useState('');
   const [initialCheckDone, setInitialCheckDone] = useState(false);
 
   const [bookedTimeSlotsForDate, setBookedTimeSlotsForDate] = useState<Set<string>>(new Set());
@@ -168,19 +169,31 @@ export default function PublicBookingPage() {
 
     let providerDataFound = false;
     try {
-      const apptRef = ref(db, `Appointments/${serviceProviderUserId}`);
-      const apptSnapshot = await get(apptRef);
-      if (apptSnapshot.exists() && Object.keys(apptSnapshot.val()).length > 0) providerDataFound = true;
-
-      if (!providerDataFound) {
-        const clientRef = ref(db, `Clients/${serviceProviderUserId}`);
-        const clientSnapshot = await get(clientRef);
-        if (clientSnapshot.exists() && Object.keys(clientSnapshot.val()).length > 0) providerDataFound = true;
+      // Fetch provider name first
+      const userRef = ref(db, `Users/${serviceProviderUserId}`);
+      const userSnapshot = await get(userRef);
+      if (userSnapshot.exists()) {
+          const userData = userSnapshot.val();
+          setServiceProviderName(userData.name || '');
+          providerDataFound = true; // Finding a user record is sufficient to confirm existence
       }
+        
+      // The rest of the checks can confirm if they have started using the app
       if (!providerDataFound) {
-        const prefsRef = ref(db, `UserPreferences/${serviceProviderUserId}`);
-        const prefsSnapshot = await get(prefsRef);
-        if (prefsSnapshot.exists()) providerDataFound = true;
+        const apptRef = ref(db, `Appointments/${serviceProviderUserId}`);
+        const apptSnapshot = await get(apptRef);
+        if (apptSnapshot.exists() && Object.keys(apptSnapshot.val()).length > 0) providerDataFound = true;
+
+        if (!providerDataFound) {
+            const clientRef = ref(db, `Clients/${serviceProviderUserId}`);
+            const clientSnapshot = await get(clientRef);
+            if (clientSnapshot.exists() && Object.keys(clientSnapshot.val()).length > 0) providerDataFound = true;
+        }
+        if (!providerDataFound) {
+            const prefsRef = ref(db, `UserPreferences/${serviceProviderUserId}`);
+            const prefsSnapshot = await get(prefsRef);
+            if (prefsSnapshot.exists()) providerDataFound = true;
+        }
       }
       
       setServiceProviderExists(providerDataFound);
@@ -540,7 +553,9 @@ export default function PublicBookingPage() {
                 )}
                 <Card className="shadow-xl">
                     <CardHeader>
-                        <CardTitle className="text-xl font-bold text-center text-primary">New Appointment Booking</CardTitle>
+                        <CardTitle className="text-xl font-bold text-center text-primary">
+                            New Appointment Booking {serviceProviderName && `for ${serviceProviderName}`}
+                        </CardTitle>
                         <CardDescription className="text-center">Fill in your details for a 1-hour appointment.</CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -654,3 +669,7 @@ export default function PublicBookingPage() {
     </div>
   );
 }
+
+    
+
+    
