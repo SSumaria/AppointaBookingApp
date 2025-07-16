@@ -3,14 +3,28 @@
   "rules": {
     "Users": {
       "$uid": {
-        ".read": true,
-        ".write": "auth != null && auth.uid === $uid"
+        ".write": "auth != null && auth.uid === $uid",
+        "name": {
+          ".read": true
+        },
+        "email": {
+          ".read": "auth != null && auth.uid === $uid"
+        },
+        "createdAt": {
+          ".read": "auth != null && auth.uid === $uid"
+        },
+        "lastLogInTime": {
+          ".read": "auth != null && auth.uid === $uid"
+        },
+        "hasSeenWelcomeTour": {
+          ".read": "auth != null && auth.uid === $uid"
+        }
       }
     },
     "UserPreferences": {
       "$uid": {
-        ".read": true,
-        ".write": "(auth != null && auth.uid === $uid) && (!data.exists() || newData.exists())",
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && !newData.exists()",
         "workingHours": {
           ".write": "auth != null && auth.uid === $uid"
         },
@@ -24,8 +38,8 @@
     },
     "Appointments": {
       "$serviceProviderId": {
-        ".read": true,
-        ".write": "(auth != null && auth.uid == $serviceProviderId) && (!data.exists() || newData.exists())",
+        ".read": "auth != null && auth.uid === $serviceProviderId",
+        ".write": "auth != null && auth.uid == $serviceProviderId && !newData.exists()",
         ".indexOn": ["AppointmentDate", "ClientID"],
         "$appointmentId": {
           ".write": "(auth != null && auth.uid == $serviceProviderId) || (newData.exists() && !data.exists() && newData.child('BookedByUserID').val() == $serviceProviderId) || (data.exists() && newData.child('_serverUpdatedBy').val() === $serviceProviderId)"
@@ -34,8 +48,8 @@
     },
     "Clients": {
       "$serviceProviderId": {
-        ".read": true,
-        ".write": "(auth != null && auth.uid == $serviceProviderId) && (!data.exists() || newData.exists())",
+        ".read": "auth != null && auth.uid === $serviceProviderId",
+        ".write": "auth != null && auth.uid == $serviceProviderId && !newData.exists()",
         ".indexOn": ["ClientEmail","ClientName"],
         "$clientId": {
           ".write": "(auth != null && auth.uid == $serviceProviderId) || (newData.exists() && !data.exists() && newData.child('CreatedByUserID').val() == $serviceProviderId)"
