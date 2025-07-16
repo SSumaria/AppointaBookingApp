@@ -78,14 +78,13 @@ export default function WelcomeTour({ isOpen, onOpenChange, onFinish }: WelcomeT
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-lg p-0" onPointerDownOutside={(e) => e.preventDefault()}>
-                <div className="relative h-60 w-full">
+                <div className="relative h-60 w-full bg-muted rounded-t-lg">
                     <Image
                         src={imageSrc}
                         alt={imageAlt}
                         layout="fill"
-                        objectFit="cover"
-                        className="rounded-t-lg"
-                        data-ai-hint="abstract technology"
+                        objectFit="contain"
+                        className="rounded-t-lg p-2"
                     />
                 </div>
                 <DialogHeader className="p-6">
