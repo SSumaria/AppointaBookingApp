@@ -3,6 +3,7 @@ import type {Metadata} from 'next';
 import './globals.css';
 import {Toaster} from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/AuthContext'; // Added
+import { GeistSans } from 'geist/font/sans';
 
 export const metadata: Metadata = {
   title: 'Appointa', // Updated title
@@ -18,8 +19,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`font-sans antialiased`}> {/* Removed Geist font classes */}
+    <html lang="en" className={GeistSans.variable}>
+      <body className={`font-sans antialiased`}>
         <AuthProvider> {/* Added AuthProvider */}
           {children}
           <Toaster/>
