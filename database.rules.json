@@ -12,9 +12,9 @@
     "UserPreferences": {
       "$uid": {
         ".read": true,
-        ".write": "auth != null && auth.uid === $uid && (!data.exists() || newData.exists())",
+        ".write": "auth != null && auth.uid === $uid",
         "googleCalendar": {
-          ".write": "newData.child('writtenBy').val() === $uid"
+          ".write": "(newData.exists() && newData.child('writtenBy').val() === $uid) || (!newData.exists() && data.child('tokens/refresh_token').exists())"
         }
       }
     },
