@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
         source: '/(.*)',
         headers: [
           {
-            key: 'Cross-Origin-Opener-Policy',
+            key: 'Cross-origin-opener-policy',
             value: 'same-origin-allow-popups',
           },
         ],
