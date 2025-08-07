@@ -21,7 +21,7 @@
     "Appointments": {
       "$serviceProviderId": {
         ".read": true,
-        ".write": "auth != null && auth.uid == $serviceProviderId && (!data.exists() || newData.exists())",
+        ".write": "auth != null && auth.uid == $serviceProviderId",
         ".indexOn": ["AppointmentDate", "ClientID"],
         "$appointmentId": {
           ".write": "(auth != null && auth.uid == $serviceProviderId) || (newData.exists() && !data.exists() && newData.child('BookedByUserID').val() == $serviceProviderId) || (data.exists() && newData.child('_serverUpdatedBy').val() === $serviceProviderId)"
@@ -31,7 +31,7 @@
     "Clients": {
       "$serviceProviderId": {
         ".read": "auth != null && auth.uid === $serviceProviderId",
-        ".write": "auth != null && auth.uid == $serviceProviderId && (!data.exists() || newData.exists())",
+        ".write": "auth != null && auth.uid == $serviceProviderId",
         ".indexOn": ["ClientEmail","ClientName"],
         "$clientId": {
           ".write": "(auth != null && auth.uid == $serviceProviderId) || (newData.exists() && !data.exists() && newData.child('CreatedByUserID').val() == $serviceProviderId)"
