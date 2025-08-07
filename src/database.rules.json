@@ -1,0 +1,42 @@
+{
+  "rules": {
+    "Users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "name": {
+          ".read": true
+        }
+      }
+    },
+    "UserPreferences": {
+      "$uid": {
+        ".read": true,
+        ".write": "auth != null && auth.uid === $uid",
+        "googleCalendar": {
+          ".write": "(newData.exists() && newData.child('writtenBy').val() === $uid) || (!newData.exists() && data.child('tokens/refresh_token').exists())"
+        }
+      }
+    },
+    "Appointments": {
+      "$serviceProviderId": {
+        ".read": true,
+        ".write": "auth != null && auth.uid == $serviceProviderId",
+        ".indexOn": ["AppointmentDate", "ClientID"],
+        "$appointmentId": {
+          ".write": "(auth != null && auth.uid == $serviceProviderId) || (newData.exists() && !data.exists() && newData.child('BookedByUserID').val() == $serviceProviderId) || (data.exists() && newData.child('_serverUpdatedBy').val() === $serviceProviderId)"
+        }
+      }
+    },
+    "Clients": {
+      "$serviceProviderId": {
+        ".read": "auth != null && auth.uid === $serviceProviderId",
+        ".write": "auth != null && auth.uid == $serviceProviderId",
+        ".indexOn": ["ClientEmail","ClientName"],
+        "$clientId": {
+          ".write": "(auth != null && auth.uid == $serviceProviderId) || (newData.exists() && !data.exists() && newData.child('CreatedByUserID').val() == $serviceProviderId)"
+        }
+      }
+    }
+  }
+}
