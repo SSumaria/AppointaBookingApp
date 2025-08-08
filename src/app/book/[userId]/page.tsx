@@ -7,7 +7,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation';
 import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { format, addMinutes, parse, getHours, getMinutes, getDay } from "date-fns";
+import { format, addMinutes, parse, getHours, getMinutes, getDay, parseISO } from "date-fns";
 import { Calendar as CalendarIcon, Clock, AlertTriangle, Loader2, User } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { ref, set, get, query as rtQuery, orderByChild, equalTo, push } from "firebase/database";
-import { db } from '@/lib/firebaseConfig'; 
+import { db } from '@/lib/firebaseConfig';
+import { emailService } from '@/lib/emailService';
 
 interface ExistingBooking {
   AppointmentStartTime: string;
@@ -89,6 +90,7 @@ export default function PublicBookingPage() {
   
   const [serviceProviderExists, setServiceProviderExists] = useState<boolean | null>(null);
   const [serviceProviderName, setServiceProviderName] = useState('');
+  const [serviceProviderEmail, setServiceProviderEmail] = useState('');
   const [initialCheckDone, setInitialCheckDone] = useState(false);
 
   const [bookedTimeSlotsForDate, setBookedTimeSlotsForDate] = useState<Set<string>>(new Set());
@@ -159,19 +161,19 @@ export default function PublicBookingPage() {
     }
 
     try {
-      // Fetch provider name first by accessing the 'name' child directly
-      const userNameRef = ref(db, `Users/${serviceProviderUserId}/name`);
-      const userNameSnapshot = await get(userNameRef);
-      if (userNameSnapshot.exists()) {
-          setServiceProviderName(userNameSnapshot.val() || '');
-          setServiceProviderExists(true); // Finding a name is sufficient to confirm existence
+      const userRef = ref(db, `Users/${serviceProviderUserId}`);
+      const userSnapshot = await get(userRef);
+
+      if (userSnapshot.exists()) {
+          const userData = userSnapshot.val();
+          setServiceProviderName(userData.name || '');
+          setServiceProviderEmail(userData.email || ''); // Store the email
+          setServiceProviderExists(true);
       } else {
-        // If name doesn't exist, we assume the provider is not valid or new.
-        // For simplicity, we'll treat them as non-existent for the public page.
         setServiceProviderExists(false);
       }
       
-      console.log(`PublicBookingPage: Provider ${userNameSnapshot.exists() ? 'VERIFIED' : 'NOT VERIFIED/NEW'}.`);
+      console.log(`PublicBookingPage: Provider ${userSnapshot.exists() ? 'VERIFIED' : 'NOT VERIFIED/NEW'}.`);
     } catch (error: any) {
       console.error(`PublicBookingPage: Error during database check for ID '${serviceProviderUserId}':`, error);
       toast({ title: "Error Verifying Provider", description: `Could not verify provider status. ${error.message}`, variant: "destructive" });
@@ -441,8 +443,26 @@ export default function PublicBookingPage() {
         const newAppointmentRef = push(ref(db, providerAppointmentsRefPath));
         appointmentDataToSave.AppointmentID = newAppointmentRef.key as string;
         await set(newAppointmentRef, appointmentDataToSave);
-
-        toast({ title: "Booking Confirmed!", description: `Your 1-hour appointment for ${serviceProcedure} has been booked.` });
+        
+        // Send email notifications
+        if (clientEmail && serviceProviderEmail && date) {
+            try {
+                await emailService.sendConfirmationNotice({
+                    providerEmail: serviceProviderEmail,
+                    clientName: clientName,
+                    clientEmail: clientEmail,
+                    appointmentDate: format(date, "PPP"),
+                    appointmentTime: `${startTime} - ${calculatedEndTime}`,
+                    service: serviceProcedure,
+                });
+                toast({ title: "Booking Confirmed!", description: `Your 1-hour appointment for ${serviceProcedure} has been booked. A confirmation email has been sent.` });
+            } catch (emailError) {
+                console.error("Failed to send confirmation emails:", emailError);
+                toast({ title: "Booking Confirmed (Email Failed)", description: "Your appointment is booked, but the confirmation email could not be sent.", variant: "destructive" });
+            }
+        } else {
+            toast({ title: "Booking Confirmed!", description: `Your 1-hour appointment for ${serviceProcedure} has been booked.` });
+        }
         
         const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         // Sync to Google Calendar (fire-and-forget)

@@ -31,6 +31,23 @@ interface BookingEmailParams {
 }
 
 export const emailService = {
+    sendConfirmationNotice: async ({ providerEmail, clientName, clientEmail, appointmentDate, appointmentTime, service }: BookingEmailParams) => {
+        const subject = `Appointment Confirmed: ${service} on ${appointmentDate}`;
+        const html = `
+            <h1>Appointment Confirmed</h1>
+            <p>This is a confirmation for the following appointment:</p>
+            <ul>
+                <li><strong>Client:</strong> ${clientName}</li>
+                <li><strong>Service:</strong> ${service}</li>
+                <li><strong>Date:</strong> ${appointmentDate}</li>
+                <li><strong>Time:</strong> ${appointmentTime}</li>
+            </ul>
+        `;
+        // Send to both provider and client
+        await sendEmail({ to: providerEmail, subject, html });
+        await sendEmail({ to: clientEmail, subject, html });
+    },
+
     sendCancellationNotice: async ({ providerEmail, clientName, clientEmail, appointmentDate, appointmentTime, service }: BookingEmailParams) => {
         const subject = `Appointment Canceled: ${service} on ${appointmentDate}`;
         const html = `

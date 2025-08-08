@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { format, addMinutes, parse } from "date-fns";
+import { format, addMinutes, parse, parseISO } from "date-fns";
 import { Calendar as CalendarIcon, Clock, User, StickyNote, Mail, Phone, Briefcase } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 
 import { ref, set, get, query as rtQuery, orderByChild, equalTo, push, startAt, endAt, update } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
+import { emailService } from '@/lib/emailService';
 
 interface Note {
   id: string;
@@ -259,7 +260,7 @@ export default function NewBookingPage() {
         e.preventDefault();
         setIsSubmitting(true);
 
-        if (!currentUser) {
+        if (!currentUser || !currentUser.email) {
             toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" });
             setIsSubmitting(false);
             router.push('/login');
@@ -407,7 +408,21 @@ export default function NewBookingPage() {
                 _ClientPhoneSnapshot: finalClientPhoneForAppointment,
             });
 
-            toast({ title: "Success", description: `Booking Confirmed for ${finalClientNameForAppointment}!` });
+             // Send email notifications
+            try {
+                await emailService.sendConfirmationNotice({
+                    providerEmail: currentUser.email,
+                    clientName: finalClientNameForAppointment,
+                    clientEmail: finalClientEmailForAppointment,
+                    appointmentDate: format(parseISO(selectedFormattedDate), "PPP"),
+                    appointmentTime: `${startTime} - ${endTime}`,
+                    service: serviceProcedure,
+                });
+                toast({ title: "Success", description: `Booking Confirmed for ${finalClientNameForAppointment}! Notifications sent.` });
+            } catch(emailError) {
+                console.error("Failed to send confirmation emails:", emailError);
+                toast({ title: "Booking Confirmed (Email Failed)", description: "The booking was saved, but email notifications could not be sent.", variant: "destructive" });
+            }
             
             // Sync to Google Calendar (fire-and-forget)
             const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
