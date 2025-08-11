@@ -2,6 +2,7 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getDatabase, type Database } from "firebase/database";
 import { getAuth, type Auth, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { getAnalytics, type Analytics } from "firebase/analytics";
 
 // --- Start of Diagnostic Logging ---
 console.log("--- Firebase Config START (firebaseConfig.ts) --- MODULE EXECUTING ---");
@@ -48,6 +49,7 @@ if (!firebaseConfig.apiKey) {
 let app: FirebaseApp;
 let db: Database;
 let authInstance: Auth;
+let analyticsInstance: Analytics | undefined = undefined;
 
 try {
   if (!getApps().length) {
@@ -67,6 +69,16 @@ try {
 
   db = getDatabase(app);
   console.log("Firebase Database and Auth services OBTAINED successfully (firebaseConfig.ts).");
+  
+  // Initialize Analytics only in the browser
+  if (typeof window !== "undefined" && firebaseConfig.measurementId) {
+    console.log("Attempting to initialize Firebase Analytics (firebaseConfig.ts)...");
+    analyticsInstance = getAnalytics(app);
+    console.log("Firebase Analytics INITIALIZED successfully (firebaseConfig.ts).");
+  } else {
+    console.log("Firebase Analytics NOT initialized (not in browser or no measurementId).");
+  }
+
 
 } catch (error: any) {
   console.error("FATAL ERROR during Firebase initialization or service retrieval (firebaseConfig.ts):", error.message, error.stack);
@@ -85,4 +97,4 @@ try {
 
 console.log("--- Firebase Config END (firebaseConfig.ts) --- Exporting app, db, authInstance:", { appExists: !!app, dbExists: !!db, authInstanceExists: !!authInstance });
 
-export { app, db, authInstance as auth, firebaseConfig };
+export { app, db, authInstance as auth, analyticsInstance as analytics, firebaseConfig };
