@@ -1,7 +1,7 @@
+
 // A mock email service for demonstration purposes.
 // In a real application, you would replace this with a real email provider like SendGrid, Mailgun, etc.
-
-import { format, parseISO } from 'date-fns';
+// This service is now called exclusively from the /api/send-email route.
 
 interface EmailParams {
     to: string;

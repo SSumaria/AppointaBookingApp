@@ -57,7 +57,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import WeeklyCalendarView from '@/components/calendar/WeeklyCalendarView';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { emailService } from '@/lib/emailService';
 
 
 interface Note {
@@ -298,23 +297,29 @@ export default function AllBookingsPage() {
 
       if (booking.ClientEmail) {
         try {
-            await emailService.sendCancellationNotice({
+            const emailPayload = {
+                action: 'sendCancellation',
                 providerEmail: currentUser.email,
                 clientName: booking.ClientName || 'Valued Client',
                 clientEmail: booking.ClientEmail,
                 appointmentDate: format(parseISO(booking.AppointmentDate), "PPP"),
                 appointmentTime: `${booking.AppointmentStartTime} - ${booking.AppointmentEndTime}`,
                 service: booking.ServiceProcedure,
+            };
+            await fetch('/api/send-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(emailPayload),
             });
             toast({
                 title: "Booking Cancelled & Notified",
-                description: "The booking was cancelled and notifications have been sent.",
+                description: "The booking was cancelled and notification logs have been generated.",
             });
         } catch (emailError) {
-            console.error("Failed to send cancellation emails:", emailError);
+            console.error("Failed to call send-email API for cancellation:", emailError);
             toast({
-                title: "Booking Cancelled (Email Failed)",
-                description: "The booking was cancelled, but email notifications could not be sent.",
+                title: "Booking Cancelled (Email API Failed)",
+                description: "The booking was cancelled, but the email notification API could not be reached.",
                 variant: "destructive"
             });
         }
@@ -517,17 +522,23 @@ export default function AllBookingsPage() {
             service: serviceProcedure,
         };
          try {
-            await emailService.sendUpdateNotice({
+            const emailPayload = {
+                action: 'sendUpdate',
                 providerEmail: currentUser.email,
                 clientName: bookingToEdit.ClientName || 'Valued Client',
                 clientEmail: bookingToEdit.ClientEmail,
                 oldDetails: oldDetails,
                 newDetails: newDetails,
+            };
+            await fetch('/api/send-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(emailPayload),
             });
-            toast({ title: "Booking Updated & Notified", description: "The booking has been successfully updated and notifications sent." });
+            toast({ title: "Booking Updated & Notified", description: "The booking has been successfully updated and notification logs generated." });
         } catch (emailError) {
-            console.error("Failed to send update emails:", emailError);
-            toast({ title: "Booking Updated (Email Failed)", description: "The booking was updated, but email notifications failed.", variant: "destructive" });
+            console.error("Failed to call send-email API for update:", emailError);
+            toast({ title: "Booking Updated (Email API Failed)", description: "The booking was updated, but email notifications failed.", variant: "destructive" });
         }
       } else {
         toast({ title: "Booking Updated", description: "The booking has been successfully updated. (No client email for notification)." });

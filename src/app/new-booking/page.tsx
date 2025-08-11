@@ -21,7 +21,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 
 import { ref, set, get, query as rtQuery, orderByChild, equalTo, push, startAt, endAt, update } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
-import { emailService } from '@/lib/emailService';
 
 interface Note {
   id: string;
@@ -408,20 +407,27 @@ export default function NewBookingPage() {
                 _ClientPhoneSnapshot: finalClientPhoneForAppointment,
             });
 
-             // Send email notifications
+             // Send email notifications via API route
             try {
-                await emailService.sendConfirmationNotice({
+                const emailPayload = {
+                    action: 'sendConfirmation',
                     providerEmail: currentUser.email,
                     clientName: finalClientNameForAppointment,
                     clientEmail: finalClientEmailForAppointment,
                     appointmentDate: format(parseISO(selectedFormattedDate), "PPP"),
                     appointmentTime: `${startTime} - ${endTime}`,
                     service: serviceProcedure,
+                };
+
+                await fetch('/api/send-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(emailPayload)
                 });
-                toast({ title: "Success", description: `Booking Confirmed for ${finalClientNameForAppointment}! Notifications sent.` });
+                toast({ title: "Success", description: `Booking Confirmed for ${finalClientNameForAppointment}! Notification logs generated.` });
             } catch(emailError) {
-                console.error("Failed to send confirmation emails:", emailError);
-                toast({ title: "Booking Confirmed (Email Failed)", description: "The booking was saved, but email notifications could not be sent.", variant: "destructive" });
+                console.error("Failed to call send-email API:", emailError);
+                toast({ title: "Booking Confirmed (Email API Failed)", description: "The booking was saved, but email notification API failed.", variant: "destructive" });
             }
             
             // Sync to Google Calendar (fire-and-forget)

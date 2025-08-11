@@ -21,7 +21,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { ref, set, get, query as rtQuery, orderByChild, equalTo, push } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
-import { emailService } from '@/lib/emailService';
 
 interface ExistingBooking {
   AppointmentStartTime: string;
@@ -447,17 +446,23 @@ export default function PublicBookingPage() {
         // Send email notifications
         if (clientEmail && serviceProviderEmail && date) {
             try {
-                await emailService.sendConfirmationNotice({
+                const emailPayload = {
+                    action: 'sendConfirmation',
                     providerEmail: serviceProviderEmail,
                     clientName: clientName,
                     clientEmail: clientEmail,
                     appointmentDate: format(date, "PPP"),
                     appointmentTime: `${startTime} - ${calculatedEndTime}`,
                     service: serviceProcedure,
+                };
+                await fetch('/api/send-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(emailPayload),
                 });
                 toast({ title: "Booking Confirmed!", description: `Your 1-hour appointment for ${serviceProcedure} has been booked. A confirmation email has been sent.` });
             } catch (emailError) {
-                console.error("Failed to send confirmation emails:", emailError);
+                console.error("Failed to call send-email API for confirmation:", emailError);
                 toast({ title: "Booking Confirmed (Email Failed)", description: "Your appointment is booked, but the confirmation email could not be sent.", variant: "destructive" });
             }
         } else {
