@@ -57,12 +57,14 @@ export default function Header() {
     <>
       {currentUser ? (
         <>
-          {currentUser.displayName && (
-            <div className="px-4 py-2 text-sm text-muted-foreground border-b">
-              <UserCircle className="mr-2 h-4 w-4 inline"/>
-              {currentUser.displayName}
-            </div>
-          )}
+          <div className="px-4 py-2 text-sm text-muted-foreground border-b">
+            <UserCircle className="mr-2 h-4 w-4 inline"/>
+            {currentUser.displayName}
+          </div>
+          <Button variant="ghost" className="justify-start w-full" onClick={() => handleNavigation('/account')}>
+            <UserCircle className="mr-2 h-4 w-4" />
+            My Account
+          </Button>
           <Button variant="ghost" className="justify-start w-full" onClick={() => handleNavigation('/preferences')}>
             <Settings className="mr-2 h-4 w-4" />
             Manage Preferences
@@ -110,6 +112,10 @@ export default function Header() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => router.push('/account')}>
+                  <UserCircle className="mr-2 h-4 w-4" />
+                  <span>My Account</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.push('/preferences')}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Manage Preferences</span>
