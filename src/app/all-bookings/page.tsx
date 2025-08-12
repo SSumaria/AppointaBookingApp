@@ -420,12 +420,18 @@ export default function AllBookingsPage() {
             reader.onloadend = async () => {
                 const base64Audio = reader.result as string;
                 try {
-                    const { transcription } = await transcribeAudio({ audioDataUri: base64Audio });
-                    if (transcription) {
-                        setNewNoteInputValue(prev => prev ? `${prev} ${transcription}`.trim() : transcription);
+                    const { subjective, objective, assessment, plan } = await transcribeAudio({ audioDataUri: base64Audio });
+                    if (subjective || objective || assessment || plan) {
+                        const formattedNote = [
+                          `S: ${subjective}`,
+                          `O: ${objective}`,
+                          `A: ${assessment}`,
+                          `P: ${plan}`
+                        ].join('\n');
+                        setNewNoteInputValue(prev => prev ? `${prev}\n\n${formattedNote}`.trim() : formattedNote);
                         toast({ title: "Transcription successful" });
                     } else {
-                        toast({ title: "Transcription failed", description: "Could not transcribe audio.", variant: "destructive" });
+                        toast({ title: "Transcription failed", description: "Could not transcribe audio to SOAP format.", variant: "destructive" });
                     }
                 } catch (error) {
                     console.error("Transcription error:", error);

@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview An audio transcription AI flow.
+ * @fileOverview An audio transcription AI flow that formats notes into SOAP format.
  *
  * - transcribeAudio - A function that handles the audio transcription process.
  * - TranscribeAudioInput - The input type for the transcribeAudio function.
@@ -21,7 +21,10 @@ const TranscribeAudioInputSchema = z.object({
 export type TranscribeAudioInput = z.infer<typeof TranscribeAudioInputSchema>;
 
 const TranscribeAudioOutputSchema = z.object({
-  transcription: z.string().describe('The transcribed text from the audio.'),
+  subjective: z.string().describe("The subjective part of the SOAP note."),
+  objective: z.string().describe("The objective part of the SOAP note."),
+  assessment: z.string().describe("The assessment part of the SOAP note."),
+  plan: z.string().describe("The plan part of the SOAP note."),
 });
 export type TranscribeAudioOutput = z.infer<
   typeof TranscribeAudioOutputSchema
@@ -31,7 +34,7 @@ const speechToTextPrompt = ai.definePrompt({
     name: 'speechToTextPrompt',
     input: { schema: TranscribeAudioInputSchema },
     output: { schema: TranscribeAudioOutputSchema },
-    prompt: `Transcribe the following audio recording to text.
+    prompt: `You are a medical transcriptionist specializing in physiotherapy. Convert the following transcript into a structured JSON object with the keys "subjective", "objective", "assessment", and "plan".
   
   Audio: {{media url=audioDataUri}}
   `,
