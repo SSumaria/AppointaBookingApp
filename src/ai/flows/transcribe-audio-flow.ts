@@ -34,7 +34,7 @@ const speechToTextPrompt = ai.definePrompt({
     name: 'speechToTextPrompt',
     input: { schema: TranscribeAudioInputSchema },
     output: { schema: TranscribeAudioOutputSchema },
-    prompt: `You are a medical transcriptionist specializing in physiotherapy. Convert the following transcript into a structured JSON object with the keys "subjective", "objective", "assessment", and "plan".
+    prompt: `You are a medical transcriptionist specializing in physiotherapy. Convert the following transcript into a structured JSON object with the keys "subjective", "objective", "assessment", and "plan". For each section, summarize the key points concisely, ensuring all critical medical details are retained while keeping the overall text brief.
   
   Audio: {{media url=audioDataUri}}
   `,
@@ -49,7 +49,7 @@ const transcribeAudioFlow = ai.defineFlow(
   },
   async ({ audioDataUri }) => {
     // The Gemini model can handle webm directly, so no conversion is needed.
-    const { output } = await speechToTextPrompt({ audioDataUri: audioDataUri });
+    const { output } = await speechToTectPrompt({ audioDataUri: audioDataUri });
     return output!;
   }
 );
