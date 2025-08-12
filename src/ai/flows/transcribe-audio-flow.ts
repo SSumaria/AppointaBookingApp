@@ -49,7 +49,7 @@ const transcribeAudioFlow = ai.defineFlow(
   },
   async ({ audioDataUri }) => {
     // The Gemini model can handle webm directly, so no conversion is needed.
-    const { output } = await speechToTectPrompt({ audioDataUri: audioDataUri });
+    const { output } = await speechToTextPrompt({ audioDataUri: audioDataUri });
     return output!;
   }
 );
