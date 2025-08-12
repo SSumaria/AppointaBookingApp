@@ -8,7 +8,7 @@
  * - TranscribeAudioOutput - The return type for the transcribeAudio function.
  */
 
-import { ai } from '@/ai/genkit';
+import { ai } from '@/ai/ai-instance';
 import { z } from 'genkit';
 import * as ffmpeg from 'fluent-ffmpeg';
 import { PassThrough } from 'stream';
