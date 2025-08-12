@@ -1,9 +1,9 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { DateRange, DayContentProps } from "react-day-picker";
-import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, CalendarDays, ChevronLeft, ChevronRight, Edit3 } from "lucide-react";
+import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, CalendarDays, ChevronLeft, ChevronRight, Edit3, Mic, MicOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parse, parseISO, isSameDay, addDays, subDays, startOfWeek, endOfWeek, eachDayOfInterval, addMinutes, getHours, getMinutes } from "date-fns";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -57,6 +57,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import WeeklyCalendarView from '@/components/calendar/WeeklyCalendarView';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { transcribeAudio } from '@/ai/flows/transcribe-audio-flow';
 
 
 interface Note {
@@ -139,13 +140,36 @@ export default function AllBookingsPage() {
   const [calendarOverviewMonth, setCalendarOverviewMonth] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState<"month" | "week">("month");
   const [weekViewDate, setWeekViewDate] = useState<Date>(new Date());
-
+  
+  // States for voice recording
+  const [isRecording, setIsRecording] = useState(false);
+  const [hasMicPermission, setHasMicPermission] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
       router.push('/login');
     }
   }, [currentUser, authLoading, router]);
+  
+  useEffect(() => {
+      // Check for mic permission on component mount silently
+      navigator.mediaDevices.enumerateDevices().then(devices => {
+          const hasMic = devices.some(device => device.kind === 'audioinput');
+          if (hasMic) {
+              navigator.permissions.query({ name: 'microphone' as PermissionName }).then(permissionStatus => {
+                  if (permissionStatus.state === 'granted') {
+                      setHasMicPermission(true);
+                  }
+                  permissionStatus.onchange = () => {
+                      setHasMicPermission(permissionStatus.state === 'granted');
+                  };
+              });
+          }
+      });
+  }, []);
 
   const fetchAndSetAllBookings = useCallback(async () => {
     if (!currentUser?.uid) return;
@@ -367,6 +391,67 @@ export default function AllBookingsPage() {
       toast({ title: "Error Adding Note", description: error.message, variant: "destructive" });
     }
   };
+  
+    // --- Voice Recording Logic ---
+  const startRecording = async () => {
+    if (isRecording) return;
+    try {
+        if (!hasMicPermission) {
+            await navigator.mediaDevices.getUserMedia({ audio: true });
+            setHasMicPermission(true);
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunksRef.current.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = async () => {
+            setIsRecording(false);
+            setIsTranscribing(true);
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            const reader = new FileReader();
+            reader.readAsDataURL(audioBlob);
+            reader.onloadend = async () => {
+                const base64Audio = reader.result as string;
+                try {
+                    const { transcription } = await transcribeAudio({ audioDataUri: base64Audio });
+                    if (transcription) {
+                        setNewNoteInputValue(prev => prev ? `${prev} ${transcription}`.trim() : transcription);
+                        toast({ title: "Transcription successful" });
+                    } else {
+                        toast({ title: "Transcription failed", description: "Could not transcribe audio.", variant: "destructive" });
+                    }
+                } catch (error) {
+                    console.error("Transcription error:", error);
+                    toast({ title: "Transcription Error", description: "An error occurred during transcription.", variant: "destructive" });
+                } finally {
+                    setIsTranscribing(false);
+                }
+            };
+        };
+
+        mediaRecorder.start();
+        setIsRecording(true);
+    } catch (error) {
+        console.error("Error starting recording:", error);
+        toast({ title: "Microphone Error", description: "Could not access microphone. Please check permissions.", variant: "destructive" });
+        setHasMicPermission(false);
+    }
+  };
+
+  const stopRecording = () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+          mediaRecorderRef.current.stop();
+          // The onstop event will handle the rest
+      }
+  };
+
 
   // --- Edit Booking Logic ---
   const fetchBookedSlotsForEditForm = useCallback(async (selectedDate: Date, currentEditingBookingId: string | null) => {
@@ -675,20 +760,47 @@ export default function AllBookingsPage() {
               <Label htmlFor="new-notes-input" className="font-medium">
                 Add New Note
               </Label>
-              <Textarea
-                id="new-notes-input"
-                value={newNoteInputValue}
-                onChange={(e) => setNewNoteInputValue(e.target.value)}
-                placeholder="Type your new note here..."
-                rows={3}
-                className="col-span-3"
-              />
+               <div className="relative">
+                <Textarea
+                    id="new-notes-input"
+                    value={newNoteInputValue}
+                    onChange={(e) => setNewNoteInputValue(e.target.value)}
+                    placeholder={isRecording ? "Recording..." : (isTranscribing ? "Transcribing..." : "Type or hold the mic to speak...")}
+                    rows={3}
+                    className="pr-12"
+                    disabled={isRecording || isTranscribing}
+                />
+                <Button
+                    type="button"
+                    size="icon"
+                    variant={isRecording ? "destructive" : "outline"}
+                    className={cn("absolute right-2 top-2 h-8 w-8", isRecording && "animate-pulse")}
+                    onMouseDown={startRecording}
+                    onMouseUp={stopRecording}
+                    onTouchStart={startRecording}
+                    onTouchEnd={stopRecording}
+                    disabled={isTranscribing}
+                    title={isRecording ? "Release to stop" : "Hold to record"}
+                >
+                    {isRecording || isTranscribing ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+                    <span className="sr-only">{isRecording ? "Stop recording" : "Start recording"}</span>
+                </Button>
+              </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setEditingBookingNotes(null); setNewNoteInputValue('');} }>Close</Button>
-            <Button onClick={handleAddNote} disabled={!newNoteInputValue.trim()}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Note
+            <Button onClick={handleAddNote} disabled={!newNoteInputValue.trim() || isRecording || isTranscribing}>
+              {isTranscribing ? (
+                  <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                      Transcribing...
+                  </>
+              ) : (
+                  <>
+                      <PlusCircle className="mr-2 h-4 w-4" /> Add Note
+                  </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
