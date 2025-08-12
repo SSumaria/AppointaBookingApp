@@ -10,8 +10,6 @@
 
 import { ai } from '@/ai/ai-instance';
 import { z } from 'genkit';
-import * as ffmpeg from 'fluent-ffmpeg';
-import { PassThrough } from 'stream';
 
 const TranscribeAudioInputSchema = z.object({
   audioDataUri: z
@@ -39,38 +37,6 @@ const speechToTextPrompt = ai.definePrompt({
   `,
 });
 
-const convertWebmToWav = (base64Webm: string): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const audioBuffer = Buffer.from(base64Webm, 'base64');
-    const inputStream = new PassThrough();
-    inputStream.end(audioBuffer);
-
-    const chunks: Buffer[] = [];
-    const outputStream = new PassThrough();
-
-    outputStream.on('data', (chunk) => {
-      chunks.push(chunk);
-    });
-
-    outputStream.on('end', () => {
-      const wavBuffer = Buffer.concat(chunks);
-      resolve(wavBuffer.toString('base64'));
-    });
-
-    ffmpeg(inputStream)
-      .fromFormat('webm')
-      .toFormat('wav')
-      .audioCodec('pcm_s16le')
-      .audioFrequency(16000)
-      .audioChannels(1)
-      .on('error', (err) => {
-        console.error('An error occurred: ' + err.message);
-        reject(err);
-      })
-      .pipe(outputStream, { end: true });
-  });
-};
-
 
 const transcribeAudioFlow = ai.defineFlow(
   {
@@ -79,11 +45,8 @@ const transcribeAudioFlow = ai.defineFlow(
     outputSchema: TranscribeAudioOutputSchema,
   },
   async ({ audioDataUri }) => {
-    const base64Audio = audioDataUri.split(',')[1];
-    const wavBase64 = await convertWebmToWav(base64Audio);
-    const wavDataUri = `data:audio/wav;base64,${wavBase64}`;
-
-    const { output } = await speechToTextPrompt({ audioDataUri: wavDataUri });
+    // The Gemini model can handle webm directly, so no conversion is needed.
+    const { output } = await speechToTextPrompt({ audioDataUri: audioDataUri });
     return output!;
   }
 );
