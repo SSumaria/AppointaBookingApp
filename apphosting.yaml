@@ -13,7 +13,7 @@ env:
   # These variables are crucial for your Next.js app to build and run.
   # Make sure the values exactly match what you find in your Firebase Project Settings.
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyBKWQTfBvkVcMZxfD6s-cDv-3Pl6ZRR8Mw
+    secret: projects/588854791090/secrets/firebase_api_key
     availability:
       - BUILD
       - RUNTIME
