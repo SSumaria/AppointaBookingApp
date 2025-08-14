@@ -713,10 +713,16 @@ export default function AllBookingsPage() {
 
   const renderNoteWithBold = (text: string) => {
     if (!text) return { __html: '' };
-    // This regex replaces **text** with <strong>text</strong>
     const html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     return { __html: html };
   };
+  
+  const mostRecentNote = useMemo(() => {
+    if (!editingBookingNotes?.Notes || editingBookingNotes.Notes.length === 0) {
+      return null;
+    }
+    return [...editingBookingNotes.Notes].sort((a, b) => b.timestamp - a.timestamp)[0];
+  }, [editingBookingNotes]);
 
 
   if (authLoading || !currentUser) {
@@ -753,61 +759,78 @@ export default function AllBookingsPage() {
               Appointment on {editingBookingNotes && format(parseISO(editingBookingNotes.AppointmentDate), "PPP")} at {editingBookingNotes?.AppointmentStartTime} - {editingBookingNotes?.AppointmentEndTime}
             </DialogDescription>
           </DialogHeader>
+            <Tabs defaultValue="draft" className="py-4">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="draft">Draft New Note</TabsTrigger>
+                <TabsTrigger value="history">All Notes ({editingBookingNotes?.Notes?.length || 0})</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="draft" className="mt-4 space-y-4">
+                <div>
+                  <Label className="font-semibold text-sm">Most Recent Note</Label>
+                   {mostRecentNote ? (
+                      <div className="text-xs p-3 mt-1 bg-muted/50 rounded-md border">
+                        <p className="whitespace-pre-wrap" dangerouslySetInnerHTML={renderNoteWithBold(mostRecentNote.text)}></p>
+                        <p className="text-muted-foreground text-right text-[10px] mt-1">
+                          {format(new Date(mostRecentNote.timestamp), "MMM d, yyyy h:mm a")}
+                        </p>
+                      </div>
+                  ) : (
+                      <p className="text-sm text-muted-foreground p-3 mt-1 border rounded-md">No existing notes for this booking.</p>
+                  )}
+                </div>
+                
+                <div>
+                   <div className="flex justify-between items-center mb-1">
+                    <Label htmlFor="note-draft" className="font-semibold text-sm">New Note Draft</Label>
+                     <Button
+                          type="button"
+                          size="sm"
+                          variant={isRecording ? "destructive" : "outline"}
+                          className={cn("h-8 w-auto px-3", isRecording && "animate-pulse")}
+                          onMouseDown={startRecording}
+                          onMouseUp={stopRecording}
+                          onTouchStart={startRecording}
+                          onTouchEnd={stopRecording}
+                          disabled={isTranscribing}
+                          title={isRecording ? "Release to stop" : "Hold to record"}
+                      >
+                          {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Mic className="h-4 w-4 mr-2" />}
+                          {isRecording ? "Recording..." : isTranscribing ? "Processing..." : "Record"}
+                          <span className="sr-only">{isRecording ? "Stop recording" : "Start recording"}</span>
+                      </Button>
+                  </div>
+                   <Textarea
+                      id="note-draft"
+                      placeholder="Hold the record button to dictate a new note, or type here..."
+                      value={noteDraft}
+                      onChange={(e) => setNoteDraft(e.target.value)}
+                      rows={8}
+                      className="mt-1"
+                      disabled={isRecording || isTranscribing}
+                  />
+                </div>
+              </TabsContent>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 py-4 overflow-y-auto">
-             {/* Existing Notes */}
-            <div className="md:col-span-2 space-y-3">
-              <h4 className="font-medium text-sm">Existing Notes:</h4>
-               {editingBookingNotes?.Notes && editingBookingNotes.Notes.length > 0 ? (
-                  <ScrollArea className="h-[120px] w-full rounded-md border p-3">
-                    <ul className="space-y-2">
-                      {editingBookingNotes.Notes.slice().sort((a,b) => b.timestamp - a.timestamp).map((note) => (
-                        <li key={note.id} className="text-xs p-2 bg-muted/50 rounded">
-                          <p className="whitespace-pre-wrap" dangerouslySetInnerHTML={renderNoteWithBold(note.text)}></p>
-                          <p className="text-muted-foreground text-right text-[10px] mt-1">
-                            {format(new Date(note.timestamp), "MMM d, yyyy h:mm a")}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  </ScrollArea>
-              ) : (
-                  <p className="text-sm text-muted-foreground p-3 border rounded-md">No existing notes for this booking.</p>
-              )}
-            </div>
-            
-            {/* New Unified Note Area */}
-            <div className="md:col-span-2">
-              <div className="flex justify-between items-center">
-                <Label htmlFor="note-draft" className="font-semibold">New Note Draft</Label>
-                 <Button
-                      type="button"
-                      size="sm"
-                      variant={isRecording ? "destructive" : "outline"}
-                      className={cn("h-8 w-auto px-3", isRecording && "animate-pulse")}
-                      onMouseDown={startRecording}
-                      onMouseUp={stopRecording}
-                      onTouchStart={startRecording}
-                      onTouchEnd={stopRecording}
-                      disabled={isTranscribing}
-                      title={isRecording ? "Release to stop" : "Hold to record"}
-                  >
-                      {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Mic className="h-4 w-4 mr-2" />}
-                      {isRecording ? "Recording..." : isTranscribing ? "Processing..." : "Record"}
-                      <span className="sr-only">{isRecording ? "Stop recording" : "Start recording"}</span>
-                  </Button>
-              </div>
-              <Textarea
-                  id="note-draft"
-                  placeholder="Hold the record button to dictate a new note, or type here..."
-                  value={noteDraft}
-                  onChange={(e) => setNoteDraft(e.target.value)}
-                  rows={8}
-                  className="mt-1"
-                  disabled={isRecording || isTranscribing}
-              />
-            </div>
-          </div>
+              <TabsContent value="history" className="mt-4">
+                 {editingBookingNotes?.Notes && editingBookingNotes.Notes.length > 0 ? (
+                    <ScrollArea className="h-[350px] w-full rounded-md border p-3">
+                      <ul className="space-y-2">
+                        {[...editingBookingNotes.Notes].sort((a,b) => b.timestamp - a.timestamp).map((note) => (
+                          <li key={note.id} className="text-xs p-2 bg-muted/50 rounded">
+                            <p className="whitespace-pre-wrap" dangerouslySetInnerHTML={renderNoteWithBold(note.text)}></p>
+                            <p className="text-muted-foreground text-right text-[10px] mt-1">
+                              {format(new Date(note.timestamp), "MMM d, yyyy h:mm a")}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    </ScrollArea>
+                ) : (
+                    <p className="text-sm text-muted-foreground p-3 text-center border rounded-md">No notes found for this booking.</p>
+                )}
+              </TabsContent>
+            </Tabs>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => { setEditingBookingNotes(null); }}>Close</Button>
@@ -1148,11 +1171,11 @@ export default function AllBookingsPage() {
                           <TableCell className="text-sm text-muted-foreground ">
                             <div className="flex items-center justify-between gap-2">
                                <p
-                                className="truncate max-w-[100px]"
-                                title={booking.Notes && booking.Notes.length > 0 ? booking.Notes[booking.Notes.length - 1].text : 'N/A'}
+                                className="truncate"
+                                title={booking.Notes && booking.Notes.length > 0 ? [...booking.Notes].sort((a,b) => b.timestamp - a.timestamp)[0].text : 'N/A'}
                                 dangerouslySetInnerHTML={
                                   booking.Notes && booking.Notes.length > 0
-                                    ? renderNoteWithBold(booking.Notes.slice().sort((a,b) => b.timestamp - a.timestamp)[0].text)
+                                    ? renderNoteWithBold([...booking.Notes].sort((a, b) => b.timestamp - a.timestamp)[0].text)
                                     : { __html: 'N/A' }
                                 }
                               />
@@ -1162,7 +1185,7 @@ export default function AllBookingsPage() {
                                   className="h-6 w-6 p-0 shrink-0"
                                   onClick={() => {
                                     setEditingBookingNotes(booking);
-                                    const latestNote = booking.Notes && booking.Notes.length > 0 ? booking.Notes.slice().sort((a,b) => b.timestamp - a.timestamp)[0].text : '';
+                                    const latestNote = booking.Notes && booking.Notes.length > 0 ? [...booking.Notes].sort((a,b) => b.timestamp - a.timestamp)[0].text : '';
                                     setNoteDraft(latestNote);
                                   }}
                                 >
