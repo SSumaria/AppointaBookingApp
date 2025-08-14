@@ -40,15 +40,17 @@ const speechToTextPrompt = ai.definePrompt({
     output: { schema: TranscribeAudioOutputSchema },
     prompt: `You are a medical transcriptionist specializing in physiotherapy. Your task is to process an audio recording and format the information into a structured JSON object with the keys "subjective", "objective", "assessment", and "plan".
 
+Within each section, identify the most critical medical details, measurements, diagnoses, and action items. Wrap these key phrases in markdown bold syntax (**key phrase**).
+
 {{#if existingNoteText}}
-You have been provided with an existing draft of the note. The new audio recording contains additional information. Your goal is to intelligently merge the information from the new audio into the existing draft. Do not simply append the new information. Instead, integrate it into the correct sections of the SOAP note to create a single, cohesive, and updated document.
+You have been provided with an existing draft of the note. The new audio recording contains additional information. Your goal is to intelligently merge the information from the new audio into the existing draft. Do not simply append the new information. Instead, integrate it into the correct sections of the SOAP note to create a single, cohesive, and updated document, applying bolding as instructed.
 
 Existing Note Draft:
 ---
 {{{existingNoteText}}}
 ---
 {{else}}
-Convert the following audio transcript into a structured JSON object. For each section, summarize the key points concisely, ensuring all critical medical details are retained while keeping the overall text brief.
+Convert the following audio transcript into a structured JSON object. For each section, summarize the key points concisely, ensuring all critical medical details are retained while keeping the overall text brief. Apply bolding to key information.
 {{/if}}
 
 New Audio to process: {{media url=audioDataUri}}
