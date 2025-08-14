@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { DateRange, DayContentProps } from "react-day-picker";
-import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, CalendarDays, ChevronLeft, ChevronRight, Edit3, Mic, MicOff, Save, Sparkles, Loader2 } from "lucide-react";
+import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, CalendarDays, ChevronLeft, ChevronRight, Edit3, Mic, Save, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parse, parseISO, isSameDay, addDays, subDays, startOfWeek, endOfWeek, eachDayOfInterval, addMinutes, getHours, getMinutes } from "date-fns";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -712,12 +712,7 @@ export default function AllBookingsPage() {
   }, [weekViewDate]);
 
   const renderNoteWithBold = (text: string) => {
-    // Sanitize by escaping basic HTML, then replace markdown bold with <strong>
-    const html = text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/\*\*(.*?)\*\*/g, "&lt;strong&gt;$1&lt;/strong&gt;");
+    const html = text.replace(/\*\*(.*?)\*\*/g, '&lt;strong&gt;$1&lt;/strong&gt;');
     return { __html: html };
   };
 
@@ -1239,7 +1234,3 @@ export default function AllBookingsPage() {
     </div>
   );
 }
-
-    
-
-    
