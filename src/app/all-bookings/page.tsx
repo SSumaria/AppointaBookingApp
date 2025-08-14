@@ -732,7 +732,7 @@ export default function AllBookingsPage() {
       <Header />
       {/* Dialog for Editing Booking Notes */}
       <Dialog open={!!editingBookingNotes} onOpenChange={(isOpen) => { if (!isOpen) { setEditingBookingNotes(null); setNewNoteInputValue('');} }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>
               Manage Notes for {editingBookingNotes?.ClientName}
