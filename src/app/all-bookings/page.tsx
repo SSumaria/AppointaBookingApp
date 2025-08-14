@@ -29,7 +29,6 @@ import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { ref, get, query as rtQuery, orderByChild, equalTo, update } from "firebase/database";
-import { db } from '@/lib/firebaseConfig';
 import {
   AlertDialog,
   AlertDialogAction,
