@@ -130,7 +130,6 @@ export default function AllBookingsPage() {
 
   const [editingBookingNotes, setEditingBookingNotes] = useState<Booking | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
-  const [refinementInstruction, setRefinementInstruction] = useState('');
   
   const [bookingToEdit, setBookingToEdit] = useState<Booking | null>(null);
   const [editFormState, setEditFormState] = useState<EditBookingFormState | null>(null);
@@ -427,13 +426,16 @@ export default function AllBookingsPage() {
             reader.onloadend = async () => {
                 const base64Audio = reader.result as string;
                 try {
-                    const result = await transcribeAudio({ audioDataUri: base64Audio });
+                    const result = await transcribeAudio({ 
+                        audioDataUri: base64Audio,
+                        existingNoteText: noteDraft 
+                    });
                     if (result) {
                         const formattedNote = `S: ${result.subjective}\n\nO: ${result.objective}\n\nA: ${result.assessment}\n\nP: ${result.plan}`;
                         setNoteDraft(formattedNote);
-                        toast({ title: "Transcription successful" });
+                        toast({ title: "Note draft updated." });
                     } else {
-                        toast({ title: "Transcription failed", description: "Could not transcribe audio to SOAP format.", variant: "destructive" });
+                        toast({ title: "Transcription failed", description: "Could not transcribe audio.", variant: "destructive" });
                     }
                 } catch (error) {
                     console.error("Transcription error:", error);
@@ -733,7 +735,7 @@ export default function AllBookingsPage() {
     <div className="min-h-screen flex flex-col">
       <Header />
       {/* Dialog for Editing Booking Notes */}
-      <Dialog open={!!editingBookingNotes} onOpenChange={(isOpen) => { if (!isOpen) { setEditingBookingNotes(null); setNoteDraft(''); setRefinementInstruction(''); } }}>
+      <Dialog open={!!editingBookingNotes} onOpenChange={(isOpen) => { if (!isOpen) { setEditingBookingNotes(null); setNoteDraft(''); } }}>
         <DialogContent className="sm:max-w-4xl grid-rows-[auto_1fr_auto]">
           <DialogHeader>
             <DialogTitle>
@@ -768,52 +770,34 @@ export default function AllBookingsPage() {
             
             {/* New Unified Note Area */}
             <div className="md:col-span-2">
+              <div className="flex justify-between items-center">
                 <Label htmlFor="note-draft" className="font-semibold">New Note Draft</Label>
-                <Textarea
-                    id="note-draft"
-                    placeholder="Hold the mic to dictate a new note, or type here..."
-                    value={noteDraft}
-                    onChange={(e) => setNoteDraft(e.target.value)}
-                    rows={8}
-                    className="mt-1"
-                />
-            </div>
-
-            {/* Refinement Section */}
-            <div className="md:col-span-2 mt-2">
-              <Label htmlFor="refinement-instruction" className="font-medium">Refinement Instructions</Label>
-               <div className="relative mt-1">
-                <Textarea
-                    id="refinement-instruction"
-                    value={refinementInstruction}
-                    onChange={(e) => setRefinementInstruction(e.target.value)}
-                    placeholder={isRecording ? "Recording..." : (isTranscribing ? "Transcribing initial note..." : "Type instruction or hold mic to dictate note...")}
-                    rows={2}
-                    className="pr-24"
-                    disabled={isRecording || isTranscribing}
-                />
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                  <Button type="button" size="sm" disabled>
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Refine
-                  </Button>
-                  <Button
+                 <Button
                       type="button"
-                      size="icon"
+                      size="sm"
                       variant={isRecording ? "destructive" : "outline"}
-                      className={cn("h-8 w-8", isRecording && "animate-pulse")}
+                      className={cn("h-8 w-auto px-3", isRecording && "animate-pulse")}
                       onMouseDown={startRecording}
                       onMouseUp={stopRecording}
                       onTouchStart={startRecording}
                       onTouchEnd={stopRecording}
                       disabled={isTranscribing}
-                      title={isRecording ? "Release to stop" : "Hold to record initial note"}
+                      title={isRecording ? "Release to stop" : "Hold to record"}
                   >
-                      {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin"/> : <Mic className="h-4 w-4" />}
+                      {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Mic className="h-4 w-4 mr-2" />}
+                      {isRecording ? "Recording..." : isTranscribing ? "Processing..." : "Record"}
                       <span className="sr-only">{isRecording ? "Stop recording" : "Start recording"}</span>
                   </Button>
-                </div>
               </div>
+              <Textarea
+                  id="note-draft"
+                  placeholder="Hold the record button to dictate a new note, or type here..."
+                  value={noteDraft}
+                  onChange={(e) => setNoteDraft(e.target.value)}
+                  rows={8}
+                  className="mt-1"
+                  disabled={isRecording || isTranscribing}
+              />
             </div>
           </div>
 
@@ -1236,5 +1220,3 @@ export default function AllBookingsPage() {
     </div>
   );
 }
-
-    
