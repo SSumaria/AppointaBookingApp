@@ -713,6 +713,7 @@ export default function AllBookingsPage() {
 
   const renderNoteWithBold = (text: string) => {
     if (!text) return { __html: '' };
+    // This regex replaces **text** with <strong>text</strong>
     const html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     return { __html: html };
   };
@@ -1168,10 +1169,10 @@ export default function AllBookingsPage() {
                           <TableCell>{format(parseISO(booking.AppointmentDate), "PPP")}</TableCell>
                           <TableCell>{booking.AppointmentStartTime}</TableCell>
                           <TableCell>{booking.AppointmentEndTime}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground ">
+                          <TableCell className="text-sm text-muted-foreground">
                             <div className="flex items-center justify-between gap-2">
                                <p
-                                className="truncate"
+                                className="truncate max-w-[150px]"
                                 title={booking.Notes && booking.Notes.length > 0 ? [...booking.Notes].sort((a,b) => b.timestamp - a.timestamp)[0].text : 'N/A'}
                                 dangerouslySetInnerHTML={
                                   booking.Notes && booking.Notes.length > 0
