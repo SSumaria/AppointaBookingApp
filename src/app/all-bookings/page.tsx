@@ -1148,7 +1148,7 @@ export default function AllBookingsPage() {
                           <TableCell className="text-sm text-muted-foreground ">
                             <div className="flex items-center justify-between gap-2">
                                <p
-                                className="truncate max-w-[100px] whitespace-pre-wrap"
+                                className="truncate max-w-[100px]"
                                 title={booking.Notes && booking.Notes.length > 0 ? booking.Notes[booking.Notes.length - 1].text : 'N/A'}
                                 dangerouslySetInnerHTML={
                                   booking.Notes && booking.Notes.length > 0
