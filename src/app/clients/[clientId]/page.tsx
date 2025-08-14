@@ -241,7 +241,9 @@ export default function ClientDetailsPage() {
   }, [bookings]);
 
   const renderNoteWithBold = (text: string) => {
+    // Sanitize by escaping basic HTML, then replace markdown bold with <strong>
     const html = text
+      .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/\*\*(.*?)\*\*/g, "&lt;strong&gt;$1&lt;/strong&gt;");
@@ -496,5 +498,7 @@ export default function ClientDetailsPage() {
     </div>
   );
 }
+
+    
 
     

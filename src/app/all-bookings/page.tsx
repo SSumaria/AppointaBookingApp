@@ -712,7 +712,9 @@ export default function AllBookingsPage() {
   }, [weekViewDate]);
 
   const renderNoteWithBold = (text: string) => {
+    // Sanitize by escaping basic HTML, then replace markdown bold with <strong>
     const html = text
+      .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/\*\*(.*?)\*\*/g, "&lt;strong&gt;$1&lt;/strong&gt;");
@@ -1153,7 +1155,7 @@ export default function AllBookingsPage() {
                                 title={booking.Notes && booking.Notes.length > 0 ? booking.Notes[booking.Notes.length - 1].text : 'N/A'}
                                 dangerouslySetInnerHTML={
                                   booking.Notes && booking.Notes.length > 0
-                                    ? renderNoteWithBold(booking.Notes[booking.Notes.length - 1].text)
+                                    ? renderNoteWithBold(booking.Notes.slice().sort((a,b) => b.timestamp - a.timestamp)[0].text)
                                     : { __html: 'N/A' }
                                 }
                               />
@@ -1237,5 +1239,7 @@ export default function AllBookingsPage() {
     </div>
   );
 }
+
+    
 
     
