@@ -97,14 +97,6 @@ interface EditBookingFormState {
   appointmentEndTime: string;
 }
 
-interface SoapNoteState {
-    subjective: string;
-    objective: string;
-    assessment: string;
-    plan: string;
-}
-
-
 const generateTimeSlots = () => {
   const slots = [];
   let currentTime = new Date();
@@ -137,7 +129,7 @@ export default function AllBookingsPage() {
   const router = useRouter();
 
   const [editingBookingNotes, setEditingBookingNotes] = useState<Booking | null>(null);
-  const [soapNotes, setSoapNotes] = useState<SoapNoteState>({ subjective: '', objective: '', assessment: '', plan: '' });
+  const [noteDraft, setNoteDraft] = useState('');
   const [refinementInstruction, setRefinementInstruction] = useState('');
   
   const [bookingToEdit, setBookingToEdit] = useState<Booking | null>(null);
@@ -376,21 +368,14 @@ export default function AllBookingsPage() {
 
   const handleSaveNote = async () => {
     if (!currentUser?.uid || !editingBookingNotes) return;
-
-    const finalNoteText = [
-        `S: ${soapNotes.subjective}`,
-        `O: ${soapNotes.objective}`,
-        `A: ${soapNotes.assessment}`,
-        `P: ${soapNotes.plan}`
-    ].join('\n\n').trim();
-
-    if (!finalNoteText || finalNoteText.replace(/[SOAP:\s]/g, '') === '') {
+    
+    if (!noteDraft.trim()) {
         toast({ title: "Cannot Save Empty Note", description: "Please generate or type a note before saving.", variant: "destructive" });
         return;
     }
 
     const bookingId = editingBookingNotes.id;
-    const newNote: Note = { id: generateNoteId(), text: finalNoteText, timestamp: Date.now() };
+    const newNote: Note = { id: generateNoteId(), text: noteDraft, timestamp: Date.now() };
 
     try {
         const bookingRefPath = `Appointments/${currentUser.uid}/${bookingId}`;
@@ -398,7 +383,7 @@ export default function AllBookingsPage() {
         const updatedNotes = [...currentNotes, newNote];
 
         await update(ref(db, bookingRefPath), { Notes: updatedNotes });
-        toast({ title: "Note Saved", description: "The new SOAP note has been saved." });
+        toast({ title: "Note Saved", description: "The new note has been saved." });
         
         // Close dialog and reset states
         setEditingBookingNotes(null);
@@ -444,7 +429,8 @@ export default function AllBookingsPage() {
                 try {
                     const result = await transcribeAudio({ audioDataUri: base64Audio });
                     if (result) {
-                        setSoapNotes(result);
+                        const formattedNote = `S: ${result.subjective}\n\nO: ${result.objective}\n\nA: ${result.assessment}\n\nP: ${result.plan}`;
+                        setNoteDraft(formattedNote);
                         toast({ title: "Transcription successful" });
                     } else {
                         toast({ title: "Transcription failed", description: "Could not transcribe audio to SOAP format.", variant: "destructive" });
@@ -747,7 +733,7 @@ export default function AllBookingsPage() {
     <div className="min-h-screen flex flex-col">
       <Header />
       {/* Dialog for Editing Booking Notes */}
-      <Dialog open={!!editingBookingNotes} onOpenChange={(isOpen) => { if (!isOpen) { setEditingBookingNotes(null); setSoapNotes({ subjective: '', objective: '', assessment: '', plan: '' }); setRefinementInstruction(''); } }}>
+      <Dialog open={!!editingBookingNotes} onOpenChange={(isOpen) => { if (!isOpen) { setEditingBookingNotes(null); setNoteDraft(''); setRefinementInstruction(''); } }}>
         <DialogContent className="sm:max-w-4xl grid-rows-[auto_1fr_auto]">
           <DialogHeader>
             <DialogTitle>
@@ -780,22 +766,17 @@ export default function AllBookingsPage() {
               )}
             </div>
             
-            {/* SOAP Note Inputs */}
-            <div>
-              <Label htmlFor="note-subjective" className="font-semibold">S: Subjective</Label>
-              <Textarea id="note-subjective" placeholder="Client's report of the issue..." value={soapNotes.subjective} onChange={(e) => setSoapNotes(s => ({...s, subjective: e.target.value}))} rows={4} className="mt-1" />
-            </div>
-             <div>
-              <Label htmlFor="note-objective" className="font-semibold">O: Objective</Label>
-              <Textarea id="note-objective" placeholder="Therapist's objective findings..." value={soapNotes.objective} onChange={(e) => setSoapNotes(s => ({...s, objective: e.target.value}))} rows={4} className="mt-1" />
-            </div>
-             <div>
-              <Label htmlFor="note-assessment" className="font-semibold">A: Assessment</Label>
-              <Textarea id="note-assessment" placeholder="Therapist's assessment..." value={soapNotes.assessment} onChange={(e) => setSoapNotes(s => ({...s, assessment: e.target.value}))} rows={4} className="mt-1" />
-            </div>
-             <div>
-              <Label htmlFor="note-plan" className="font-semibold">P: Plan</Label>
-              <Textarea id="note-plan" placeholder="Plan for future sessions..." value={soapNotes.plan} onChange={(e) => setSoapNotes(s => ({...s, plan: e.target.value}))} rows={4} className="mt-1" />
+            {/* New Unified Note Area */}
+            <div className="md:col-span-2">
+                <Label htmlFor="note-draft" className="font-semibold">New Note Draft</Label>
+                <Textarea
+                    id="note-draft"
+                    placeholder="Hold the mic to dictate a new note, or type here..."
+                    value={noteDraft}
+                    onChange={(e) => setNoteDraft(e.target.value)}
+                    rows={8}
+                    className="mt-1"
+                />
             </div>
 
             {/* Refinement Section */}
