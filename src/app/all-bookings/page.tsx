@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { DateRange, DayContentProps } from "react-day-picker";
-import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, CalendarDays, ChevronLeft, ChevronRight, Edit3, Mic, MicOff, Save, Sparkles } from "lucide-react";
+import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, CalendarDays, ChevronLeft, ChevronRight, Edit3, Mic, MicOff, Save, Sparkles, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parse, parseISO, isSameDay, addDays, subDays, startOfWeek, endOfWeek, eachDayOfInterval, addMinutes, getHours, getMinutes } from "date-fns";
 import { Button, buttonVariants } from "@/components/ui/button";
