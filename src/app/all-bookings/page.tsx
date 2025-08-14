@@ -712,7 +712,9 @@ export default function AllBookingsPage() {
   }, [weekViewDate]);
 
   const renderNoteWithBold = (text: string) => {
-    const html = text.replace(/\*\*(.*?)\*\*/g, '&lt;strong&gt;$1&lt;/strong&gt;');
+    if (!text) return { __html: '' };
+    // This regex replaces **text** with <strong>text</strong>
+    const html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     return { __html: html };
   };
 
@@ -1234,3 +1236,5 @@ export default function AllBookingsPage() {
     </div>
   );
 }
+
+    
