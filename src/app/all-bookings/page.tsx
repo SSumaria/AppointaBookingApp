@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { DateRange, DayContentProps } from "react-day-picker";
-import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, CalendarDays, ChevronLeft, ChevronRight, Edit3, Mic, MicOff } from "lucide-react";
+import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, CalendarDays, ChevronLeft, ChevronRight, Edit3, Mic, MicOff, Save, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parse, parseISO, isSameDay, addDays, subDays, startOfWeek, endOfWeek, eachDayOfInterval, addMinutes, getHours, getMinutes } from "date-fns";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -97,6 +97,14 @@ interface EditBookingFormState {
   appointmentEndTime: string;
 }
 
+interface SoapNoteState {
+    subjective: string;
+    objective: string;
+    assessment: string;
+    plan: string;
+}
+
+
 const generateTimeSlots = () => {
   const slots = [];
   let currentTime = new Date();
@@ -129,7 +137,8 @@ export default function AllBookingsPage() {
   const router = useRouter();
 
   const [editingBookingNotes, setEditingBookingNotes] = useState<Booking | null>(null);
-  const [newNoteInputValue, setNewNoteInputValue] = useState('');
+  const [soapNotes, setSoapNotes] = useState<SoapNoteState>({ subjective: '', objective: '', assessment: '', plan: '' });
+  const [refinementInstruction, setRefinementInstruction] = useState('');
   
   const [bookingToEdit, setBookingToEdit] = useState<Booking | null>(null);
   const [editFormState, setEditFormState] = useState<EditBookingFormState | null>(null);
@@ -365,30 +374,43 @@ export default function AllBookingsPage() {
     }
   };
 
-  const handleAddNote = async () => {
-    if (!currentUser?.uid || !editingBookingNotes || !newNoteInputValue.trim()) {
-      toast({ title: "Error", description: "Cannot add note.", variant: "destructive" });
-      return;
+  const handleSaveNote = async () => {
+    if (!currentUser?.uid || !editingBookingNotes) return;
+
+    const finalNoteText = [
+        `S: ${soapNotes.subjective}`,
+        `O: ${soapNotes.objective}`,
+        `A: ${soapNotes.assessment}`,
+        `P: ${soapNotes.plan}`
+    ].join('\n\n').trim();
+
+    if (!finalNoteText || finalNoteText.replace(/[SOAP:\s]/g, '') === '') {
+        toast({ title: "Cannot Save Empty Note", description: "Please generate or type a note before saving.", variant: "destructive" });
+        return;
     }
+
     const bookingId = editingBookingNotes.id;
-    const newNote: Note = { id: generateNoteId(), text: newNoteInputValue.trim(), timestamp: Date.now() };
+    const newNote: Note = { id: generateNoteId(), text: finalNoteText, timestamp: Date.now() };
 
     try {
-      const bookingRefPath = `Appointments/${currentUser.uid}/${bookingId}`;
-      let currentNotes: Note[] = Array.isArray(editingBookingNotes.Notes) ? editingBookingNotes.Notes : [];
-      const updatedNotes = [...currentNotes, newNote];
+        const bookingRefPath = `Appointments/${currentUser.uid}/${bookingId}`;
+        const currentNotes: Note[] = Array.isArray(editingBookingNotes.Notes) ? editingBookingNotes.Notes : [];
+        const updatedNotes = [...currentNotes, newNote];
 
-      await update(ref(db, bookingRefPath), { Notes: updatedNotes });
-      toast({ title: "Note Added", description: "The new note has been added." });
-      setNewNoteInputValue('');
+        await update(ref(db, bookingRefPath), { Notes: updatedNotes });
+        toast({ title: "Note Saved", description: "The new SOAP note has been saved." });
+        
+        // Close dialog and reset states
+        setEditingBookingNotes(null);
 
-      setEditingBookingNotes(prev => prev ? {...prev, Notes: updatedNotes} : null);
-      setAllFetchedBookings(prevBookings => prevBookings.map(b =>
-          b.id === bookingId ? { ...b, Notes: updatedNotes } : b
-      ));
+        // Update local state to reflect changes immediately
+        setAllFetchedBookings(prevBookings => prevBookings.map(b =>
+            b.id === bookingId ? { ...b, Notes: updatedNotes } : b
+        ));
+
     } catch (error: any) {
-      console.error("Error adding note:", error);
-      toast({ title: "Error Adding Note", description: error.message, variant: "destructive" });
+        console.error("Error saving note:", error);
+        toast({ title: "Error Saving Note", description: error.message, variant: "destructive" });
     }
   };
   
@@ -420,15 +442,9 @@ export default function AllBookingsPage() {
             reader.onloadend = async () => {
                 const base64Audio = reader.result as string;
                 try {
-                    const { subjective, objective, assessment, plan } = await transcribeAudio({ audioDataUri: base64Audio });
-                    if (subjective || objective || assessment || plan) {
-                        const formattedNote = [
-                          `S: ${subjective}`,
-                          `O: ${objective}`,
-                          `A: ${assessment}`,
-                          `P: ${plan}`
-                        ].join('\n');
-                        setNewNoteInputValue(prev => prev ? `${prev}\n\n${formattedNote}`.trim() : formattedNote);
+                    const result = await transcribeAudio({ audioDataUri: base64Audio });
+                    if (result) {
+                        setSoapNotes(result);
                         toast({ title: "Transcription successful" });
                     } else {
                         toast({ title: "Transcription failed", description: "Could not transcribe audio to SOAP format.", variant: "destructive" });
@@ -731,82 +747,99 @@ export default function AllBookingsPage() {
     <div className="min-h-screen flex flex-col">
       <Header />
       {/* Dialog for Editing Booking Notes */}
-      <Dialog open={!!editingBookingNotes} onOpenChange={(isOpen) => { if (!isOpen) { setEditingBookingNotes(null); setNewNoteInputValue('');} }}>
-        <DialogContent className="sm:max-w-4xl">
+      <Dialog open={!!editingBookingNotes} onOpenChange={(isOpen) => { if (!isOpen) { setEditingBookingNotes(null); setSoapNotes({ subjective: '', objective: '', assessment: '', plan: '' }); setRefinementInstruction(''); } }}>
+        <DialogContent className="sm:max-w-4xl grid-rows-[auto_1fr_auto]">
           <DialogHeader>
             <DialogTitle>
-              Manage Notes for {editingBookingNotes?.ClientName}
+              Manage Note for {editingBookingNotes?.ClientName}
             </DialogTitle>
             <DialogDescription>
               Appointment on {editingBookingNotes && format(parseISO(editingBookingNotes.AppointmentDate), "PPP")} at {editingBookingNotes?.AppointmentStartTime} - {editingBookingNotes?.AppointmentEndTime}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {editingBookingNotes?.Notes && editingBookingNotes.Notes.length > 0 && (
-              <div className="space-y-3">
-                <h4 className="font-medium text-sm">Existing Notes:</h4>
-                <ScrollArea className="h-[150px] w-full rounded-md border p-3">
-                  <ul className="space-y-2">
-                    {editingBookingNotes.Notes.slice().sort((a,b) => b.timestamp - a.timestamp).map((note) => (
-                      <li key={note.id} className="text-xs p-2 bg-muted/50 rounded">
-                        <p className="whitespace-pre-wrap">{note.text}</p>
-                        <p className="text-muted-foreground text-right text-[10px] mt-1">
-                          {format(new Date(note.timestamp), "MMM d, yyyy h:mm a")}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                </ScrollArea>
-              </div>
-            )}
-              {(editingBookingNotes?.Notes?.length === 0 || !editingBookingNotes?.Notes) && (
-              <p className="text-sm text-muted-foreground">No existing notes for this booking.</p>
-            )}
-            <div className="grid grid-cols-1 items-center gap-2 mt-4">
-              <Label htmlFor="new-notes-input" className="font-medium">
-                Add New Note
-              </Label>
-               <div className="relative">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 py-4 overflow-y-auto">
+             {/* Existing Notes */}
+            <div className="md:col-span-2 space-y-3">
+              <h4 className="font-medium text-sm">Existing Notes:</h4>
+               {editingBookingNotes?.Notes && editingBookingNotes.Notes.length > 0 ? (
+                  <ScrollArea className="h-[120px] w-full rounded-md border p-3">
+                    <ul className="space-y-2">
+                      {editingBookingNotes.Notes.slice().sort((a,b) => b.timestamp - a.timestamp).map((note) => (
+                        <li key={note.id} className="text-xs p-2 bg-muted/50 rounded">
+                          <p className="whitespace-pre-wrap">{note.text}</p>
+                          <p className="text-muted-foreground text-right text-[10px] mt-1">
+                            {format(new Date(note.timestamp), "MMM d, yyyy h:mm a")}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </ScrollArea>
+              ) : (
+                  <p className="text-sm text-muted-foreground p-3 border rounded-md">No existing notes for this booking.</p>
+              )}
+            </div>
+            
+            {/* SOAP Note Inputs */}
+            <div>
+              <Label htmlFor="note-subjective" className="font-semibold">S: Subjective</Label>
+              <Textarea id="note-subjective" placeholder="Client's report of the issue..." value={soapNotes.subjective} onChange={(e) => setSoapNotes(s => ({...s, subjective: e.target.value}))} rows={4} className="mt-1" />
+            </div>
+             <div>
+              <Label htmlFor="note-objective" className="font-semibold">O: Objective</Label>
+              <Textarea id="note-objective" placeholder="Therapist's objective findings..." value={soapNotes.objective} onChange={(e) => setSoapNotes(s => ({...s, objective: e.target.value}))} rows={4} className="mt-1" />
+            </div>
+             <div>
+              <Label htmlFor="note-assessment" className="font-semibold">A: Assessment</Label>
+              <Textarea id="note-assessment" placeholder="Therapist's assessment..." value={soapNotes.assessment} onChange={(e) => setSoapNotes(s => ({...s, assessment: e.target.value}))} rows={4} className="mt-1" />
+            </div>
+             <div>
+              <Label htmlFor="note-plan" className="font-semibold">P: Plan</Label>
+              <Textarea id="note-plan" placeholder="Plan for future sessions..." value={soapNotes.plan} onChange={(e) => setSoapNotes(s => ({...s, plan: e.target.value}))} rows={4} className="mt-1" />
+            </div>
+
+            {/* Refinement Section */}
+            <div className="md:col-span-2 mt-2">
+              <Label htmlFor="refinement-instruction" className="font-medium">Refinement Instructions</Label>
+               <div className="relative mt-1">
                 <Textarea
-                    id="new-notes-input"
-                    value={newNoteInputValue}
-                    onChange={(e) => setNewNoteInputValue(e.target.value)}
-                    placeholder={isRecording ? "Recording..." : (isTranscribing ? "Transcribing..." : "Type or hold the mic to speak...")}
-                    rows={3}
-                    className="pr-12"
+                    id="refinement-instruction"
+                    value={refinementInstruction}
+                    onChange={(e) => setRefinementInstruction(e.target.value)}
+                    placeholder={isRecording ? "Recording..." : (isTranscribing ? "Transcribing initial note..." : "Type instruction or hold mic to dictate note...")}
+                    rows={2}
+                    className="pr-24"
                     disabled={isRecording || isTranscribing}
                 />
-                <Button
-                    type="button"
-                    size="icon"
-                    variant={isRecording ? "destructive" : "outline"}
-                    className={cn("absolute right-2 top-2 h-8 w-8", isRecording && "animate-pulse")}
-                    onMouseDown={startRecording}
-                    onMouseUp={stopRecording}
-                    onTouchStart={startRecording}
-                    onTouchEnd={stopRecording}
-                    disabled={isTranscribing}
-                    title={isRecording ? "Release to stop" : "Hold to record"}
-                >
-                    {isRecording || isTranscribing ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-                    <span className="sr-only">{isRecording ? "Stop recording" : "Start recording"}</span>
-                </Button>
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  <Button type="button" size="sm" disabled>
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Refine
+                  </Button>
+                  <Button
+                      type="button"
+                      size="icon"
+                      variant={isRecording ? "destructive" : "outline"}
+                      className={cn("h-8 w-8", isRecording && "animate-pulse")}
+                      onMouseDown={startRecording}
+                      onMouseUp={stopRecording}
+                      onTouchStart={startRecording}
+                      onTouchEnd={stopRecording}
+                      disabled={isTranscribing}
+                      title={isRecording ? "Release to stop" : "Hold to record initial note"}
+                  >
+                      {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin"/> : <Mic className="h-4 w-4" />}
+                      <span className="sr-only">{isRecording ? "Stop recording" : "Start recording"}</span>
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setEditingBookingNotes(null); setNewNoteInputValue('');} }>Close</Button>
-            <Button onClick={handleAddNote} disabled={!newNoteInputValue.trim() || isRecording || isTranscribing}>
-              {isTranscribing ? (
-                  <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                      Transcribing...
-                  </>
-              ) : (
-                  <>
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add Note
-                  </>
-              )}
+            <Button variant="outline" onClick={() => { setEditingBookingNotes(null); }}>Close</Button>
+            <Button onClick={handleSaveNote} disabled={isRecording || isTranscribing}>
+              <Save className="mr-2 h-4 w-4" /> Save Note
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1150,7 +1183,6 @@ export default function AllBookingsPage() {
                                   className="h-6 w-6 p-0 shrink-0"
                                   onClick={() => {
                                     setEditingBookingNotes(booking);
-                                    setNewNoteInputValue('');
                                   }}
                                 >
                                   <Edit className="h-4 w-4" />
@@ -1223,3 +1255,5 @@ export default function AllBookingsPage() {
     </div>
   );
 }
+
+    
