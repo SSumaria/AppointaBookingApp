@@ -240,6 +240,14 @@ export default function ClientDetailsPage() {
     }
   }, [bookings]);
 
+  const renderNoteWithBold = (text: string) => {
+    const html = text
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\*\*(.*?)\*\*/g, "&lt;strong&gt;$1&lt;/strong&gt;");
+    return { __html: html };
+  };
+
 
   if (authLoading || (!client && isLoadingClient)) {
     return (
@@ -393,8 +401,16 @@ export default function ClientDetailsPage() {
                               <TableCell>{format(parseISO(booking.AppointmentDate), "PPP")}</TableCell>
                               <TableCell>{booking.AppointmentStartTime}</TableCell>
                               <TableCell>{booking.AppointmentEndTime}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate" title={booking.Notes && booking.Notes.length > 0 ? booking.Notes.slice().sort((a,b) => b.timestamp - a.timestamp)[0].text : 'N/A'}>
-                                  {booking.Notes && booking.Notes.length > 0 ? booking.Notes.slice().sort((a,b) => b.timestamp - a.timestamp)[0].text : 'N/A'}
+                               <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">
+                                <p 
+                                  className="whitespace-pre-wrap"
+                                  title={booking.Notes && booking.Notes.length > 0 ? booking.Notes.slice().sort((a, b) => b.timestamp - a.timestamp)[0].text : 'N/A'}
+                                  dangerouslySetInnerHTML={
+                                    booking.Notes && booking.Notes.length > 0
+                                      ? renderNoteWithBold(booking.Notes.slice().sort((a, b) => b.timestamp - a.timestamp)[0].text)
+                                      : { __html: 'N/A' }
+                                  }
+                                ></p>
                               </TableCell>
                               <TableCell>
                                 <span className={cn(
@@ -453,7 +469,9 @@ export default function ClientDetailsPage() {
                               <TableCell className="text-sm">
                                 {format(new Date(note.noteTimestamp), "PPPp")}
                               </TableCell>
-                              <TableCell className="text-sm whitespace-pre-wrap">{note.noteText}</TableCell>
+                               <TableCell className="text-sm">
+                                <p className="whitespace-pre-wrap" dangerouslySetInnerHTML={renderNoteWithBold(note.noteText)}></p>
+                              </TableCell>
                               <TableCell className="text-sm">{note.serviceProcedure}</TableCell>
                               <TableCell className="text-sm">{format(parseISO(note.appointmentDate), "PPP")}</TableCell>
                             </TableRow>
@@ -478,3 +496,5 @@ export default function ClientDetailsPage() {
     </div>
   );
 }
+
+    

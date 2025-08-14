@@ -386,6 +386,7 @@ export default function AllBookingsPage() {
         
         // Close dialog and reset states
         setEditingBookingNotes(null);
+        setNoteDraft('');
 
         // Update local state to reflect changes immediately
         setAllFetchedBookings(prevBookings => prevBookings.map(b =>
@@ -710,6 +711,14 @@ export default function AllBookingsPage() {
     });
   }, [weekViewDate]);
 
+  const renderNoteWithBold = (text: string) => {
+    const html = text
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\*\*(.*?)\*\*/g, "&lt;strong&gt;$1&lt;/strong&gt;");
+    return { __html: html };
+  };
+
 
   if (authLoading || !currentUser) {
     return (
@@ -755,7 +764,7 @@ export default function AllBookingsPage() {
                     <ul className="space-y-2">
                       {editingBookingNotes.Notes.slice().sort((a,b) => b.timestamp - a.timestamp).map((note) => (
                         <li key={note.id} className="text-xs p-2 bg-muted/50 rounded">
-                          <p className="whitespace-pre-wrap">{note.text}</p>
+                          <p className="whitespace-pre-wrap" dangerouslySetInnerHTML={renderNoteWithBold(note.text)}></p>
                           <p className="text-muted-foreground text-right text-[10px] mt-1">
                             {format(new Date(note.timestamp), "MMM d, yyyy h:mm a")}
                           </p>
@@ -1139,15 +1148,23 @@ export default function AllBookingsPage() {
                           <TableCell>{booking.AppointmentEndTime}</TableCell>
                           <TableCell className="text-sm text-muted-foreground ">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="truncate max-w-[100px]" title={booking.Notes && booking.Notes.length > 0 ? booking.Notes[booking.Notes.length - 1].text : 'N/A'}>
-                                {booking.Notes && booking.Notes.length > 0 ? booking.Notes[booking.Notes.length - 1].text : 'N/A'}
-                              </span>
+                               <p
+                                className="truncate max-w-[100px] whitespace-pre-wrap"
+                                title={booking.Notes && booking.Notes.length > 0 ? booking.Notes[booking.Notes.length - 1].text : 'N/A'}
+                                dangerouslySetInnerHTML={
+                                  booking.Notes && booking.Notes.length > 0
+                                    ? renderNoteWithBold(booking.Notes[booking.Notes.length - 1].text)
+                                    : { __html: 'N/A' }
+                                }
+                              />
                                 <Button
                                   variant="ghost"
                                   size="icon"
                                   className="h-6 w-6 p-0 shrink-0"
                                   onClick={() => {
                                     setEditingBookingNotes(booking);
+                                    const latestNote = booking.Notes && booking.Notes.length > 0 ? booking.Notes.slice().sort((a,b) => b.timestamp - a.timestamp)[0].text : '';
+                                    setNoteDraft(latestNote);
                                   }}
                                 >
                                   <Edit className="h-4 w-4" />
@@ -1220,3 +1237,5 @@ export default function AllBookingsPage() {
     </div>
   );
 }
+
+    
