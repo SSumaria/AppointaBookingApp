@@ -29,7 +29,6 @@ import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { ref, get, query as rtQuery, orderByChild, equalTo, update } from "firebase/database";
-import { db } from '@/lib/firebaseConfig';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1183,8 +1182,7 @@ export default function AllBookingsPage() {
                                   className="h-6 w-6 p-0 shrink-0"
                                   onClick={() => {
                                     setEditingBookingNotes(booking);
-                                    const latestNote = booking.Notes && booking.Notes.length > 0 ? [...booking.Notes].sort((a,b) => b.timestamp - a.timestamp)[0].text : '';
-                                    setNoteDraft(latestNote);
+                                    setNoteDraft('');
                                   }}
                                 >
                                   <Edit className="h-4 w-4" />
@@ -1257,11 +1255,3 @@ export default function AllBookingsPage() {
     </div>
   );
 }
-
-    
-
-    
-
-    
-
-    
