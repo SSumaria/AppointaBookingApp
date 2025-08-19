@@ -127,6 +127,7 @@ export default function AllBookingsPage() {
   const { toast } = useToast();
   const { currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [editingBookingNotes, setEditingBookingNotes] = useState<Booking | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
@@ -273,6 +274,25 @@ export default function AllBookingsPage() {
     setBookingsForDisplay(filtered);
     setIsLoading(false);
   }, [allFetchedBookings, filterDateRange]);
+
+  useEffect(() => {
+    const bookingToOpenId = searchParams.get('openBooking');
+    if (bookingToOpenId && allFetchedBookings.length > 0) {
+      const booking = allFetchedBookings.find(b => b.id === bookingToOpenId);
+      if (booking) {
+        setEditingBookingNotes(booking);
+        const noteToEditId = searchParams.get('editNote');
+        if (noteToEditId) {
+          const noteToEdit = booking.Notes?.find(n => n.id === noteToEditId);
+          if (noteToEdit) {
+            handleEditNoteClick(noteToEdit);
+          }
+        }
+        // Clean the URL params after opening
+        router.replace('/all-bookings', { scroll: false });
+      }
+    }
+  }, [searchParams, allFetchedBookings, router]);
 
 
   const handleFilterDateChange = (selectedRange: DateRange | undefined) => {
@@ -758,7 +778,7 @@ export default function AllBookingsPage() {
 
   const renderNoteWithBold = (text: string) => {
     if (!text) return { __html: '' };
-    const html = text.replace(/\*\*(.*?)\*\*/g, '&lt;strong&gt;$1&lt;/strong&gt;');
+    const html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     return { __html: html };
   };
   
