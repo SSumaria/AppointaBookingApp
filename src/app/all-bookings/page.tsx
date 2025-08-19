@@ -27,7 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ref, get, query as rtQuery, orderByChild, equalTo, update } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
 import {
@@ -280,7 +280,7 @@ export default function AllBookingsPage() {
     if (bookingToOpenId && allFetchedBookings.length > 0) {
       const booking = allFetchedBookings.find(b => b.id === bookingToOpenId);
       if (booking) {
-        setEditingBookingNotes(booking);
+        handleOpenNotesDialog(booking);
         const noteToEditId = searchParams.get('editNote');
         if (noteToEditId) {
           const noteToEdit = booking.Notes?.find(n => n.id === noteToEditId);
@@ -796,6 +796,12 @@ export default function AllBookingsPage() {
     setActiveNotesTab("draft");
   };
 
+  const handleOpenNotesDialog = (booking: Booking) => {
+    setEditingBookingNotes(booking);
+    setNoteDraft('');
+    setEditingNoteId(null);
+  };
+
 
   if (authLoading || !currentUser) {
     return (
@@ -1279,9 +1285,7 @@ export default function AllBookingsPage() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-6 w-6 p-0 shrink-0"
-                                  onClick={() => {
-                                    setEditingBookingNotes(booking);
-                                  }}
+                                  onClick={() => handleOpenNotesDialog(booking)}
                                 >
                                   <Edit className="h-4 w-4" />
                                   <span className="sr-only">Manage Notes</span>
