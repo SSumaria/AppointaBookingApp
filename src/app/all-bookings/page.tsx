@@ -713,7 +713,6 @@ export default function AllBookingsPage() {
 
   const renderNoteWithBold = (text: string) => {
     if (!text) return { __html: '' };
-    // This regex replaces **text** with <strong>text</strong>
     const html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     return { __html: html };
   };
@@ -1260,5 +1259,7 @@ export default function AllBookingsPage() {
     </div>
   );
 }
+
+    
 
     
