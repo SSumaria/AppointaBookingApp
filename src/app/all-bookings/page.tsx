@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { DateRange, DayContentProps } from "react-day-picker";
-import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, CalendarDays, ChevronLeft, ChevronRight, Edit3, Mic, Save, Loader2 } from "lucide-react";
+import { Calendar as CalendarIconLucide, ListFilter, XCircle, Edit, PlusCircle, CalendarDays, ChevronLeft, ChevronRight, Edit3, Mic, Save, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parse, parseISO, isSameDay, addDays, subDays, startOfWeek, endOfWeek, eachDayOfInterval, addMinutes, getHours, getMinutes } from "date-fns";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -384,12 +384,13 @@ export default function AllBookingsPage() {
         await update(ref(db, bookingRefPath), { Notes: updatedNotes });
         toast({ title: "Note Saved", description: "The new note has been saved." });
         
-        setEditingBookingNotes(null);
-        setNoteDraft('');
-
+        // Update local state to reflect the new note
+        const updatedBooking = { ...editingBookingNotes, Notes: updatedNotes };
+        setEditingBookingNotes(updatedBooking);
         setAllFetchedBookings(prevBookings => prevBookings.map(b =>
-            b.id === bookingId ? { ...b, Notes: updatedNotes } : b
+            b.id === bookingId ? updatedBooking : b
         ));
+        setNoteDraft(''); // Clear the draft area after saving
 
     } catch (error: any) {
         console.error("Error saving note:", error);
@@ -660,6 +661,34 @@ export default function AllBookingsPage() {
   // --- End of Edit Booking Logic ---
 
 
+  // --- Note Deletion Logic ---
+  const handleDeleteNote = async (bookingId: string, noteId: string) => {
+    if (!currentUser?.uid || !bookingId || !noteId) return;
+
+    try {
+        const bookingRefPath = `Appointments/${currentUser.uid}/${bookingId}`;
+        const targetBooking = allFetchedBookings.find(b => b.id === bookingId);
+        if (!targetBooking || !targetBooking.Notes) {
+          throw new Error("Booking or notes not found for deletion.");
+        }
+        
+        const updatedNotes = targetBooking.Notes.filter(n => n.id !== noteId);
+        await update(ref(db, bookingRefPath), { Notes: updatedNotes });
+        toast({ title: "Note Deleted", description: "The selected note has been deleted." });
+
+        // Update local state immediately
+        const updatedBooking = { ...targetBooking, Notes: updatedNotes };
+        setEditingBookingNotes(updatedBooking);
+        setAllFetchedBookings(prevBookings => prevBookings.map(b =>
+            b.id === bookingId ? updatedBooking : b
+        ));
+    } catch(error: any) {
+        console.error("Error deleting note:", error);
+        toast({ title: "Error Deleting Note", description: error.message, variant: "destructive" });
+    }
+  };
+  // --- End of Note Deletion Logic ---
+
   const CustomDayContent = (props: DayContentProps) => {
     const dayBookings = allFetchedBookings
       .filter(booking => isSameDay(parseISO(booking.AppointmentDate), props.date) && booking.BookingStatus !== "Cancelled")
@@ -815,11 +844,31 @@ export default function AllBookingsPage() {
                     <ScrollArea className="h-[350px] w-full rounded-md border p-3">
                       <ul className="space-y-2">
                         {[...editingBookingNotes.Notes].sort((a,b) => b.timestamp - a.timestamp).map((note) => (
-                          <li key={note.id} className="text-xs p-2 bg-muted/50 rounded">
-                            <p className="whitespace-pre-wrap" dangerouslySetInnerHTML={renderNoteWithBold(note.text)}></p>
-                            <p className="text-muted-foreground text-right text-[10px] mt-1">
-                              {format(new Date(note.timestamp), "MMM d, yyyy h:mm a")}
-                            </p>
+                          <li key={note.id} className="text-xs p-2 bg-muted/50 rounded flex items-start justify-between gap-2">
+                            <div>
+                                <p className="whitespace-pre-wrap" dangerouslySetInnerHTML={renderNoteWithBold(note.text)}></p>
+                                <p className="text-muted-foreground text-right text-[10px] mt-1">
+                                {format(new Date(note.timestamp), "MMM d, yyyy h:mm a")}
+                                </p>
+                            </div>
+                             <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 p-1 text-muted-foreground hover:text-destructive shrink-0">
+                                        <Trash2 className="h-4 w-4" />
+                                        <span className="sr-only">Delete note</span>
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>This action will permanently delete this note. This cannot be undone.</AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeleteNote(editingBookingNotes.id, note.id)} className="bg-destructive hover:bg-destructive/90">Delete Note</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
                           </li>
                         ))}
                       </ul>

@@ -204,7 +204,31 @@ export default function ClientDetailsPage() {
     } finally {
         setIsDeleting(false);
     }
-};
+  };
+
+  const handleDeleteNote = async (bookingId: string, noteIdToDelete: string) => {
+    if (!currentUser?.uid) return;
+
+    try {
+        const bookingRefPath = `Appointments/${currentUser.uid}/${bookingId}`;
+        const targetBooking = bookings.find(b => b.id === bookingId);
+        
+        if (!targetBooking || !targetBooking.Notes) {
+            throw new Error("Booking or notes not found for deletion.");
+        }
+
+        const updatedNotes = targetBooking.Notes.filter(n => n.id !== noteIdToDelete);
+        await update(ref(db, bookingRefPath), { Notes: updatedNotes });
+        toast({ title: "Note Deleted", description: "The selected note has been deleted." });
+
+        // Refresh local data to reflect the change
+        fetchClientBookings();
+
+    } catch (error: any) {
+        console.error("Error deleting note from client page:", error);
+        toast({ title: "Error Deleting Note", description: error.message, variant: "destructive" });
+    }
+  };
 
 
   useEffect(() => {
@@ -459,6 +483,7 @@ export default function ClientDetailsPage() {
                             <TableHead>Note</TableHead>
                             <TableHead className="w-[200px]">Associated Service</TableHead>
                             <TableHead className="w-[150px]">Appointment Date</TableHead>
+                             <TableHead className="w-[100px] text-right">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -472,6 +497,26 @@ export default function ClientDetailsPage() {
                               </TableCell>
                               <TableCell className="text-sm">{note.serviceProcedure}</TableCell>
                               <TableCell className="text-sm">{format(parseISO(note.appointmentDate), "PPP")}</TableCell>
+                              <TableCell className="text-right">
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 p-1 text-muted-foreground hover:text-destructive">
+                                            <Trash2 className="h-4 w-4" />
+                                            <span className="sr-only">Delete note</span>
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>This action will permanently delete this note. This cannot be undone.</AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteNote(note.bookingId, note.id)} className="bg-destructive hover:bg-destructive/90">Delete Note</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -494,5 +539,3 @@ export default function ClientDetailsPage() {
     </div>
   );
 }
-
-    
