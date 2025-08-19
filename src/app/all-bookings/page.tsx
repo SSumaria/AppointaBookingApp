@@ -384,11 +384,9 @@ export default function AllBookingsPage() {
         await update(ref(db, bookingRefPath), { Notes: updatedNotes });
         toast({ title: "Note Saved", description: "The new note has been saved." });
         
-        // Close dialog and reset states
         setEditingBookingNotes(null);
         setNoteDraft('');
 
-        // Update local state to reflect changes immediately
         setAllFetchedBookings(prevBookings => prevBookings.map(b =>
             b.id === bookingId ? { ...b, Notes: updatedNotes } : b
         ));
@@ -833,7 +831,7 @@ export default function AllBookingsPage() {
             </Tabs>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setEditingBookingNotes(null); }}>Close</Button>
+            <Button variant="outline" onClick={() => { setEditingBookingNotes(null); setNoteDraft(''); }}>Close</Button>
             <Button onClick={handleSaveNote} disabled={isRecording || isTranscribing}>
               <Save className="mr-2 h-4 w-4" /> Save Note
             </Button>
@@ -1259,6 +1257,8 @@ export default function AllBookingsPage() {
     </div>
   );
 }
+
+    
 
     
 
