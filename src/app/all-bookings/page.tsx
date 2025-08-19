@@ -758,8 +758,8 @@ export default function AllBookingsPage() {
 
   const renderNoteWithBold = (text: string) => {
     if (!text) return { __html: '' };
-    const html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    return { __html: html.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/<strong>/g, '<strong>').replace(/<\/strong>/g, '</strong>') };
+    const html = text.replace(/\*\*(.*?)\*\*/g, '&lt;strong&gt;$1&lt;/strong&gt;');
+    return { __html: html };
   };
   
   const mostRecentNote = useMemo(() => {
@@ -818,7 +818,7 @@ export default function AllBookingsPage() {
               </TabsList>
               
               <TabsContent value="draft" className="mt-4 space-y-4">
-                {mostRecentNote && !editingNoteId && (
+                {mostRecentNote && (
                   <div>
                     <Label className="font-semibold text-sm">Most Recent Note</Label>
                     <div className="text-xs p-3 mt-1 bg-muted/50 rounded-md border">

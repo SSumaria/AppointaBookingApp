@@ -278,8 +278,8 @@ export default function ClientDetailsPage() {
 
   const renderNoteWithBold = (text: string) => {
     if (!text) return { __html: '' };
-    const html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    return { __html: html.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/<strong>/g, '<strong>').replace(/<\/strong>/g, '</strong>') };
+    const html = text.replace(/\*\*(.*?)\*\*/g, '&lt;strong&gt;$1&lt;/strong&gt;');
+    return { __html: html };
   };
 
 
