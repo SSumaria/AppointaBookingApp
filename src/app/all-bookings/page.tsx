@@ -130,6 +130,9 @@ export default function AllBookingsPage() {
 
   const [editingBookingNotes, setEditingBookingNotes] = useState<Booking | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [activeNotesTab, setActiveNotesTab] = useState("draft");
+
   
   const [bookingToEdit, setBookingToEdit] = useState<Booking | null>(null);
   const [editFormState, setEditFormState] = useState<EditBookingFormState | null>(null);
@@ -365,7 +368,7 @@ export default function AllBookingsPage() {
     }
   };
 
-  const handleSaveNote = async () => {
+    const handleSaveNote = async () => {
     if (!currentUser?.uid || !editingBookingNotes) return;
     
     if (!noteDraft.trim()) {
@@ -374,17 +377,27 @@ export default function AllBookingsPage() {
     }
 
     const bookingId = editingBookingNotes.id;
-    const newNote: Note = { id: generateNoteId(), text: noteDraft, timestamp: Date.now() };
+    const currentNotes: Note[] = Array.isArray(editingBookingNotes.Notes) ? editingBookingNotes.Notes : [];
+    let updatedNotes;
 
+    if (editingNoteId) {
+        // This is an edit of an existing note
+        updatedNotes = currentNotes.map(note =>
+            note.id === editingNoteId ? { ...note, text: noteDraft, timestamp: Date.now() } : note
+        );
+        setEditingNoteId(null); // Reset editing state
+    } else {
+        // This is a new note
+        const newNote: Note = { id: generateNoteId(), text: noteDraft, timestamp: Date.now() };
+        updatedNotes = [...currentNotes, newNote];
+    }
+    
     try {
         const bookingRefPath = `Appointments/${currentUser.uid}/${bookingId}`;
-        const currentNotes: Note[] = Array.isArray(editingBookingNotes.Notes) ? editingBookingNotes.Notes : [];
-        const updatedNotes = [...currentNotes, newNote];
-
         await update(ref(db, bookingRefPath), { Notes: updatedNotes });
-        toast({ title: "Note Saved", description: "The new note has been saved." });
+        toast({ title: "Note Saved", description: "The note has been successfully saved." });
         
-        // Update local state to reflect the new note
+        // Update local state to reflect the change
         const updatedBooking = { ...editingBookingNotes, Notes: updatedNotes };
         setEditingBookingNotes(updatedBooking);
         setAllFetchedBookings(prevBookings => prevBookings.map(b =>
@@ -660,8 +673,13 @@ export default function AllBookingsPage() {
 
   // --- End of Edit Booking Logic ---
 
+  // --- Note Edit/Delete Logic ---
+  const handleEditNoteClick = (noteToEdit: Note) => {
+    setNoteDraft(noteToEdit.text);
+    setEditingNoteId(noteToEdit.id);
+    setActiveNotesTab("draft");
+  };
 
-  // --- Note Deletion Logic ---
   const handleDeleteNote = async (bookingId: string, noteId: string) => {
     if (!currentUser?.uid || !bookingId || !noteId) return;
 
@@ -687,7 +705,7 @@ export default function AllBookingsPage() {
         toast({ title: "Error Deleting Note", description: error.message, variant: "destructive" });
     }
   };
-  // --- End of Note Deletion Logic ---
+  // --- End of Note Logic ---
 
   const CustomDayContent = (props: DayContentProps) => {
     const dayBookings = allFetchedBookings
@@ -741,7 +759,7 @@ export default function AllBookingsPage() {
   const renderNoteWithBold = (text: string) => {
     if (!text) return { __html: '' };
     const html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    return { __html: html };
+    return { __html: html.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/<strong>/g, '<strong>').replace(/<\/strong>/g, '</strong>') };
   };
   
   const mostRecentNote = useMemo(() => {
@@ -750,6 +768,13 @@ export default function AllBookingsPage() {
     }
     return [...editingBookingNotes.Notes].sort((a, b) => b.timestamp - a.timestamp)[0];
   }, [editingBookingNotes]);
+
+  const closeAndResetNotesDialog = () => {
+    setEditingBookingNotes(null);
+    setNoteDraft('');
+    setEditingNoteId(null);
+    setActiveNotesTab("draft");
+  };
 
 
   if (authLoading || !currentUser) {
@@ -776,7 +801,7 @@ export default function AllBookingsPage() {
     <div className="min-h-screen flex flex-col">
       <Header />
       {/* Dialog for Editing Booking Notes */}
-      <Dialog open={!!editingBookingNotes} onOpenChange={(isOpen) => { if (!isOpen) { setEditingBookingNotes(null); setNoteDraft(''); } }}>
+      <Dialog open={!!editingBookingNotes} onOpenChange={(isOpen) => { if (!isOpen) closeAndResetNotesDialog() }}>
         <DialogContent className="sm:max-w-4xl grid-rows-[auto_1fr_auto]">
           <DialogHeader>
             <DialogTitle>
@@ -786,30 +811,28 @@ export default function AllBookingsPage() {
               Appointment on {editingBookingNotes && format(parseISO(editingBookingNotes.AppointmentDate), "PPP")} at {editingBookingNotes?.AppointmentStartTime} - {editingBookingNotes?.AppointmentEndTime}
             </DialogDescription>
           </DialogHeader>
-            <Tabs defaultValue="draft" className="py-4">
+            <Tabs value={activeNotesTab} onValueChange={setActiveNotesTab} className="py-4">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="draft">Draft New Note</TabsTrigger>
+                <TabsTrigger value="draft">Draft / Edit Note</TabsTrigger>
                 <TabsTrigger value="history">All Notes ({editingBookingNotes?.Notes?.length || 0})</TabsTrigger>
               </TabsList>
               
               <TabsContent value="draft" className="mt-4 space-y-4">
-                <div>
-                  <Label className="font-semibold text-sm">Most Recent Note</Label>
-                   {mostRecentNote ? (
-                      <div className="text-xs p-3 mt-1 bg-muted/50 rounded-md border">
+                {mostRecentNote && !editingNoteId && (
+                  <div>
+                    <Label className="font-semibold text-sm">Most Recent Note</Label>
+                    <div className="text-xs p-3 mt-1 bg-muted/50 rounded-md border">
                         <p className="whitespace-pre-wrap" dangerouslySetInnerHTML={renderNoteWithBold(mostRecentNote.text)}></p>
                         <p className="text-muted-foreground text-right text-[10px] mt-1">
                           {format(new Date(mostRecentNote.timestamp), "MMM d, yyyy h:mm a")}
                         </p>
-                      </div>
-                  ) : (
-                      <p className="text-sm text-muted-foreground p-3 mt-1 border rounded-md">No existing notes for this booking.</p>
-                  )}
-                </div>
+                    </div>
+                  </div>
+                )}
                 
                 <div>
                    <div className="flex justify-between items-center mb-1">
-                    <Label htmlFor="note-draft" className="font-semibold text-sm">New Note Draft</Label>
+                    <Label htmlFor="note-draft" className="font-semibold text-sm">{editingNoteId ? 'Editing Note' : 'New Note Draft'}</Label>
                      <Button
                           type="button"
                           size="sm"
@@ -851,24 +874,30 @@ export default function AllBookingsPage() {
                                 {format(new Date(note.timestamp), "MMM d, yyyy h:mm a")}
                                 </p>
                             </div>
-                             <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 p-1 text-muted-foreground hover:text-destructive shrink-0">
-                                        <Trash2 className="h-4 w-4" />
-                                        <span className="sr-only">Delete note</span>
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                        <AlertDialogDescription>This action will permanently delete this note. This cannot be undone.</AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteNote(editingBookingNotes.id, note.id)} className="bg-destructive hover:bg-destructive/90">Delete Note</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
+                            <div className="flex items-center shrink-0">
+                               <Button variant="ghost" size="icon" className="h-6 w-6 p-1 text-muted-foreground hover:text-primary" onClick={() => handleEditNoteClick(note)}>
+                                  <Edit className="h-4 w-4" />
+                                  <span className="sr-only">Edit note</span>
+                               </Button>
+                               <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6 p-1 text-muted-foreground hover:text-destructive">
+                                          <Trash2 className="h-4 w-4" />
+                                          <span className="sr-only">Delete note</span>
+                                      </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                          <AlertDialogDescription>This action will permanently delete this note. This cannot be undone.</AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => handleDeleteNote(editingBookingNotes.id, note.id)} className="bg-destructive hover:bg-destructive/90">Delete Note</AlertDialogAction>
+                                      </AlertDialogFooter>
+                                  </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
                           </li>
                         ))}
                       </ul>
@@ -880,7 +909,7 @@ export default function AllBookingsPage() {
             </Tabs>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setEditingBookingNotes(null); setNoteDraft(''); }}>Close</Button>
+            <Button variant="outline" onClick={closeAndResetNotesDialog}>Close</Button>
             <Button onClick={handleSaveNote} disabled={isRecording || isTranscribing}>
               <Save className="mr-2 h-4 w-4" /> Save Note
             </Button>
@@ -1232,7 +1261,6 @@ export default function AllBookingsPage() {
                                   className="h-6 w-6 p-0 shrink-0"
                                   onClick={() => {
                                     setEditingBookingNotes(booking);
-                                    setNoteDraft('');
                                   }}
                                 >
                                   <Edit className="h-4 w-4" />

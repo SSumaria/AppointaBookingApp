@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import { User, Calendar as CalendarIconLucide, Briefcase, Mail, Phone, Clock, FileText, Trash2, AlertTriangle } from "lucide-react";
+import { User, Calendar as CalendarIconLucide, Briefcase, Mail, Phone, Clock, FileText, Trash2, AlertTriangle, Edit } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -206,6 +206,18 @@ export default function ClientDetailsPage() {
     }
   };
 
+    const handleEditNote = (noteId: string) => {
+        // Find the booking associated with this note to pass to the All Bookings page
+        const bookingForNote = bookings.find(b => b.Notes?.some(n => n.id === noteId));
+        if (bookingForNote) {
+            // Use query params to tell the bookings page to open the dialog for a specific booking and note
+            router.push(`/all-bookings?openBooking=${bookingForNote.id}&editNote=${noteId}`);
+        } else {
+            toast({ title: "Error", description: "Could not find the booking associated with this note.", variant: "destructive" });
+        }
+    };
+
+
   const handleDeleteNote = async (bookingId: string, noteIdToDelete: string) => {
     if (!currentUser?.uid) return;
 
@@ -266,9 +278,8 @@ export default function ClientDetailsPage() {
 
   const renderNoteWithBold = (text: string) => {
     if (!text) return { __html: '' };
-    // This regex replaces **text** with <strong>text</strong>
     const html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    return { __html: html };
+    return { __html: html.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/<strong>/g, '<strong>').replace(/<\/strong>/g, '</strong>') };
   };
 
 
@@ -400,8 +411,7 @@ export default function ClientDetailsPage() {
                     <div className="text-center py-10">
                         <svg className="animate-spin mx-auto h-10 w-10 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         <p className="mt-2 text-muted-foreground">Loading bookings...</p>
                     </div>
                   ) : bookings.length > 0 ? (
@@ -498,24 +508,30 @@ export default function ClientDetailsPage() {
                               <TableCell className="text-sm">{note.serviceProcedure}</TableCell>
                               <TableCell className="text-sm">{format(parseISO(note.appointmentDate), "PPP")}</TableCell>
                               <TableCell className="text-right">
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 p-1 text-muted-foreground hover:text-destructive">
-                                            <Trash2 className="h-4 w-4" />
-                                            <span className="sr-only">Delete note</span>
-                                        </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                            <AlertDialogDescription>This action will permanently delete this note. This cannot be undone.</AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handleDeleteNote(note.bookingId, note.id)} className="bg-destructive hover:bg-destructive/90">Delete Note</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
+                                 <div className="flex items-center justify-end">
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 p-1 text-muted-foreground hover:text-primary" onClick={() => handleEditNote(note.id)}>
+                                          <Edit className="h-4 w-4" />
+                                          <span className="sr-only">Edit note</span>
+                                      </Button>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 p-1 text-muted-foreground hover:text-destructive">
+                                                <Trash2 className="h-4 w-4" />
+                                                <span className="sr-only">Delete note</span>
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                <AlertDialogDescription>This action will permanently delete this note. This cannot be undone.</AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleDeleteNote(note.bookingId, note.id)} className="bg-destructive hover:bg-destructive/90">Delete Note</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                 </div>
                               </TableCell>
                             </TableRow>
                           ))}
