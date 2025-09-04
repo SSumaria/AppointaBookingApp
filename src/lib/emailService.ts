@@ -1,24 +1,68 @@
 
-// A mock email service for demonstration purposes.
-// In a real application, you would replace this with a real email provider like SendGrid, Mailgun, etc.
-// This service is now called exclusively from the /api/send-email route.
+// This service integrates with the Aha Send API to send transactional emails.
+// It is called exclusively from the /api/send-email route.
 
 interface EmailParams {
     to: string;
+    toName: string;
     subject: string;
     html: string;
 }
 
 const sendEmail = async (params: EmailParams) => {
-    console.log("--- SIMULATING EMAIL SEND ---");
-    console.log(`To: ${params.to}`);
-    console.log(`Subject: ${params.subject}`);
-    console.log("Body (HTML):");
-    console.log(params.html);
-    console.log("-----------------------------");
-    // In a real implementation, this would involve an API call to your email provider.
-    // e.g., await resend.emails.send({ ... });
-    return Promise.resolve();
+    const accountId = process.env.AHASEND_ACCOUNT_ID;
+    const apiKey = process.env.AHASEND_API_KEY;
+    const fromEmail = process.env.AHASEND_FROM_EMAIL;
+    const fromName = process.env.AHASEND_FROM_NAME;
+
+    if (!accountId || !apiKey || !fromEmail || !fromName) {
+        console.error("Aha Send environment variables are not set. Cannot send email.");
+        // Silently fail in production to avoid breaking user-facing flows.
+        // In a real-world scenario, you might have more robust error reporting.
+        return;
+    }
+
+    const url = `https://api.ahasend.com/v2/accounts/${accountId}/messages`;
+    
+    const body = {
+        from: {
+            email: fromEmail,
+            name: fromName,
+        },
+        recipients: [{
+            email: params.to,
+            name: params.toName,
+        }],
+        subject: params.subject,
+        html_content: params.html,
+        text_content: params.html.replace(/<[^>]*>?/gm, ''), // Basic conversion from HTML to text
+        sandbox: true,
+        sandbox_result: 'deliver'
+    };
+
+    const options = {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+    };
+
+    try {
+        console.log(`--- Sending email via Aha Send to: ${params.to} ---`);
+        const response = await fetch(url, options);
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.error("Aha Send API Error:", data);
+            throw new Error(`Aha Send API responded with status ${response.status}`);
+        }
+        
+        console.log("--- Successfully sent email via Aha Send. Response:", data);
+    } catch (error) {
+        console.error("Error sending email with Aha Send:", error);
+    }
 };
 
 interface BookingEmailParams {
@@ -44,8 +88,8 @@ export const emailService = {
             </ul>
         `;
         // Send to both provider and client
-        await sendEmail({ to: providerEmail, subject, html });
-        await sendEmail({ to: clientEmail, subject, html });
+        await sendEmail({ to: providerEmail, toName: "Service Provider", subject, html });
+        await sendEmail({ to: clientEmail, toName: clientName, subject, html });
     },
 
     sendCancellationNotice: async ({ providerEmail, clientName, clientEmail, appointmentDate, appointmentTime, service }: BookingEmailParams) => {
@@ -62,8 +106,8 @@ export const emailService = {
         `;
 
         // Send to both provider and client
-        await sendEmail({ to: providerEmail, subject, html });
-        await sendEmail({ to: clientEmail, subject, html });
+        await sendEmail({ to: providerEmail, toName: "Service Provider", subject, html });
+        await sendEmail({ to: clientEmail, toName: clientName, subject, html });
     },
 
     sendUpdateNotice: async ({ providerEmail, clientName, clientEmail, oldDetails, newDetails }: {
@@ -91,8 +135,8 @@ export const emailService = {
             </ul>
         `;
         
-        await sendEmail({ to: providerEmail, subject, html });
-        await sendEmail({ to: clientEmail, subject, html });
+        await sendEmail({ to: providerEmail, toName: "Service Provider", subject, html });
+        await sendEmail({ to: clientEmail, toName: clientName, subject, html });
     },
 
     sendReminder: async ({ providerEmail, clientName, clientEmail, appointmentDate, appointmentTime, service }: BookingEmailParams) => {
@@ -109,7 +153,7 @@ export const emailService = {
             <p>We look forward to seeing you!</p>
         `;
 
-        await sendEmail({ to: providerEmail, subject, html });
-        await sendEmail({ to: clientEmail, subject, html });
+        await sendEmail({ to: providerEmail, toName: "Service Provider", subject, html });
+        await sendEmail({ to: clientEmail, toName: clientName, subject, html });
     },
 };
