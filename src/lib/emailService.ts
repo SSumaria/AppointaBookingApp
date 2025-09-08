@@ -75,20 +75,78 @@ const createStyledEmailHtml = (title: string, content: string): string => {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>${title}</title>
       <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'; margin: 0; padding: 0; background-color: #f2f4f6; }
-        .container { width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); overflow: hidden; }
-        .header { background-color: #3B82F6; color: #ffffff; padding: 24px; text-align: center; }
-        .header h1 { margin: 0; font-size: 24px; }
-        .content { padding: 24px; color: #333333; line-height: 1.6; }
-        .content h2 { color: #3B82F6; font-size: 20px; }
-        .content ul { list-style: none; padding: 0; }
-        .content li { background-color: #f8f9fa; margin-bottom: 8px; padding: 12px; border-left: 4px solid #3B82F6; border-radius: 4px; }
-        .footer { text-align: center; padding: 20px; font-size: 12px; color: #777777; }
-        .footer img { height: 32px; width: auto; margin-bottom: 8px; }
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+          margin: 0; 
+          padding: 0; 
+          background-color: #f8f9fa; /* A very light gray, similar to muted */
+        }
+        .wrapper {
+          padding: 20px;
+        }
+        .container { 
+          width: 100%; 
+          max-width: 600px; 
+          margin: 0 auto; 
+          background-color: #ffffff; 
+          border: 1px solid #e2e8f0; /* Softer border */
+          border-radius: 0.5rem; /* Match app's border radius */
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+          overflow: hidden; 
+        }
+        .header { 
+          background-color: #2563eb; /* Primary blue */
+          color: #ffffff; 
+          padding: 24px; 
+          text-align: center; 
+        }
+        .header h1 { 
+          margin: 0; 
+          font-size: 24px; 
+          font-weight: 600;
+        }
+        .content { 
+          padding: 24px; 
+          color: #1f2937; /* Darker foreground text */
+          line-height: 1.6; 
+          font-size: 16px;
+        }
+        .content h2 { 
+          color: #2563eb; /* Primary blue */
+          font-size: 20px; 
+          font-weight: 600;
+        }
+        .content ul { 
+          list-style: none; 
+          padding: 0; 
+        }
+        .content li { 
+          background-color: #f8f9fa; 
+          margin-bottom: 8px; 
+          padding: 12px 16px; 
+          border-left: 4px solid #2563eb; /* Primary blue accent */
+          border-radius: 4px; 
+        }
+        .content li strong {
+          color: #111827; /* Even darker for emphasis */
+        }
+        .footer { 
+          text-align: center; 
+          padding: 20px; 
+          font-size: 12px; 
+          color: #6b7280; /* Muted foreground */
+          background-color: #f8f9fa;
+          border-top: 1px solid #e2e8f0;
+        }
+        .footer img { 
+          height: 32px; 
+          width: auto; 
+          margin-bottom: 8px; 
+        }
       </style>
     </head>
     <body>
-      <div style="padding: 20px;">
+      <div class="wrapper">
         <div class="container">
           <div class="header"><h1>${title}</h1></div>
           <div class="content">${content}</div>
