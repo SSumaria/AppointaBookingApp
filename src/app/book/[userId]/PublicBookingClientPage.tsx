@@ -7,7 +7,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation';
 import { Calendar as CalendarIconLucideShadcn } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { format, addMinutes, parse, getHours, getMinutes, getDay, parseISO } from "date-fns";
+import { format, addMinutes, parse, getHours, getMinutes, getDay, parseISO, eachDayOfInterval, isWithinInterval } from "date-fns";
 import { Calendar as CalendarIcon, Clock, AlertTriangle, Loader2, User } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import type { DateRange } from 'react-day-picker';
 
 import { ref, set, get, query as rtQuery, orderByChild, equalTo, push } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
@@ -49,6 +50,12 @@ const initialWorkingHoursDefaults: WorkingHours = {
   saturday:  { startTime: "09:00", endTime: "17:00", isUnavailable: true },
   sunday:    { startTime: "09:00", endTime: "17:00", isUnavailable: true },
 };
+
+interface OutOfOfficeRange {
+    from: string; // ISO String yyyy-MM-dd
+    to: string;   // ISO String yyyy-MM-dd
+}
+
 
 const generateTimeSlots = () => {
   const slots = [];
@@ -96,6 +103,7 @@ export default function PublicBookingClientPage() {
   const [isLoadingBookedSlots, setIsLoadingBookedSlots] = useState(false);
 
   const [workingHoursPreferences, setWorkingHoursPreferences] = useState<WorkingHours | null>(null);
+  const [outOfOfficeRanges, setOutOfOfficeRanges] = useState<OutOfOfficeRange[]>([]);
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(true);
 
   const [isLookingUpClient, setIsLookingUpClient] = useState(false);
@@ -112,38 +120,48 @@ export default function PublicBookingClientPage() {
     }
     setIsLoadingPreferences(true);
     try {
-        const preferencesRef = ref(db, `UserPreferences/${userId}/workingHours`);
+        const preferencesRefPath = `UserPreferences/${userId}`;
+        const preferencesRef = ref(db, preferencesRefPath);
         const snapshot = await get(preferencesRef);
+
         if (snapshot.exists()) {
-            const loadedPrefs = snapshot.val() as WorkingHours;
-            let isValid = true;
-            daysOfWeekConst.forEach(day => {
-                if (!loadedPrefs[day] || 
-                    typeof loadedPrefs[day].startTime !== 'string' ||
-                    typeof loadedPrefs[day].endTime !== 'string' ||
-                    typeof loadedPrefs[day].isUnavailable !== 'boolean'
-                ) {
-                    isValid = false;
-                }
-            });
-            if(isValid) {
-                setWorkingHoursPreferences(loadedPrefs);
+            const prefsData = snapshot.val();
+
+            // Load Working Hours
+            if (prefsData.workingHours) {
+                const loadedPrefs = prefsData.workingHours as WorkingHours;
+                let isValid = true;
+                daysOfWeekConst.forEach(day => {
+                    if (!loadedPrefs[day] || typeof loadedPrefs[day].startTime !== 'string' || typeof loadedPrefs[day].endTime !== 'string' || typeof loadedPrefs[day].isUnavailable !== 'boolean') {
+                        isValid = false;
+                    }
+                });
+                setWorkingHoursPreferences(isValid ? loadedPrefs : initialWorkingHoursDefaults);
             } else {
-                console.warn(`Invalid preferences structure for provider ${userId}, using defaults.`);
-                setWorkingHoursPreferences(initialWorkingHoursDefaults); 
+                setWorkingHoursPreferences(initialWorkingHoursDefaults);
             }
+
+            // Load Out of Office Dates
+            if (prefsData.outOfOfficeDates && Array.isArray(prefsData.outOfOfficeDates)) {
+                setOutOfOfficeRanges(prefsData.outOfOfficeDates);
+            } else {
+                setOutOfOfficeRanges([]);
+            }
+
         } else {
             console.log(`No preferences found for provider ${userId}, using defaults.`);
             setWorkingHoursPreferences(initialWorkingHoursDefaults);
+            setOutOfOfficeRanges([]);
         }
     } catch (error: any) {
         console.error("Error fetching user preferences for public booking:", error);
         let description = error.message || "Could not load provider's availability settings.";
         if (error.message && error.message.toLowerCase().includes("permission denied")) {
-            description = "Permission denied fetching provider availability. The provider's settings might not be publicly accessible. Please ensure Firebase rules allow reading 'UserPreferences/$uid/workingHours'.";
+            description = "Permission denied fetching provider availability. The provider's settings might not be publicly accessible.";
         }
         toast({ title: "Error", description: description, variant: "destructive", duration: 10000 });
         setWorkingHoursPreferences(initialWorkingHoursDefaults);
+        setOutOfOfficeRanges([]);
     } finally {
         setIsLoadingPreferences(false);
     }
@@ -518,6 +536,26 @@ export default function PublicBookingClientPage() {
     }
     toast({ title: "Booking Error", description: detailedMessage, variant: "destructive", duration: 10000 });
   };
+  
+    const isDateDisabled = (day: Date) => {
+        if (day < new Date(new Date().setHours(0, 0, 0, 0))) return true;
+
+        if (isLoadingPreferences) return false;
+
+        const dayName = daysOfWeekConst[getDay(day)] as DayOfWeek;
+        if (workingHoursPreferences && workingHoursPreferences[dayName]?.isUnavailable) {
+            return true;
+        }
+
+        for (const range of outOfOfficeRanges) {
+            const interval = { start: parseISO(range.from), end: parseISO(range.to) };
+            if (isWithinInterval(day, interval)) {
+                return true;
+            }
+        }
+
+        return false;
+    };
 
 
   if (!serviceProviderUserId) { 
@@ -608,12 +646,7 @@ export default function PublicBookingClientPage() {
                                                 mode="single"
                                                 selected={date}
                                                 onSelect={(selectedDay) => { setDate(selectedDay); setStartTime(''); }}
-                                                disabled={(d) => {
-                                                    if (d < new Date(new Date().setHours(0,0,0,0))) return true;
-                                                    if (isLoadingPreferences || !workingHoursPreferences) return false; 
-                                                    const dayName = daysOfWeekConst[getDay(d)] as DayOfWeek;
-                                                    return workingHoursPreferences[dayName]?.isUnavailable || false;
-                                                }}
+                                                disabled={isDateDisabled}
                                                 initialFocus
                                             />
                                         </PopoverContent>
@@ -680,3 +713,5 @@ export default function PublicBookingClientPage() {
     </div>
   );
 }
+
+    

@@ -6,15 +6,19 @@ import Header from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Settings, Clock, Ban, Loader2, Moon, Sun, MousePointer2, XCircle, CalendarDays, Trash2, AlertTriangle, Timer } from "lucide-react";
+import { Settings, Clock, Ban, Loader2, Moon, Sun, MousePointer2, XCircle, CalendarDays, Trash2, AlertTriangle, Timer, CalendarOff } from "lucide-react";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { format, addMinutes, parse } from 'date-fns';
+import { format, addMinutes, parse, parseISO } from 'date-fns';
 import { Switch } from "@/components/ui/switch";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import type { DateRange } from 'react-day-picker';
 
 // Firebase imports
 import { ref, set, get } from "firebase/database";
@@ -63,6 +67,11 @@ interface BookingSettings {
     timeInterval: 15 | 30 | 60;
 }
 
+interface OutOfOfficeRange {
+    from: string; // ISO String yyyy-MM-dd
+    to: string;   // ISO String yyyy-MM-dd
+}
+
 const initialBookingSettings: BookingSettings = {
     timeInterval: 30,
 };
@@ -85,6 +94,10 @@ export default function PreferencesClientPage() {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [isClient, setIsClient] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  const [outOfOfficeRanges, setOutOfOfficeRanges] = useState<OutOfOfficeRange[]>([]);
+  const [newOutOfOfficeRange, setNewOutOfOfficeRange] = useState<DateRange | undefined>(undefined);
+
 
   useEffect(() => {
     setIsClient(true);
@@ -115,37 +128,47 @@ export default function PreferencesClientPage() {
     }
     setIsLoadingPreferences(true);
     try {
-      const workingHoursRef = ref(db, `UserPreferences/${userId}/workingHours`);
-      const workingHoursSnapshot = await get(workingHoursRef);
-      if (workingHoursSnapshot.exists()) {
-        const loadedPreferences = workingHoursSnapshot.val() as WorkingHours;
-        let isValid = true;
-        daysOfWeek.forEach(day => {
-            if (!loadedPreferences[day] || typeof loadedPreferences[day].startTime !== 'string' || typeof loadedPreferences[day].endTime !== 'string' || typeof loadedPreferences[day].isUnavailable !== 'boolean') {
-                isValid = false;
-            }
-        });
-        if(isValid) {
-            setWorkingHours(loadedPreferences);
-        } else {
-            setWorkingHours(initialWorkingHours); 
-        }
-      }
+      const preferencesRefPath = `UserPreferences/${userId}`;
+      const preferencesRef = ref(db, preferencesRefPath);
+      const snapshot = await get(preferencesRef);
 
-      const bookingSettingsRef = ref(db, `UserPreferences/${userId}/bookingSettings`);
-      const bookingSettingsSnapshot = await get(bookingSettingsRef);
-      if(bookingSettingsSnapshot.exists()){
-          const loadedSettings = bookingSettingsSnapshot.val() as BookingSettings;
-          if (loadedSettings.timeInterval && [15, 30, 60].includes(loadedSettings.timeInterval)) {
-              setBookingSettings(loadedSettings);
+      if (snapshot.exists()) {
+          const prefsData = snapshot.val();
+          
+          if(prefsData.workingHours) {
+              const loadedPreferences = prefsData.workingHours as WorkingHours;
+              let isValid = true;
+              daysOfWeek.forEach(day => {
+                  if (!loadedPreferences[day] || typeof loadedPreferences[day].startTime !== 'string' || typeof loadedPreferences[day].endTime !== 'string' || typeof loadedPreferences[day].isUnavailable !== 'boolean') {
+                      isValid = false;
+                  }
+              });
+              setWorkingHours(isValid ? loadedPreferences : initialWorkingHours);
+          } else {
+              setWorkingHours(initialWorkingHours);
+          }
+          
+          if(prefsData.bookingSettings){
+              const loadedSettings = prefsData.bookingSettings as BookingSettings;
+              if (loadedSettings.timeInterval && [15, 30, 60].includes(loadedSettings.timeInterval)) {
+                  setBookingSettings(loadedSettings);
+              } else {
+                  setBookingSettings(initialBookingSettings);
+              }
           } else {
               setBookingSettings(initialBookingSettings);
           }
-      }
+          
+          if(prefsData.outOfOfficeDates && Array.isArray(prefsData.outOfOfficeDates)) {
+              setOutOfOfficeRanges(prefsData.outOfOfficeDates);
+          } else {
+              setOutOfOfficeRanges([]);
+          }
 
+      }
     } catch (error: any) {
       console.error("Error fetching user preferences:", error);
-      toast({ title: "Error Loading Preferences", description: error.message || "Could not load your saved working hours.", variant: "destructive" });
+      toast({ title: "Error Loading Preferences", description: error.message || "Could not load your saved settings.", variant: "destructive" });
     } finally {
       setIsLoadingPreferences(false);
     }
@@ -255,6 +278,24 @@ export default function PreferencesClientPage() {
     setBookingSettings(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleAddOutOfOfficeRange = () => {
+    if (newOutOfOfficeRange?.from && newOutOfOfficeRange?.to) {
+        const newRange = {
+            from: format(newOutOfOfficeRange.from, 'yyyy-MM-dd'),
+            to: format(newOutOfOfficeRange.to, 'yyyy-MM-dd')
+        };
+        setOutOfOfficeRanges(prev => [...prev, newRange].sort((a, b) => new Date(a.from).getTime() - new Date(b.from).getTime()));
+        setNewOutOfOfficeRange(undefined);
+    } else {
+        toast({ title: "Incomplete Range", description: "Please select a start and end date for your time off.", variant: 'destructive'});
+    }
+  };
+  
+  const handleRemoveOutOfOfficeRange = (index: number) => {
+      setOutOfOfficeRanges(prev => prev.filter((_, i) => i !== index));
+  };
+
+
   const handleSaveChanges = async () => {
     if (!currentUser?.uid) return;
     
@@ -272,11 +313,12 @@ export default function PreferencesClientPage() {
 
     setIsSaving(true);
     try {
-      const workingHoursRef = ref(db, `UserPreferences/${currentUser.uid}/workingHours`);
-      await set(workingHoursRef, workingHours);
-      
-      const bookingSettingsRef = ref(db, `UserPreferences/${currentUser.uid}/bookingSettings`);
-      await set(bookingSettingsRef, bookingSettings);
+      const userPreferencesRef = ref(db, `UserPreferences/${currentUser.uid}`);
+      await set(userPreferencesRef, {
+        workingHours: workingHours,
+        bookingSettings: bookingSettings,
+        outOfOfficeDates: outOfOfficeRanges,
+      });
 
       toast({ title: "Preferences Saved", description: "Your settings have been successfully saved." });
     } catch (error: any) {
@@ -432,10 +474,72 @@ export default function PreferencesClientPage() {
                 </>
               )}
             </CardContent>
-             <CardFooter className="flex justify-end pt-0 p-6">
-                <Button onClick={handleSaveChanges} disabled={isSaving || isLoadingPreferences}>{isSaving ? <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5" /> : "Save All Settings"}</Button>
-            </CardFooter>
           </Card>
+          
+           <Card className="shadow-xl">
+              <CardHeader>
+                  <CardTitle className="text-xl font-bold flex items-center"><CalendarOff className="mr-2 h-5 w-5 text-primary" /> Out of Office</CardTitle>
+                  <CardDescription>Add date ranges when you are unavailable. These dates will be blocked on your public booking page.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                  <div className="flex flex-col sm:flex-row items-center gap-2">
+                       <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    id="date"
+                                    variant={"outline"}
+                                    className={cn("w-full sm:w-auto justify-start text-left font-normal flex-grow", !newOutOfOfficeRange && "text-muted-foreground")}
+                                >
+                                    <CalendarDays className="mr-2 h-4 w-4" />
+                                    {newOutOfOfficeRange?.from ? (
+                                        newOutOfOfficeRange.to ? (
+                                            <>
+                                                {format(newOutOfOfficeRange.from, "LLL dd, y")} - {format(newOutOfOfficeRange.to, "LLL dd, y")}
+                                            </>
+                                        ) : (
+                                            format(newOutOfOfficeRange.from, "LLL dd, y")
+                                        )
+                                    ) : (
+                                        <span>Pick a date range</span>
+                                    )}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                    initialFocus
+                                    mode="range"
+                                    defaultMonth={newOutOfOfficeRange?.from}
+                                    selected={newOutOfOfficeRange}
+                                    onSelect={setNewOutOfOfficeRange}
+                                    numberOfMonths={2}
+                                />
+                            </PopoverContent>
+                        </Popover>
+                        <Button onClick={handleAddOutOfOfficeRange} disabled={!newOutOfOfficeRange?.from || !newOutOfOfficeRange?.to}>
+                            Add Time Off
+                        </Button>
+                  </div>
+                  <div className="space-y-2">
+                      {outOfOfficeRanges.length > 0 ? (
+                          outOfOfficeRanges.map((range, index) => (
+                              <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-md text-sm">
+                                  <span>{format(parseISO(range.from), "PPP")} &mdash; {format(parseISO(range.to), "PPP")}</span>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveOutOfOfficeRange(index)}>
+                                      <XCircle className="h-4 w-4 text-destructive" />
+                                  </Button>
+                              </div>
+                          ))
+                      ) : (
+                          <p className="text-sm text-muted-foreground text-center py-2">No out of office periods set.</p>
+                      )}
+                  </div>
+              </CardContent>
+          </Card>
+          
+           <div className="flex justify-end pt-4">
+              <Button onClick={handleSaveChanges} disabled={isSaving || isLoadingPreferences} size="lg">{isSaving ? <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5" /> : "Save All Preferences"}</Button>
+            </div>
+
           
           <Card className="shadow-xl border-destructive/50">
             <CardHeader>
