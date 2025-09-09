@@ -37,8 +37,8 @@ const sendEmail = async (params: EmailParams) => {
         subject: params.subject,
         html_content: params.html,
         text_content: params.html.replace(/<[^>]*>?/gm, ''), // Basic conversion from HTML to text
-        sandbox: true,
-        sandbox_result: 'deliver'
+        //sandbox: true,
+        //sandbox_result: 'deliver'
     };
 
     const options = {
