@@ -411,6 +411,7 @@ export default function NewBookingPage() {
             try {
                 const emailPayload = {
                     action: 'sendConfirmation',
+                    providerName: currentUser.displayName || 'Your Provider',
                     providerEmail: currentUser.email,
                     clientName: finalClientNameForAppointment,
                     clientEmail: finalClientEmailForAppointment,

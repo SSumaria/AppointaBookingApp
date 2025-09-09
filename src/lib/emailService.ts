@@ -37,8 +37,8 @@ const sendEmail = async (params: EmailParams) => {
         subject: params.subject,
         html_content: params.html,
         text_content: params.html.replace(/<[^>]*>?/gm, ''), // Basic conversion from HTML to text
-        //sandbox: true,
-        //sandbox_result: 'deliver'
+        sandbox: true,
+        sandbox_result: 'deliver'
     };
 
     const options = {
@@ -79,7 +79,7 @@ const createStyledEmailHtml = (title: string, content: string): string => {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
           margin: 0; 
           padding: 0; 
-          background-color: #f8f9fa; /* A very light gray, similar to muted */
+          background-color: hsl(220, 14%, 96%); /* Light Gray Background */
         }
         .wrapper {
           padding: 20px;
@@ -89,13 +89,13 @@ const createStyledEmailHtml = (title: string, content: string): string => {
           max-width: 600px; 
           margin: 0 auto; 
           background-color: #ffffff; 
-          border: 1px solid #e2e8f0; /* Softer border */
+          border: 1px solid hsl(0, 0%, 89.8%); /* Border */
           border-radius: 0.5rem; /* Match app's border radius */
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
           overflow: hidden; 
         }
         .header { 
-          background-color: #2563eb; /* Primary blue */
+          background-color: hsl(211, 63%, 56%); /* Calming Blue */
           color: #ffffff; 
           padding: 24px; 
           text-align: center; 
@@ -107,12 +107,12 @@ const createStyledEmailHtml = (title: string, content: string): string => {
         }
         .content { 
           padding: 24px; 
-          color: #1f2937; /* Darker foreground text */
+          color: hsl(0, 0%, 3.9%); /* Foreground */
           line-height: 1.6; 
           font-size: 16px;
         }
         .content h2 { 
-          color: #2563eb; /* Primary blue */
+          color: hsl(211, 63%, 56%); /* Calming Blue */
           font-size: 20px; 
           font-weight: 600;
         }
@@ -121,22 +121,22 @@ const createStyledEmailHtml = (title: string, content: string): string => {
           padding: 0; 
         }
         .content li { 
-          background-color: #f8f9fa; 
+          background-color: hsl(220, 13%, 91%); /* Muted */
           margin-bottom: 8px; 
           padding: 12px 16px; 
-          border-left: 4px solid #2563eb; /* Primary blue accent */
+          border-left: 4px solid hsl(211, 63%, 56%); /* Primary blue accent */
           border-radius: 4px; 
         }
         .content li strong {
-          color: #111827; /* Even darker for emphasis */
+          color: hsl(0, 0%, 9%); /* Secondary Foreground */
         }
         .footer { 
           text-align: center; 
           padding: 20px; 
           font-size: 12px; 
-          color: #6b7280; /* Muted foreground */
-          background-color: #f8f9fa;
-          border-top: 1px solid #e2e8f0;
+          color: hsl(0, 0%, 45.1%); /* Muted Foreground */
+          background-color: hsl(220, 14%, 96%);
+          border-top: 1px solid hsl(0, 0%, 89.8%);
         }
         .footer img { 
           height: 32px; 
@@ -163,6 +163,7 @@ const createStyledEmailHtml = (title: string, content: string): string => {
 
 
 interface BookingEmailParams {
+    providerName: string;
     providerEmail: string;
     clientName: string;
     clientEmail: string;
@@ -171,12 +172,22 @@ interface BookingEmailParams {
     service: string;
 }
 
+interface UpdateEmailParams {
+    providerName: string;
+    providerEmail: string;
+    clientName: string;
+    clientEmail: string;
+    oldDetails: { date: string, time: string, service: string };
+    newDetails: { date: string, time: string, service: string };
+}
+
 export const emailService = {
-    sendConfirmationNotice: async ({ providerEmail, clientName, clientEmail, appointmentDate, appointmentTime, service }: BookingEmailParams) => {
-        const subject = `Appointment Confirmed: ${service} on ${appointmentDate}`;
-        const content = `
+    sendConfirmationNotice: async ({ providerName, providerEmail, clientName, clientEmail, appointmentDate, appointmentTime, service }: BookingEmailParams) => {
+        // --- For Client ---
+        const clientSubject = `Appointment Confirmed with ${providerName}`;
+        const clientContent = `
             <p>Hi ${clientName},</p>
-            <p>This is a confirmation for the following appointment:</p>
+            <p>This is a confirmation for your appointment with <strong>${providerName}</strong>:</p>
             <ul>
                 <li><strong>Service:</strong> ${service}</li>
                 <li><strong>Date:</strong> ${appointmentDate}</li>
@@ -184,41 +195,60 @@ export const emailService = {
             </ul>
             <p>We look forward to seeing you!</p>
         `;
-        const html = createStyledEmailHtml("Appointment Confirmed", content);
-        // Send to both provider and client
-        await sendEmail({ to: providerEmail, toName: "Service Provider", subject, html });
-        await sendEmail({ to: clientEmail, toName: clientName, subject, html });
-    },
-
-    sendCancellationNotice: async ({ providerEmail, clientName, clientEmail, appointmentDate, appointmentTime, service }: BookingEmailParams) => {
-        const subject = `Appointment Canceled: ${service} on ${appointmentDate}`;
-        const content = `
-             <p>Hi ${clientName},</p>
-            <p>This is a notification that the following appointment has been canceled:</p>
+        const clientHtml = createStyledEmailHtml("Appointment Confirmed", clientContent);
+        await sendEmail({ to: clientEmail, toName: clientName, subject: clientSubject, html: clientHtml });
+        
+        // --- For Provider ---
+        const providerSubject = `New Booking with ${clientName}`;
+        const providerContent = `
+            <p>Hi ${providerName},</p>
+            <p>You have a new booking from <strong>${clientName}</strong>:</p>
             <ul>
                 <li><strong>Service:</strong> ${service}</li>
                 <li><strong>Date:</strong> ${appointmentDate}</li>
                 <li><strong>Time:</strong> ${appointmentTime}</li>
             </ul>
         `;
-        const html = createStyledEmailHtml("Appointment Canceled", content);
-
-        // Send to both provider and client
-        await sendEmail({ to: providerEmail, toName: "Service Provider", subject, html });
-        await sendEmail({ to: clientEmail, toName: clientName, subject, html });
+        const providerHtml = createStyledEmailHtml("New Booking Notification", providerContent);
+        await sendEmail({ to: providerEmail, toName: providerName, subject: providerSubject, html: providerHtml });
     },
 
-    sendUpdateNotice: async ({ providerEmail, clientName, clientEmail, oldDetails, newDetails }: {
-        providerEmail: string;
-        clientName: string;
-        clientEmail: string;
-        oldDetails: { date: string, time: string, service: string };
-        newDetails: { date:string, time: string, service: string };
-    }) => {
-        const subject = `Appointment Updated: ${newDetails.service} on ${newDetails.date}`;
-        const content = `
+    sendCancellationNotice: async ({ providerName, providerEmail, clientName, clientEmail, appointmentDate, appointmentTime, service }: BookingEmailParams) => {
+        // --- For Client ---
+        const clientSubject = `Appointment Canceled with ${providerName}`;
+        const clientContent = `
+             <p>Hi ${clientName},</p>
+            <p>This is a notification that your appointment with <strong>${providerName}</strong> has been canceled:</p>
+            <ul>
+                <li><strong>Service:</strong> ${service}</li>
+                <li><strong>Date:</strong> ${appointmentDate}</li>
+                <li><strong>Time:</strong> ${appointmentTime}</li>
+            </ul>
+        `;
+        const clientHtml = createStyledEmailHtml("Appointment Canceled", clientContent);
+        await sendEmail({ to: clientEmail, toName: clientName, subject: clientSubject, html: clientHtml });
+
+        // --- For Provider ---
+        const providerSubject = `Canceled Booking with ${clientName}`;
+        const providerContent = `
+            <p>Hi ${providerName},</p>
+            <p>Your booking with <strong>${clientName}</strong> has been canceled:</p>
+             <ul>
+                <li><strong>Service:</strong> ${service}</li>
+                <li><strong>Date:</strong> ${appointmentDate}</li>
+                <li><strong>Time:</strong> ${appointmentTime}</li>
+            </ul>
+        `;
+        const providerHtml = createStyledEmailHtml("Booking Cancellation", providerContent);
+        await sendEmail({ to: providerEmail, toName: providerName, subject: providerSubject, html: providerHtml });
+    },
+
+    sendUpdateNotice: async ({ providerName, providerEmail, clientName, clientEmail, oldDetails, newDetails }: UpdateEmailParams) => {
+        // --- For Client ---
+        const clientSubject = `Appointment Updated with ${providerName}`;
+        const clientContent = `
             <p>Hi ${clientName},</p>
-            <p>This is a notification that your appointment has been updated.</p>
+            <p>Your appointment with <strong>${providerName}</strong> has been updated.</p>
             <h2>Previous Details:</h2>
             <ul>
                 <li><strong>Service:</strong> ${oldDetails.service}</li>
@@ -232,26 +262,28 @@ export const emailService = {
                 <li><strong>Time:</strong> ${newDetails.time}</li>
             </ul>
         `;
-        const html = createStyledEmailHtml("Appointment Updated", content);
+        const clientHtml = createStyledEmailHtml("Appointment Updated", clientContent);
+        await sendEmail({ to: clientEmail, toName: clientName, subject: clientSubject, html: clientHtml });
         
-        await sendEmail({ to: providerEmail, toName: "Service Provider", subject, html });
-        await sendEmail({ to: clientEmail, toName: clientName, subject, html });
-    },
-
-    sendReminder: async ({ providerEmail, clientName, clientEmail, appointmentDate, appointmentTime, service }: BookingEmailParams) => {
-        const subject = `Reminder: Your appointment for ${service} is tomorrow!`;
-        const content = `
-            <p>Hi ${clientName},</p>
-            <p>This is a friendly reminder for your upcoming appointment:</p>
+        // --- For Provider ---
+        const providerSubject = `Updated Booking with ${clientName}`;
+        const providerContent = `
+             <p>Hi ${providerName},</p>
+            <p>Your appointment with <strong>${clientName}</strong> has been updated.</p>
+            <h2>Previous Details:</h2>
             <ul>
-                <li><strong>Service:</strong> ${service}</li>
-                <li><strong>Date:</strong> ${appointmentDate}</li>
-                <li><strong>Time:</strong> ${appointmentTime}</li>
+                <li><strong>Service:</strong> ${oldDetails.service}</li>
+                <li><strong>Date:</strong> ${oldDetails.date}</li>
+                <li><strong>Time:</strong> ${oldDetails.time}</li>
             </ul>
-            <p>We look forward to seeing you!</p>
+            <h2>New Details:</h2>
+            <ul>
+                <li><strong>Service:</strong> ${newDetails.service}</li>
+                <li><strong>Date:</strong> ${newDetails.date}</li>
+                <li><strong>Time:</strong> ${newDetails.time}</li>
+            </ul>
         `;
-        const html = createStyledEmailHtml("Appointment Reminder", content);
-        await sendEmail({ to: providerEmail, toName: "Service Provider", subject, html });
-        await sendEmail({ to: clientEmail, toName: clientName, subject, html });
+        const providerHtml = createStyledEmailHtml("Booking Updated", providerContent);
+        await sendEmail({ to: providerEmail, toName: providerName, subject: providerSubject, html: providerHtml });
     },
 };

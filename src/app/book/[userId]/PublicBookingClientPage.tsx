@@ -448,6 +448,7 @@ export default function PublicBookingClientPage() {
             try {
                 const emailPayload = {
                     action: 'sendConfirmation',
+                    providerName: serviceProviderName || 'Your Provider',
                     providerEmail: serviceProviderEmail,
                     clientName: clientName,
                     clientEmail: clientEmail,

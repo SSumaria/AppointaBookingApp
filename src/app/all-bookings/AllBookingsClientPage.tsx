@@ -346,6 +346,7 @@ export default function AllBookingsClientPage() {
         try {
             const emailPayload = {
                 action: 'sendCancellation',
+                providerName: currentUser.displayName || 'Your Provider',
                 providerEmail: currentUser.email,
                 clientName: booking.ClientName || 'Valued Client',
                 clientEmail: booking.ClientEmail,
@@ -652,6 +653,7 @@ export default function AllBookingsClientPage() {
          try {
             const emailPayload = {
                 action: 'sendUpdate',
+                providerName: currentUser.displayName || 'Your Provider',
                 providerEmail: currentUser.email,
                 clientName: bookingToEdit.ClientName || 'Valued Client',
                 clientEmail: bookingToEdit.ClientEmail,
