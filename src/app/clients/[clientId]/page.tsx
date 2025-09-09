@@ -15,6 +15,9 @@ import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ref, get, query as rtQuery, orderByChild, equalTo, remove, update } from "firebase/database";
 import { db } from '@/lib/firebaseConfig';
 
@@ -28,8 +31,8 @@ interface Client {
   id: string;
   ClientID: string;
   ClientName: string;
-  ClientEmail?: string; // Added ClientEmail
-  ClientContact?: string; // This is primarily used for phone now
+  ClientEmail?: string; 
+  ClientContact?: string; 
   CreateDate: string;
   CreateTime: string;
   CreatedByUserID?: string;
@@ -49,12 +52,18 @@ interface Booking {
 }
 
 interface ProcessedNote {
-  id: string; // Note ID
+  id: string; 
   noteText: string;
   noteTimestamp: number;
   serviceProcedure: string;
-  appointmentDate: string; // Booking's appointment date
+  appointmentDate: string; 
   bookingId: string;
+}
+
+interface EditClientFormState {
+    ClientName: string;
+    ClientEmail: string;
+    ClientContact: string;
 }
 
 export default function ClientDetailsPage() {
@@ -70,6 +79,10 @@ export default function ClientDetailsPage() {
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
   const [allClientNotes, setAllClientNotes] = useState<ProcessedNote[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  const [isEditClientOpen, setIsEditClientOpen] = useState(false);
+  const [editClientForm, setEditClientForm] = useState<EditClientFormState | null>(null);
+  const [isSavingClient, setIsSavingClient] = useState(false);
 
 
   const fetchClientDetails = useCallback(async () => {
@@ -79,7 +92,13 @@ export default function ClientDetailsPage() {
       const clientRef = ref(db, `Clients/${currentUser.uid}/${clientId}`);
       const snapshot = await get(clientRef);
       if (snapshot.exists()) {
-        setClient({ id: snapshot.key, ...snapshot.val() } as Client);
+        const clientData = { id: snapshot.key, ...snapshot.val() } as Client;
+        setClient(clientData);
+        setEditClientForm({
+            ClientName: clientData.ClientName || '',
+            ClientEmail: clientData.ClientEmail || '',
+            ClientContact: clientData.ClientContact || ''
+        });
       } else {
         toast({
           title: "Client Not Found",
@@ -157,9 +176,7 @@ export default function ClientDetailsPage() {
         const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const appointmentDeletionPromises: Promise<any>[] = [];
 
-        // 1. Delete all associated appointments and their Google Calendar events
         for (const booking of bookings) {
-            // If there's a Google Calendar event, trigger its deletion.
             if (booking.googleEventId) {
                 const gcalSyncPromise = fetch('/api/google-calendar-sync', {
                     method: 'POST',
@@ -174,15 +191,12 @@ export default function ClientDetailsPage() {
                 appointmentDeletionPromises.push(gcalSyncPromise);
             }
             
-            // Add the database deletion for the appointment to the list.
             const appointmentRef = ref(db, `Appointments/${currentUser.uid}/${booking.id}`);
             appointmentDeletionPromises.push(remove(appointmentRef));
         }
         
-        // Execute all appointment-related deletions.
         await Promise.all(appointmentDeletionPromises);
 
-        // 2. Delete the client record itself
         const clientRef = ref(db, `Clients/${currentUser.uid}/${client.id}`);
         await remove(clientRef);
 
@@ -191,7 +205,6 @@ export default function ClientDetailsPage() {
             description: `${client.ClientName} and all their associated bookings have been permanently deleted.`,
         });
 
-        // 3. Redirect to the client search page
         router.push('/client-search');
 
     } catch (error: any) {
@@ -206,11 +219,40 @@ export default function ClientDetailsPage() {
     }
   };
 
+  const handleUpdateClient = async () => {
+    if (!currentUser?.uid || !client || !editClientForm) {
+        toast({ title: "Error", description: "Cannot update client. Missing required data.", variant: "destructive"});
+        return;
+    }
+
+    if (!editClientForm.ClientName.trim()) {
+        toast({ title: "Validation Error", description: "Client name cannot be empty.", variant: "destructive"});
+        return;
+    }
+
+    setIsSavingClient(true);
+    try {
+        const clientRef = ref(db, `Clients/${currentUser.uid}/${client.id}`);
+        const updates: Partial<Client> = {
+            ClientName: editClientForm.ClientName.trim(),
+            ClientEmail: editClientForm.ClientEmail.trim(),
+            ClientContact: editClientForm.ClientContact.trim(),
+        };
+        await update(clientRef, updates);
+        toast({ title: "Client Updated", description: "The client's details have been saved." });
+        setIsEditClientOpen(false);
+        fetchClientDetails(); // Re-fetch to update the view
+    } catch (error: any) {
+        console.error("Error updating client:", error);
+        toast({ title: "Update Failed", description: error.message, variant: "destructive" });
+    } finally {
+        setIsSavingClient(false);
+    }
+  };
+
     const handleEditNote = (noteId: string) => {
-        // Find the booking associated with this note to pass to the All Bookings page
         const bookingForNote = bookings.find(b => b.Notes?.some(n => n.id === noteId));
         if (bookingForNote) {
-            // Use query params to tell the bookings page to open the dialog for a specific booking and note
             router.push(`/all-bookings?openBooking=${bookingForNote.id}&editNote=${noteId}`);
         } else {
             toast({ title: "Error", description: "Could not find the booking associated with this note.", variant: "destructive" });
@@ -233,7 +275,6 @@ export default function ClientDetailsPage() {
         await update(ref(db, bookingRefPath), { Notes: updatedNotes });
         toast({ title: "Note Deleted", description: "The selected note has been deleted." });
 
-        // Refresh local data to reflect the change
         fetchClientBookings();
 
     } catch (error: any) {
@@ -269,7 +310,7 @@ export default function ClientDetailsPage() {
           });
         }
       });
-      notes.sort((a, b) => b.noteTimestamp - a.noteTimestamp); // Sort by most recent note
+      notes.sort((a, b) => b.noteTimestamp - a.noteTimestamp); 
       setAllClientNotes(notes);
     } else {
       setAllClientNotes([]);
@@ -328,16 +369,72 @@ export default function ClientDetailsPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
+        {/* Edit Client Dialog */}
+        <Dialog open={isEditClientOpen} onOpenChange={setIsEditClientOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Edit Client Details</DialogTitle>
+                    <DialogDescription>Update the information for {client.ClientName}.</DialogDescription>
+                </DialogHeader>
+                {editClientForm && (
+                    <div className="grid gap-4 py-4">
+                        <div>
+                            <Label htmlFor="editClientName">Client Name</Label>
+                            <Input
+                                id="editClientName"
+                                value={editClientForm.ClientName}
+                                onChange={(e) => setEditClientForm(prev => prev ? { ...prev, ClientName: e.target.value } : null)}
+                                className="mt-1"
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="editClientEmail">Client Email</Label>
+                            <Input
+                                id="editClientEmail"
+                                type="email"
+                                value={editClientForm.ClientEmail}
+                                onChange={(e) => setEditClientForm(prev => prev ? { ...prev, ClientEmail: e.target.value } : null)}
+                                className="mt-1"
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="editClientContact">Client Phone</Label>
+                            <Input
+                                id="editClientContact"
+                                type="tel"
+                                value={editClientForm.ClientContact}
+                                onChange={(e) => setEditClientForm(prev => prev ? { ...prev, ClientContact: e.target.value } : null)}
+                                className="mt-1"
+                            />
+                        </div>
+                    </div>
+                )}
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsEditClientOpen(false)}>Cancel</Button>
+                    <Button onClick={handleUpdateClient} disabled={isSavingClient}>
+                        {isSavingClient ? "Saving..." : "Save Changes"}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
       <main className="flex-grow py-10">
         <div className="container max-w-5xl mx-auto space-y-8">
           <Card className="shadow-xl">
             <CardHeader>
-              <CardTitle className="text-3xl font-bold flex items-center text-primary">
-                <User className="mr-3 h-8 w-8" /> {client.ClientName}
-              </CardTitle>
-              <CardDescription>
-                Detailed information and history for {client.ClientName}.
-              </CardDescription>
+              <div className="flex justify-between items-start">
+                    <div>
+                        <CardTitle className="text-3xl font-bold flex items-center text-primary">
+                            <User className="mr-3 h-8 w-8" /> {client.ClientName}
+                        </CardTitle>
+                        <CardDescription>
+                            Detailed information and history for {client.ClientName}.
+                        </CardDescription>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setIsEditClientOpen(true)}>
+                        <Edit className="mr-2 h-4 w-4" /> Edit Client
+                    </Button>
+                </div>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3">
@@ -348,7 +445,7 @@ export default function ClientDetailsPage() {
                     <span className="font-medium">Email:</span> {client.ClientEmail}
                   </p>
                 )}
-                {client.ClientContact && ( // ClientContact is now primarily phone
+                {client.ClientContact && ( 
                   <p className="flex items-center">
                     <Phone className="mr-2 h-5 w-5 text-primary/80" />
                     <span className="font-medium">Phone:</span> {client.ClientContact}
@@ -555,3 +652,4 @@ export default function ClientDetailsPage() {
     </div>
   );
 }
+
