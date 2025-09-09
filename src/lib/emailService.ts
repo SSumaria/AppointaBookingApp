@@ -1,5 +1,4 @@
 
-
 // This service integrates with the Aha Send API to send transactional emails.
 // It is called exclusively from the /api/send-email route.
 
@@ -37,8 +36,6 @@ const sendEmail = async (params: EmailParams) => {
         subject: params.subject,
         html_content: params.html,
         text_content: params.html.replace(/<[^>]*>?/gm, ''), // Basic conversion from HTML to text
-        sandbox: true,
-        sandbox_result: 'deliver'
     };
 
     const options = {
