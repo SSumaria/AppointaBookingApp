@@ -69,3 +69,30 @@ env:
       - BUILD
       - RUNTIME
 
+  # Securely load AHASEND_API_KEY from Secret Manager
+  - variable: AHASEND_API_KEY
+    secret: projects/588854791090/secrets/ahasend-api-key
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Securely load AHASEND_ACCOUNT_ID from Secret Manager
+  - variable: AHASEND_ACCOUNT_ID
+    secret: projects/588854791090/secrets/ahasend-account-id
+    availability:
+      - BUILD
+      - RUNTIME
+    
+  # Securely load AHASEND_FROM_EMAIL from Secret Manager
+  - variable: AHASEND_FROM_EMAIL
+    value: noreply@appointa.pro
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Securely load AHASEND_FROM_NAME from Secret Manager
+  - variable: AHASEND_FROM_NAME
+    value: Appointa
+    availability:
+      - BUILD
+      - RUNTIME
