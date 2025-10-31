@@ -71,7 +71,7 @@ env:
 
   # Securely load AHASEND_API_KEY from Secret Manager
   - variable: AHASEND_API_KEY
-    secret: projects/588854791090/secrets/ahasend-api-key
+    secret: projects/588854791090/secrets/ahasend-api-key-new
     availability:
       - BUILD
       - RUNTIME
