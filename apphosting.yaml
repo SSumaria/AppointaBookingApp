@@ -69,6 +69,12 @@ env:
       - BUILD
       - RUNTIME
 
+  - variable: GOOGLE_API_KEY
+    secret: projects/588854791090/secrets/google_api_key_ai_transcription
+    availability:
+      - BUILD
+      - RUNTIME
+
   # Securely load AHASEND_API_KEY from Secret Manager
   - variable: AHASEND_API_KEY
     secret: projects/588854791090/secrets/ahasend-api-key-new
